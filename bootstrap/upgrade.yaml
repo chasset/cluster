@@ -1,0 +1,7 @@
+# code: language=ansible
+- name: Install Kubernetes
+  hosts:
+    - cloud
+    - vm
+  roles:
+    - upgrade-os

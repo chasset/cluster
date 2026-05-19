@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://json.schemastore.org/yamllint.json
+
+extends: default
+
+rules:
+  line-length:
+    max: 160
+    level: warning
+  truthy:
+    # Kubernetes manifests sometimes use 'on' as a key name
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  document-start: disable
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+ignore: |
+  node_modules/
+  pnpm-lock.yaml
+  storage/ceph/crds.yaml
+  storage/ceph/operator.yaml
+  storage/ceph/common.yaml
+  storage/ceph/dashboard.yaml
+  storage/ceph/cluster.yaml
+  storage/ceph/toolbox.yaml

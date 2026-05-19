@@ -1,0 +1,7 @@
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: reddit
+spec:
+  bucketName: reddit
+  storageClassName: rook-ceph-datalake

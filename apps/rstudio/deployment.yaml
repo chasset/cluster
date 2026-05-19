@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rstudio-deployment
+  namespace: rstudio
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rstudio
+  template:
+    metadata:
+      labels:
+        app: rstudio
+    spec:
+      containers:
+        - name: rstudio
+          image: rocker/geospatial
+          ports:
+            - containerPort: 8787
+          env:
+            - name: DISABLE_AUTH
+              value: 'true'
+          resources:
+            requests:
+              memory: '2Gi'
+              cpu: '500m'
+            limits:
+              memory: '40Gi'
+              cpu: '10'
+          volumeMounts:
+            - mountPath: '/home/rstudio/workspace'
+              name: rstudio-storage
+      volumes:
+        - name: rstudio-storage
+          persistentVolumeClaim:
+            claimName: rstudio-pvc

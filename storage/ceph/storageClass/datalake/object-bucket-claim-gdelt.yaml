@@ -1,0 +1,8 @@
+apiVersion: objectbucket.io/v1alpha1
+kind: ObjectBucketClaim
+metadata:
+  name: gdelt
+  namespace: rook-ceph
+spec:
+  bucketName: gdelt
+  storageClassName: rook-ceph-datalake

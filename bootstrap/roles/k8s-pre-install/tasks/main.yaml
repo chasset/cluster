@@ -1,0 +1,119 @@
+# code: language=ansible
+# Following protocol https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
+- name: Machines have all the same stable operating system, suitable for k8s
+  ansible.builtin.assert:
+    that: ansible_distribution == 'Debian' and ansible_distribution_version ==
+      '12.11'
+    fail_msg: 'The distribution {{ ansible_distribution }} {{
+      ansible_distribution_version }} installed on {{ ansible_hostname }} isn’t
+      allowed.'
+
+- name: Machine characteristics suit k8s
+  block:
+    - name: Each machine has at least 2 Gb of RAM
+      ansible.builtin.assert:
+        that: ansible_memory_mb.real.total >= 2048
+        fail_msg: '{{ ansible_hostname }} hasn’t enough RAM: only {{
+          ansible_memory_mb.real.total }} Mb detected.'
+
+    - name: Each machine have at least 2 CPUs
+      ansible.builtin.assert:
+        that: ansible_processor_vcpus >= 2
+        fail_msg: '{{ ansible_hostname }} hasn’t enough CPU: only {{
+          ansible_processor_vcpus }} CPU detected.'
+
+- name: Full network connectivity between all machines in the cluster (public or
+    private network is fine) # noqa: ignore-errors
+  ansible.builtin.fail:
+    msg: Not implemented
+  when: true
+  ignore_errors: true
+  run_once: true
+
+- name: Machine hostnames are unique in the cluster
+  block:
+    - name: Gather hostnames
+      ansible.builtin.set_fact:
+        all_hostnames: "{{ ansible_play_hosts_all | map('extract', hostvars,
+          'ansible_hostname') | list }}"
+
+    - name: Print hostnames
+      run_once: true
+      ansible.builtin.debug:
+        msg: '{{ all_hostnames }}'
+
+    - name: Hostnames are unique
+      run_once: true
+      ansible.builtin.assert:
+        that: all_hostnames | length == all_hostnames | unique | length
+        fail_msg: 'At least 2 machines have the same hostname: {{ all_hostnames |
+          difference(all_hostnames | unique) }}'
+
+- name: Machine MAC adresses are unique in the cluster # noqa: ignore-errors
+  ansible.builtin.fail:
+    msg: Not applicable
+  when: true
+  ignore_errors: true
+  run_once: true
+
+- name: Machine UUIDs are unique in the cluster
+  block:
+    - name: Get UUID from each machine
+      become: true
+      become_method: ansible.builtin.sudo
+      ansible.builtin.command: cat /sys/class/dmi/id/product_uuid
+      register: uuid
+      changed_when: false
+
+    - name: Build UUID list
+      ansible.builtin.set_fact:
+        uuids: "{{ ansible_play_hosts | map('extract', hostvars, 'uuid') |
+          map(attribute='stdout') | list }}"
+
+    - name: Print UUIDs
+      run_once: true
+      ansible.builtin.debug:
+        msg: '{{ uuids }}'
+
+    - name: UUIDs are unique
+      run_once: true
+      ansible.builtin.assert:
+        that: uuids | length == uuids | unique | length
+        fail_msg: 'At least 2 machines have the same UUID: {{ uuids | difference(uuids |
+          unique) }}'
+
+- name: Certain ports are open # noqa: ignore-errors
+  ansible.builtin.fail:
+    msg: Not implemented
+  when: true
+  ignore_errors: true
+  run_once: true
+
+- name: Check network adaptaters # noqa: ignore-errors
+  ansible.builtin.fail:
+    msg: Not implemented
+  when: true
+  ignore_errors: true
+  run_once: true
+
+- name: Check required ports # noqa: ignore-errors
+  ansible.builtin.fail:
+    msg: Not implemented
+  when: true
+  ignore_errors: true
+  run_once: true
+
+- name: Swap is off
+  become: true
+  become_method: ansible.builtin.sudo
+  block:
+    - name: Gather facts on SWAP
+      ansible.builtin.command: swapon --show
+      register: output_swapon
+      changed_when: false
+
+    - name: SWAP is disabled
+      ansible.builtin.debug:
+        msg: '{{ output_swapon.stdout }}'
+      when: output_swapon.stdout == ""
+      notify: Disable swap

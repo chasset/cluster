@@ -1,0 +1,30 @@
+{
+  "name": "cluster",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Kubernetes cluster manifests, playbooks and runbooks",
+  "author": {
+    "name": "Pierre-Olivier Chasset",
+    "email": "pierre-olivier.chasset@univ-lehavre.fr"
+  },
+  "license": "MIT",
+  "scripts": {
+    "format": "prettier --write \"**/*.{yaml,yml,md,json}\"",
+    "format:check": "prettier --check \"**/*.{yaml,yml,md,json}\"",
+    "lint:yaml": "yamllint .",
+    "lint:shell": "find . -name '*.sh' -not -path './node_modules/*' -not -path './.git/*' -print0 | xargs -0 shellcheck",
+    "lint:k8s": "find . -name '*.yaml' -not -path './bootstrap/*' -not -path './apps/jupyter/config.yaml' -not -path './node_modules/*' -not -path './.git/*' -print0 | xargs -0 kubeconform -strict -ignore-missing-schemas -schema-location default -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json'",
+    "lint:ansible": "ansible-lint bootstrap/",
+    "lint": "npm run format:check && npm run lint:yaml && npm run lint:shell",
+    "release": "commit-and-tag-version",
+    "release:dry": "commit-and-tag-version --dry-run",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^21.0.0",
+    "@commitlint/config-conventional": "^21.0.0",
+    "commit-and-tag-version": "^12.5.0",
+    "lefthook": "^2.0.0",
+    "prettier": "^3.3.0"
+  }
+}

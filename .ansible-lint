@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible-lint-config.json
+
+profile: production
+
+exclude_paths:
+  - .git/
+  - .github/
+  - node_modules/
+  - storage/
+  - platform/
+  - apps/
+
+# Ansible playbooks live under bootstrap/ — these files are not Ansible content.
+kinds:
+  - playbook: 'bootstrap/*.yaml'
+  - tasks: 'bootstrap/roles/*/tasks/*.yaml'
+  - handlers: 'bootstrap/roles/*/handlers/*.yaml'

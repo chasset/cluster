@@ -1,0 +1,24 @@
+# Node
+node_modules/
+
+# macOS
+.DS_Store
+
+# Editors
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+secrets/
+
+# Temp
+tmp/
+*.tmp

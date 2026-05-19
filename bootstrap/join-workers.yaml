@@ -1,0 +1,8 @@
+- name: Cluster initialization from one control-plane node
+  hosts: control
+  roles:
+    - k8s-pre-join
+- name: Workers join the cluster
+  hosts: workers
+  roles:
+    - k8s-join-cluster

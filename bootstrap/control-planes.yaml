@@ -1,0 +1,5 @@
+# code: language=ansible
+- name: Install Kubernetes
+  hosts: control
+  roles:
+    - k8s-control-plane-nodes

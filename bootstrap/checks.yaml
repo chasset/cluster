@@ -1,0 +1,5 @@
+# code: language=ansible
+- name: Install Kubernetes
+  hosts: cloud
+  roles:
+    - k8s-pre-install

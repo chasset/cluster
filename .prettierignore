@@ -1,0 +1,12 @@
+# Vendored upstream Rook manifests
+storage/ceph/crds.yaml
+storage/ceph/operator.yaml
+storage/ceph/common.yaml
+storage/ceph/dashboard.yaml
+storage/ceph/cluster.yaml
+storage/ceph/toolbox.yaml
+
+# Common
+node_modules/
+package-lock.json
+pnpm-lock.yaml
