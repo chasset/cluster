@@ -106,8 +106,11 @@ Procédure dans l’installateur Debian (partitionnement **manuel**) :
 1. À l’étape « Partitionner les disques », choisir **Manuel**.
 2. Sélectionner le disque de boot (~447 GiB) → créer une **nouvelle table de
    partitions** vide (GPT).
-3. Créer la partition **EFI** : 512 Mo, usage « Partition système EFI », point
-   de montage `/boot/efi`.
+3. Créer la partition **EFI** : 512 Mo, usage **« Partition système EFI »**.
+   L'installateur la monte automatiquement sur `/boot/efi` (il ne demande pas de
+   point de montage : c'est normal) et pose le bon type GPT. **Aucun drapeau
+   d'amorçage à activer** — le « bootable flag » est un concept MBR, inutile en
+   UEFI.
 4. Créer **`/boot`** : 1 Go, `ext4`, point de montage `/boot`.
 5. Créer une partition occupant **tout l’espace restant**, usage « volume
    physique pour LVM ».
