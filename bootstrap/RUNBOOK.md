@@ -1,7 +1,7 @@
 # Runbook — Installation de Kubernetes
 
 Procédure complète d'installation d'un cluster Kubernetes à partir de serveurs
-Debian Bookworm, depuis la préparation OS jusqu'à la jonction des workers.
+Debian Trixie (13), depuis la préparation OS jusqu'à la jonction des workers.
 
 ## Préparation des serveurs
 
@@ -71,14 +71,67 @@ nvme1n1                 259:5    0   2,9T  0 disk
 
 ### Installation du système d’exploitation
 
-Pour installer le système d’exploitation, utilisez l’image Debian Bookworm
-(12.0) et suivez les instructions suivantes :
+Pour installer le système d’exploitation, utilisez l’image Debian Trixie (13) et
+suivez les instructions suivantes :
 
-1. **Téléchargez l’image ISO** de Debian Bookworm (12.0) depuis le site
-   officiel.
+1. **Téléchargez l’image ISO** de Debian Trixie (13) depuis le site officiel.
 2. **Attachez l’image ISO** à la machine virtuelle ou au serveur physique.
 3. **Démarrez l’installation** en sélectionnant l’image ISO comme périphérique
    de démarrage.
+
+### Partitionnement du disque de démarrage
+
+> Ne concerne **que** le disque de démarrage (miroir NVMe HPE NS204i-p, ~447
+> GiB). Les **12 HDD SAS 5,5 TiB et le NVMe `nvme1n1` 2,9 TiB restent bruts, non
+> partitionnés** : ils sont consommés directement par Ceph (voir
+> [`storage/ceph/cluster.yaml`](../storage/ceph/cluster.yaml)). Ne jamais créer
+> de partition dessus.
+
+Le défaut d’usine (`/home` = 404 G, `/var` = 9 G) étouffe `/var`, qui héberge
+`containerd`, les logs, `/var/lib/rook` et `/var/lib/etcd`. On repartitionne
+donc le disque de boot ainsi (control plane `dirqual1`) :
+
+| Partition / LV | Taille   | Montage         | FS    | Rôle                                                                |
+| -------------- | -------- | --------------- | ----- | ------------------------------------------------------------------- |
+| ESP            | 512 MiB  | `/boot/efi`     | FAT32 | amorçage EFI                                                        |
+| `boot`         | 1 GiB    | `/boot`         | ext4  | noyaux + initramfs (marge Debian 13)                                |
+| `lv_root`      | 40 GiB   | `/`             | ext4  | OS, `/usr`, paquets                                                 |
+| `lv_etcd`      | 10 GiB   | `/var/lib/etcd` | ext4  | isole etcd (control plane) : I/O dédiées, protégé d’un `/var` plein |
+| `lv_var`       | ~360 GiB | `/var`          | ext4  | `containerd`, `kubelet`, `/var/log`, `/var/lib/rook` (mon)          |
+| (libre)        | ~30 GiB  | —               | —     | extents LVM libres : snapshots / marge                              |
+| swap           | —        | —               | —     | **aucun** (Kubernetes refuse le swap actif)                         |
+
+Procédure dans l’installateur Debian (partitionnement **manuel**) :
+
+1. À l’étape « Partitionner les disques », choisir **Manuel**.
+2. Sélectionner le disque de boot (~447 GiB) → créer une **nouvelle table de
+   partitions** vide (GPT).
+3. Créer la partition **EFI** : 512 Mo, usage « Partition système EFI », point
+   de montage `/boot/efi`.
+4. Créer **`/boot`** : 1 Go, `ext4`, point de montage `/boot`.
+5. Créer une partition occupant **tout l’espace restant**, usage « volume
+   physique pour LVM ».
+6. Entrer dans « Configurer le gestionnaire de volumes logiques (LVM) » :
+   - créer le groupe de volumes **`dirqual1-vg`** sur ce volume physique ;
+   - y créer les volumes logiques : **`root` 40 Go**, **`var` 360 Go**, **`etcd`
+     10 Go** ; **laisser ~30 Go non alloués** dans le VG.
+7. De retour dans le partitionnement, formater et monter chaque LV :
+   - `root` → `/` en `ext4` ;
+   - `var` → `/var` en `ext4` ;
+   - `etcd` → `/var/lib/etcd` en `ext4` (l’installateur ordonne les montages
+     imbriqués automatiquement).
+8. **Ne pas créer de partition d’échange (swap).**
+9. « Terminer le partitionnement » et appliquer les changements.
+
+Post-installation, monter `/tmp` en **tmpfs** (RAM) plutôt qu’en LV :
+
+```bash
+sudo systemctl enable --now tmp.mount
+```
+
+> **Workers `dirqual2-4`** : layout identique, sauf que `lv_etcd` est inutile
+> (pas de control plane) → réaffecter ses 10 Go à `var`, ou conserver la même
+> recette pour l’uniformité (la LV reste alors simplement inutilisée).
 
 ### Accès SSH par clef asymétrique
 
