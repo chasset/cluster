@@ -1,7 +1,7 @@
 # Runbook — Installation de Kubernetes
 
 Procédure complète d'installation d'un cluster Kubernetes à partir de serveurs
-Debian Trixie (13), depuis la préparation OS jusqu'à la jonction des workers.
+Debian Bookworm (12), depuis la préparation OS jusqu'à la jonction des workers.
 
 ## Préparation des serveurs
 
@@ -71,10 +71,10 @@ nvme1n1                 259:5    0   2,9T  0 disk
 
 ### Installation du système d’exploitation
 
-Pour installer le système d’exploitation, utilisez l’image Debian Trixie (13) et
-suivez les instructions suivantes :
+Pour installer le système d’exploitation, utilisez l’image Debian Bookworm (12)
+et suivez les instructions suivantes :
 
-1. **Téléchargez l’image ISO** de Debian Trixie (13) depuis le site officiel.
+1. **Téléchargez l’image ISO** de Debian Bookworm (12) depuis le site officiel.
 2. **Attachez l’image ISO** à la machine virtuelle ou au serveur physique.
 3. **Démarrez l’installation** en sélectionnant l’image ISO comme périphérique
    de démarrage.
@@ -94,7 +94,7 @@ donc le disque de boot ainsi (control plane `dirqual1`) :
 | Partition / LV | Taille   | Montage         | FS    | Rôle                                                                |
 | -------------- | -------- | --------------- | ----- | ------------------------------------------------------------------- |
 | ESP            | 512 MiB  | `/boot/efi`     | FAT32 | amorçage EFI                                                        |
-| `boot`         | 1 GiB    | `/boot`         | ext4  | noyaux + initramfs (marge Debian 13)                                |
+| `boot`         | 1 GiB    | `/boot`         | ext4  | noyaux + initramfs (marge Debian 12)                                |
 | `lv_root`      | 40 GiB   | `/`             | ext4  | OS, `/usr`, paquets                                                 |
 | `lv_etcd`      | 10 GiB   | `/var/lib/etcd` | ext4  | isole etcd (control plane) : I/O dédiées, protégé d’un `/var` plein |
 | `lv_var`       | ~360 GiB | `/var`          | ext4  | `containerd`, `kubelet`, `/var/log`, `/var/lib/rook` (mon)          |

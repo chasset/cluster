@@ -1,14 +1,14 @@
 # code: language=ansible
 # Following https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/
-- name: Machines run a supported, homogeneous operating system (Debian 13)
+- name: Machines run a supported, homogeneous operating system (Debian 12)
   ansible.builtin.assert:
     that:
       - ansible_distribution == 'Debian'
-      - ansible_distribution_major_version == '13'
+      - ansible_distribution_major_version == '12'
     fail_msg: >-
       The distribution {{ ansible_distribution }}
       {{ ansible_distribution_version }} on {{ ansible_hostname }} is not
-      supported (Debian 13 / Trixie required).
+      supported (Debian 12 / Bookworm required).
 
 - name: Machine characteristics suit Kubernetes
   block:

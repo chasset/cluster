@@ -52,16 +52,38 @@
           - gpg
         state: present
 
-    # Debian 13 ships a recent containerd; use the distribution package instead
-    # of the Docker repository (one less external dependency, no extra keyring).
-    - name: Install the container runtime (containerd)
-      ansible.builtin.apt:
-        name: containerd
+    # Debian 12 ships only containerd 1.6.x (deprecated by recent Kubernetes),
+    # so install containerd.io from the Docker repository (1.7.x/2.x).
+    - name: Ensure the APT keyrings directory exists
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download the Docker GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Add the Docker repository
+      ansible.builtin.apt_repository:
+        repo: >-
+          deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }}
+          signed-by=/etc/apt/keyrings/docker.asc]
+          https://download.docker.com/linux/debian
+          {{ ansible_distribution_release }} stable
         state: present
         update_cache: true
 
-    # The Debian package ships a minimal config.toml without a SystemdCgroup
-    # line, so generate the full default and force the systemd cgroup driver.
+    - name: Install the container runtime (containerd.io)
+      ansible.builtin.apt:
+        name: containerd.io
+        state: present
+        update_cache: true
+
+    # containerd.io ships a config.toml that disables the CRI plugin, so
+    # generate the full default and force the systemd cgroup driver.
     - name: Generate the default containerd configuration
       ansible.builtin.command: containerd config default
       register: containerd_default
