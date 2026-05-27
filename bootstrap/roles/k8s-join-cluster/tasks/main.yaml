@@ -3,14 +3,14 @@
   become: true
   become_method: ansible.builtin.sudo
   block:
-    - name: Test if primary control plane is reacheable
+    - name: Wait for the primary control plane API to be reachable
       ansible.builtin.wait_for:
-        host: "{{ hostvars['dirqual1']['ansible_default_ipv4']['address'] }}"
-        port: 6443
-        timeout: 1
+        host: "{{ hostvars[groups['control'][0]].ansible_default_ipv4.address }}"
+        port: '{{ control_plane_port }}'
+        timeout: 30
 
     - name: Join the cluster
-      ansible.builtin.shell: "{{ hostvars['dirqual1'].join_command }} >> node-joined.log"
+      ansible.builtin.shell: "{{ hostvars[groups['control'][0]].join_command }} >> node-joined.log"
       args:
         chdir: /home/debian
         creates: node-joined.log

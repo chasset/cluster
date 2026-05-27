@@ -54,3 +54,10 @@
         daemon_reload: true
         enabled: true
         state: started
+
+    - name: Map the control-plane endpoint to the primary control-plane node
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '\s{{ control_plane_endpoint }}$'
+        line: "{{ hostvars[groups['control'][0]].ansible_default_ipv4.address }} {{ control_plane_endpoint }}"
+        state: present
