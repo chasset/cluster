@@ -12,6 +12,7 @@ exclude_paths:
 
 # Ansible playbooks live under bootstrap/ — these files are not Ansible content.
 kinds:
+  - inventory: 'bootstrap/hosts.yaml'
   - playbook: 'bootstrap/*.yaml'
   - tasks: 'bootstrap/roles/*/tasks/*.yaml'
   - handlers: 'bootstrap/roles/*/handlers/*.yaml'

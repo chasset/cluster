@@ -25,6 +25,7 @@
         remote_src: true
         dest: /home/debian/.kube/config
         owner: debian
+        mode: '0600'
 
     # - name: Install CNI
     #   ansible.builtin.shell:
