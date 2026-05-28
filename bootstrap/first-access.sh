@@ -52,7 +52,7 @@ for h in "${hosts[@]}"; do
 
     # (2) sudo NOPASSWD + durcissement sshd via drop-ins.
     #     Dernier passage où sudo demande un mot de passe.
-    ssh -t "$USER_REMOTE@$h" "sudo bash -s" <<'REMOTE'
+    ssh -tt "$USER_REMOTE@$h" "sudo bash -s" <<'REMOTE'
 set -euo pipefail
 
 install -m 0440 /dev/stdin /etc/sudoers.d/90-debian-nopasswd <<'SUDOERS'
