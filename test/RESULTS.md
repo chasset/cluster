@@ -121,24 +121,70 @@ done
   `10.67.2.X` directement (les nœuds n'ont qu'une interface cluster, pas de NAT
   séparé).
 
-### 🟡 4 — INTERNAL-IP du kubelet = NAT (banc-only)
+### 🔴 4 — INTERNAL-IP du kubelet = NAT (corrigé)
 
-**Symptôme** : `kubectl get nodes -o wide` montre `INTERNAL-IP=10.0.2.15` sur
-les 3 VMs. Cilium agent sur les workers reste en `Init:0/6` car il ne peut pas
-joindre l'API service via NAT.
+**Symptôme** : `kubectl get nodes -o wide` montrait `INTERNAL-IP=10.0.2.15`
+(NAT) sur les 3 VMs. Cilium agent sur les workers restait en `Init:0/6` car il
+ne pouvait pas joindre l'API service via NAT.
 
 **Cause** : kubelet annonce par défaut son `default_ipv4`, qui est le NAT sur le
-banc.
+banc multi-VM.
 
-**Statut** : drift **non corrigé dans ce test** — bloque Phase 3+ sur le banc
-multi-node arm64. Pas un bug du dépôt (la prod a une IP cluster directe sur
-eth0, pas de NAT). Pour fixer sur le banc : poser
-`KUBELET_EXTRA_ARGS=--node-ip=10.67.2.X` dans `/etc/default/kubelet` sur chaque
-VM, ou enrichir le rôle `k8s-install` pour pousser un `KubeletConfiguration`
-paramétré.
+**Correctifs appliqués** :
 
-**Suggestion** : à intégrer comme **drift #5 corrigé** lors du prochain test,
-après ajout d'une variable `kubelet_node_ip` analogue à `control_plane_ip`.
+- Nouvelle variable `kubelet_node_ip` (optionnelle) ajoutée au rôle
+  [`k8s-install`](../bootstrap/roles/k8s-install/tasks/main.yaml). Pose
+  `/etc/default/kubelet KUBELET_EXTRA_ARGS=--node-ip=<ip>` + handler
+  `Restart kubelet`.
+- [`test/multi-node/inventory.yaml`](multi-node/inventory.yaml) pose la variable
+  par host (192.168.67.X).
+- Sans la variable (prod) → kubelet détecte l'IP de l'interface cluster unique.
+
+### 🔴 #6 — Collision réseau prod ↔ banc (critique, fixé)
+
+**Symptôme** : pendant le test, l'utilisateur n'arrivait plus à se connecter au
+serveur prod `dirqual1` (10.67.2.11). `ssh-keyscan` montrait une clé hôte
+ED25519 différente de celle stockée dans `~/.ssh/known_hosts`.
+
+**Cause** : le banc multi-node avait été configuré sur **la même plage IP que la
+prod** (`10.67.2.0/24`). VirtualBox crée une interface host-only sur cette plage
+→ toutes les routes locales `10.67.2.X` partent vers les VMs du banc, capturant
+tout SSH vers les vrais serveurs.
+
+```text
+# bridge100 (interface host-only VBox sur la plage prod) :
+bridge100: inet 10.67.2.1 netmask 0xffffff00
+# Route locale :
+10.67.2.11    8.0.27.3c.ba.c7    UHLWIi  bridge100    # = VM banc, pas prod
+```
+
+**Impact opérationnel** : tant que le banc tournait, l'utilisateur perdait
+l'accès SSH aux 4 serveurs prod. À la limite du sabotage involontaire.
+
+**Correctifs appliqués** :
+
+1. **Plage banc déplacée** sur `192.168.67.0/24` — disjointe de toute prod
+   possible. Plage `192.168.0.0/16` autorisée par défaut par VBox → plus de
+   `networks.conf` nécessaire.
+2. **Pre-flight dans le Vagrantfile** : refuse le `vagrant up` si une interface
+   VBox host-only existe encore sur la plage prod (10.67.2.x), signe d'un ancien
+   banc non nettoyé.
+3. Documentation dans `SAFEGUARDS.md` (règle d'isolation banc/prod) et
+   `test/multi-node/README.md`.
+
+**Règle d'or pour éviter à l'avenir** :
+
+> La plage IP du banc DOIT être disjointe de toute plage de production
+> accessible depuis le poste de contrôle. Si le poste route vers la prod via
+> VPN, switch, Wi-Fi université, etc., toute IP banc qui overlap capture les
+> routes locales.
+
+Vérifier avant un `up` :
+
+```bash
+netstat -rn | grep <plage-prod>                              # routes locales
+VBoxManage list hostonlyifs | grep -E 'Name|IPAddress'       # interfaces VBox
+```
 
 ### 🟢 5 — `vagrant ssh` se connecte comme `vagrant` (kubeconfig manquant)
 
@@ -163,10 +209,12 @@ corrigés (drift #4 reste un gap banc-arm64-only, sans impact prod).
 `audit-log`, `rollback.yaml` (avec confirm=yes), `state.sh` couches 0-3b,
 variable `control_plane_ip` partagée par 3 rôles.
 
-⚠️ **Phase 3-5 non testées sur le banc** : bloquées par le drift #4 (INTERNAL-IP
-NAT). À refaire après ajout d'une variable `kubelet_node_ip`.
+⚠️ **Phase 3-5 non testées sur le banc** : bloquées initialement par le drift #4
+(INTERNAL-IP NAT), corrigé via la variable `kubelet_node_ip` ; à refaire après
+le redéploiement banc sur la plage `192.168.67.0/24`.
 
-✅ **Aucun bug bloquant côté prod** — les 5 drifts détectés sont soit
-(0a/0b/0c/5) propres au banc Vagrant arm64, soit (#3) un fix généralisé qui rend
-les rôles compatibles avec un réseau multi-IP sans surcharger la prod (variable
-optionnelle).
+✅ **Aucun bug bloquant côté prod** — les 6 drifts détectés sont soit
+(0a/0b/0c/5) propres au banc Vagrant arm64, soit (#3/#4) des fixes généralisés
+qui rendent les rôles compatibles avec un réseau multi-IP sans surcharger la
+prod (variables optionnelles), soit (#6) une erreur de conception du banc qui a
+corrigée la plage IP.

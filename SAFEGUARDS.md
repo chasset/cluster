@@ -81,12 +81,34 @@ toucher les serveurs.
 
 ### [`test/multi-node/`](test/multi-node/) — validation complète (15 min)
 
-3 VMs Debian 13 arm64 + réseau privé `10.67.2.0/24` + 3 disques HDD virtuels + 1
-disque "NVMe" par VM. Couvre **Phase 1-5** : bootstrap, join-workers, Rook-Ceph,
-StorageClasses, workloads applicatifs.
+3 VMs Debian 13 arm64 + réseau privé `192.168.67.0/24` + 3 disques HDD virtuels
+
+- 1 disque "NVMe" par VM. Couvre **Phase 1-5** : bootstrap, join-workers,
+  Rook-Ceph, StorageClasses, workloads applicatifs.
 
 **Toujours valider sur multi-node avant la prod** — c'est le seul endroit où le
 multi-VM et les disques Ceph sont exercés.
+
+#### Règle d'isolation banc ↔ prod
+
+> **La plage IP du banc DOIT être disjointe de toute plage de production
+> accessible depuis le poste de contrôle.**
+
+Si le banc et la prod partagent une plage IP (cas vécu : `10.67.2.0/24` des deux
+côtés), VirtualBox crée une interface host-only sur cette plage et **capture
+toutes les routes locales** vers les vrais serveurs → on perd l'accès SSH à la
+prod tant que le banc tourne. Cf.
+[drift #6 dans test/RESULTS.md](test/RESULTS.md).
+
+Garde-fous en place :
+
+- **Plage banc** : `192.168.67.0/24` (disjointe de prod `10.67.2.0/22`).
+- **Pre-flight Vagrantfile**
+  ([test/multi-node/Vagrantfile](test/multi-node/Vagrantfile)) : refuse
+  `vagrant up` si VBox a déjà une interface host-only sur la plage prod (signe
+  d'un ancien banc non nettoyé).
+- À vérifier manuellement avant un cycle : `netstat -rn | grep 10.67.2` +
+  `VBoxManage list hostonlyifs | grep IPAddress`.
 
 ## Vérifications en place sur les nœuds
 

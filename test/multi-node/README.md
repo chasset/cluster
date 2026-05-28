@@ -1,9 +1,15 @@
 # Banc multi-nœuds (Phase 1-5 + Ceph)
 
 3 VMs Debian 13 arm64 reproduisant la topologie de prod à l'échelle : 1 control
-plane (`dirqual1`) + 2 workers (`dirqual2-3`), réseau privé `10.67.2.0/24`,
+plane (`dirqual1`) + 2 workers (`dirqual2-3`), réseau privé `192.168.67.0/24`,
 chaque VM dotée de **3 HDD virtuels + 1 NVMe virtuel** pour exercer Rook-Ceph
 (OSDs, block.db, quorum mon).
+
+> ⚠️ **Plage IP volontairement disjointe de la prod (10.67.2.0/22)** : le banc
+> utilise `192.168.67.0/24` pour éviter qu'une interface VBox host-only capture
+> les routes locales vers les vrais serveurs (cf.
+> [drift #6 dans RESULTS.md](../RESULTS.md)). Un pre-flight dans le Vagrantfile
+> refuse le `up` si la collision est détectée.
 
 > Pour un cycle rapide Phase 1-2 uniquement (sans Ceph), préférer le
 > [banc mono-nœud](../single-node/) qui démarre en quelques minutes.
@@ -37,18 +43,10 @@ Réserves :
 | Vagrant    | ≥ 2.4.9  | `brew install --cask hashicorp/tap/hashicorp-vagrant` |
 | Ansible    | ≥ 2.20.5 | `brew install ansible`                                |
 
-**Réseau host-only à autoriser** : VirtualBox bloque par défaut tout réseau
-host-only hors `192.168.x.x`. Pour utiliser `10.67.2.0/24` (fidèle à la prod),
-ajouter une fois pour toutes :
-
-```bash
-sudo tee -a /etc/vbox/networks.conf <<'EOF'
-* 10.67.2.0/22
-EOF
-```
-
-(Le chemin peut être `~/Library/VirtualBox/networks.conf` sur macOS récent ;
-VBox lit les deux. La syntaxe `* 10.67.2.0/22` autorise toute la plage.)
+**Pas de configuration `/etc/vbox/networks.conf` requise** : la plage
+`192.168.67.0/24` est dans `192.168.0.0/16`, autorisée par défaut par VirtualBox
+sur macOS. (Ce n'était pas le cas de l'ancienne plage `10.67.2.0/24` — cf. drift
+#6.)
 
 ## RAM consommée
 
@@ -70,14 +68,19 @@ Au 1ᵉʳ `up`, Vagrant crée pour chaque VM :
 Les disques persistent à travers `vagrant halt/up`, mais sont supprimés par
 `vagrant destroy`.
 
-> ⚠️ **Différence avec la prod** : ici le NVMe block.db est `/dev/nvme0n1` (le
-> disque OS étant sur SATA), alors qu'en prod c'est `/dev/nvme1n1` (disque OS
-> sur le 1ᵉʳ NVMe, le 2ᵉ NVMe étant le block.db).
-> [`bootstrap/state.sh`](../../bootstrap/state.sh) accepte une variable d'env
-> `CEPH_BLOCK_DEVICE=nvme0n1` à passer depuis le poste de contrôle :
+> ⚠️ **Différences avec la prod sur ce banc** :
+>
+> - IPs : `192.168.67.X` (banc) vs `10.67.2.X` (prod) — pour éviter le conflit
+>   de routage (drift #6).
+> - Disques : `/dev/sde` (banc, contrôleur VirtIO) vs `/dev/nvme1n1` (prod,
+>   contrôleur NVMe matériel).
+>
+> [`bootstrap/state.sh`](../../bootstrap/state.sh) accepte des variables d'env
+> pour s'adapter :
 >
 > ```bash
-> CEPH_BLOCK_DEVICE=nvme0n1 CEPH_MIN_HDD=3 bash bootstrap/state.sh dirqual1 dirqual2 dirqual3
+> CEPH_BLOCK_DEVICE=sde CEPH_MIN_HDD=3 \
+>   bash bootstrap/state.sh 192.168.67.11 192.168.67.12 192.168.67.13
 > ```
 >
 > En prod, les défauts (`nvme1n1`, 12 HDD) sont les bons.
@@ -99,12 +102,12 @@ cloud:
 
 control:
   hosts:
-    dirqual1: { ansible_host: 10.67.2.11 }
+    dirqual1: { ansible_host: 192.168.67.11 }
 
 workers:
   hosts:
-    dirqual2: { ansible_host: 10.67.2.12 }
-    dirqual3: { ansible_host: 10.67.2.13 }
+    dirqual2: { ansible_host: 192.168.67.12 }
+    dirqual3: { ansible_host: 192.168.67.13 }
 ```
 
 (Gitignoré par sécurité — on peut le générer à la demande.)
@@ -121,15 +124,15 @@ done
 Différences avec le banc mono-nœud :
 
 - `join-workers.yaml` **est** exécuté (et testable).
-- `kubeadm init` doit utiliser `--apiserver-advertise-address=10.67.2.11` pour
-  que les workers joignent le control plane via le réseau privé (pas le NAT
+- `kubeadm init` doit utiliser `--apiserver-advertise-address=192.168.67.11`
+  pour que les workers joignent le control plane via le réseau privé (pas le NAT
   Vagrant). À vérifier dans `bootstrap/initialisation.yaml` — au besoin,
   surcharger via une variable d'inventaire.
 
 ## 4. Cilium
 
 ```bash
-ssh debian@10.67.2.11 'bash -s' < ../../bootstrap/cni.sh
+ssh debian@192.168.67.11 'bash -s' < ../../bootstrap/cni.sh
 ```
 
 ## 5. Rook-Ceph (Phase 3+)
@@ -153,7 +156,7 @@ Puis :
 
 ```bash
 cd ../../storage/ceph
-ssh debian@10.67.2.11 'sudo mkdir -p /var/lib/rook'   # créé par Rook, sinon
+ssh debian@192.168.67.11 'sudo mkdir -p /var/lib/rook'   # créé par Rook, sinon
 kubectl apply -f crds.yaml -f common.yaml -f operator.yaml
 # attendre l'operator Ready
 kubectl apply -f cluster.yaml                          # ← surcharger metadataDevice sur nvme0n1
@@ -173,10 +176,10 @@ rm -rf .vagrant/ceph-disks/   # supprime les VDI orphelins si nécessaire
 
 ## Dépannage
 
-| Symptôme                                     | Cause                                                    | Remède                                                                                             |
-| -------------------------------------------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `Cannot create host-only network 10.67.2.x`  | VBox refuse la plage                                     | Éditer `/etc/vbox/networks.conf` (voir Pré-requis hôte)                                            |
-| `Controller already exists: NVMe` au 2ᵉ `up` | Le flag `.flag` a été supprimé sans nettoyer la conf VM  | `vagrant destroy && rm -rf .vagrant/ceph-disks/`                                                   |
-| Workers ne joignent pas                      | Endpoint cluster-api non résolvable depuis 10.67.2.12/13 | Ajouter à `/etc/hosts` des workers : `10.67.2.11 cluster-api` (devrait l'être par le rôle kubeadm) |
-| OSDs `Pending`                               | Disques pas bruts (déjà utilisés par un cycle précédent) | Sur chaque worker : `sudo bash storage/ceph/cleanup.sh` puis recréer le `CephCluster`              |
-| Mon non quorum (`HEALTH_WARN`)               | Moins de 3 mon Up                                        | `kubectl -n rook-ceph get pods -l app=rook-ceph-mon` ; chaque worker doit en avoir 1               |
+| Symptôme                                     | Cause                                                       | Remède                                                                                                |
+| -------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `Cannot create host-only network 10.67.2.x`  | VBox refuse la plage                                        | Éditer `/etc/vbox/networks.conf` (voir Pré-requis hôte)                                               |
+| `Controller already exists: NVMe` au 2ᵉ `up` | Le flag `.flag` a été supprimé sans nettoyer la conf VM     | `vagrant destroy && rm -rf .vagrant/ceph-disks/`                                                      |
+| Workers ne joignent pas                      | Endpoint cluster-api non résolvable depuis 192.168.67.12/13 | Ajouter à `/etc/hosts` des workers : `192.168.67.11 cluster-api` (devrait l'être par le rôle kubeadm) |
+| OSDs `Pending`                               | Disques pas bruts (déjà utilisés par un cycle précédent)    | Sur chaque worker : `sudo bash storage/ceph/cleanup.sh` puis recréer le `CephCluster`                 |
+| Mon non quorum (`HEALTH_WARN`)               | Moins de 3 mon Up                                           | `kubectl -n rook-ceph get pods -l app=rook-ceph-mon` ; chaque worker doit en avoir 1                  |
