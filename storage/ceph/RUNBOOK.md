@@ -1,7 +1,7 @@
 # Runbook — Rook-Ceph
 
 Installation, opération et désinstallation d'un cluster Ceph distribué via
-l'opérateur Rook 1.16.
+l'opérateur Rook 1.19 (Ceph Tentacle 20.2.1).
 
 ## Installation de l'opérateur
 
