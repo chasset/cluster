@@ -169,11 +169,8 @@ Procédure dans l’installateur Debian (partitionnement **manuel**) :
 8. **Ne pas créer de partition d’échange (swap).**
 9. « Terminer le partitionnement » et appliquer les changements.
 
-Post-installation, monter `/tmp` en **tmpfs** (RAM) plutôt qu’en LV :
-
-```bash
-sudo systemctl enable --now tmp.mount
-```
+`/tmp` est déjà monté en **tmpfs** par défaut sur Debian 13 (systemd ≥ 256
+active `tmp.mount` d’office) — rien à faire en post-installation.
 
 > **Workers `dirqual2-4`** : layout identique, sauf que `lv_etcd` est inutile
 > (pas de control plane) → réaffecter ses 10 Go à `var`, ou conserver la même
