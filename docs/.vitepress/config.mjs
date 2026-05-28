@@ -7,6 +7,10 @@ import { defineConfig } from 'vitepress'
 
 export default defineConfig({
   srcDir: '..',
+  // Le site est publié sur https://univ-lehavre.github.io/cluster/ via le
+  // workflow .github/workflows/docs.yml ; en dev local (`pnpm docs:dev`),
+  // VITEPRESS_BASE peut être laissé vide pour servir depuis /.
+  base: process.env.VITEPRESS_BASE ?? '/cluster/',
   title: 'Cluster',
   description: 'Cluster Kubernetes hyperconvergé — Debian 13, Cilium, Rook-Ceph',
   lang: 'fr-FR',
@@ -14,7 +18,14 @@ export default defineConfig({
   lastUpdated: true,
   ignoreDeadLinks: true,
 
-  srcExclude: ['node_modules/**', '.git/**', '.github/**', 'CHANGELOG.md', 'docs/.vitepress/**'],
+  srcExclude: [
+    'node_modules/**',
+    '.git/**',
+    '.github/**',
+    '**/CHANGELOG.md',
+    '**/LICENSE.md',
+    'docs/.vitepress/**',
+  ],
 
   // Map every README.md to its directory's index.md so URLs like /test/,
   // /bootstrap/, /storage/ceph/ resolve cleanly.
@@ -51,6 +62,7 @@ export default defineConfig({
         items: [
           { text: "Vue d'ensemble (server-security)", link: '/bootstrap/security/' },
           { text: 'Implications par couche', link: '/bootstrap/security/IMPLICATIONS' },
+          { text: 'Roadmap sécurité', link: '/bootstrap/security/TODO' },
         ],
       },
       {

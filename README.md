@@ -6,6 +6,11 @@ Manifests, playbooks et runbooks pour déployer et opérer un cluster Kubernetes
 de recherche : installation, stockage distribué, applications de calcul et
 services transverses.
 
+📖 **Documentation en ligne** :
+[univ-lehavre.github.io/cluster](https://univ-lehavre.github.io/cluster/) —
+publiée automatiquement depuis `main` par
+[.github/workflows/docs.yml](.github/workflows/docs.yml).
+
 ## Structure
 
 | Dossier                          | Rôle                                          |
