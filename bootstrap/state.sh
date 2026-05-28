@@ -451,6 +451,86 @@ else
     fi
 fi
 
+# ─── Couche 7 — Plateforme (registry + dashboard) ──────────────────────────
+section "Plateforme (registry + Kubernetes Dashboard)"
+if ! kubectl_ready; then
+    mark skip "kubectl indisponible"
+else
+    # ── Container registry ───────────────────────────────────────────────
+    if kubectl_q get ns registry >/dev/null 2>&1; then
+        registry_ready=$(kubectl_q -n registry get deploy registry -o jsonpath='{.status.readyReplicas}')
+        registry_desired=$(kubectl_q -n registry get deploy registry -o jsonpath='{.spec.replicas}')
+        if [ -n "$registry_ready" ] && [ "$registry_ready" = "$registry_desired" ] && [ "$registry_ready" != "0" ]; then
+            mark ok "registry : ${registry_ready}/${registry_desired} Ready"
+        else
+            mark fail "registry : ${registry_ready:-0}/${registry_desired:-?} Ready" \
+                      "kubectl -n registry get pods,events"
+        fi
+
+        registry_pvc=$(kubectl_q -n registry get pvc registry-pvc -o jsonpath='{.status.phase}')
+        if [ "$registry_pvc" = "Bound" ]; then
+            mark ok "registry : PVC registry-pvc Bound"
+        else
+            mark fail "registry : PVC registry-pvc = ${registry_pvc:-absente}" \
+                      "kubectl apply -f platform/container-registry/persistent-volume-claim.yaml"
+        fi
+
+        if kubectl_q -n registry get cronjob registry-gc >/dev/null 2>&1; then
+            registry_gc_suspended=$(kubectl_q -n registry get cronjob registry-gc -o jsonpath='{.spec.suspend}')
+            if [ "$registry_gc_suspended" = "true" ]; then
+                mark ok "registry : CronJob registry-gc présent (suspended — validation banc avant activation)"
+            else
+                mark ok "registry : CronJob registry-gc présent (actif)"
+            fi
+        else
+            mark skip "registry : CronJob registry-gc absent (kubectl apply -f platform/container-registry/garbage-collect-cronjob.yaml)"
+        fi
+    else
+        mark skip "registry : namespace absent (Phase 5 à dérouler)"
+    fi
+
+    # ── Kubernetes Dashboard ─────────────────────────────────────────────
+    if kubectl_q get ns kubernetes-dashboard >/dev/null 2>&1; then
+        dash_not_ready=$(kubectl_q -n kubernetes-dashboard get pods --no-headers 2>/dev/null \
+            | awk '$3 != "Running" && $3 != "Completed" {print $1}' | tr '\n' ' ')
+        dash_total=$(kubectl_q -n kubernetes-dashboard get pods --no-headers 2>/dev/null | wc -l | tr -d ' ')
+        if [ "$dash_total" = "0" ]; then
+            mark skip "dashboard : aucun pod (helm install via platform/k8s-dashboard/manage.sh)"
+        elif [ -z "$dash_not_ready" ]; then
+            mark ok "dashboard : ${dash_total} pods Running"
+        else
+            mark fail "dashboard : pods non Running : $dash_not_ready" \
+                      "kubectl -n kubernetes-dashboard describe pods"
+        fi
+
+        if kubectl_q -n kubernetes-dashboard get sa admin-user >/dev/null 2>&1; then
+            mark ok "dashboard : ServiceAccount admin-user présent"
+        else
+            mark fail "dashboard : ServiceAccount admin-user absent" \
+                      "kubectl apply -f platform/k8s-dashboard/service-account.yaml"
+        fi
+
+        if kubectl_q get clusterrolebinding admin-user >/dev/null 2>&1; then
+            mark ok "dashboard : ClusterRoleBinding admin-user (cluster-admin) en place"
+        else
+            mark fail "dashboard : ClusterRoleBinding admin-user absent" \
+                      "kubectl apply -f platform/k8s-dashboard/cluster-role-binding.yaml"
+        fi
+
+        # H1 — preuve observable que la migration vers les tokens éphémères
+        # est effective : le Secret legacy `admin-user` (type service-account-token)
+        # ne doit PAS exister. Cf. ADR 0010.
+        if kubectl_q -n kubernetes-dashboard get secret admin-user >/dev/null 2>&1; then
+            mark fail "dashboard : Secret legacy admin-user présent (anti-pattern K8s 1.24+)" \
+                      "kubectl -n kubernetes-dashboard delete secret admin-user (cf. ADR 0010)"
+        else
+            mark ok "dashboard : aucun Secret legacy admin-user (tokens éphémères via credentials.sh)"
+        fi
+    else
+        mark skip "dashboard : namespace absent (helm install via platform/k8s-dashboard/manage.sh)"
+    fi
+fi
+
 # ─── Résumé ────────────────────────────────────────────────────────────────
 section "Résumé"
 printf "  ${G}%d ok${N}   ${R}%d drift${N}   ${D}%d non applicable${N}\n" \
@@ -462,7 +542,5 @@ if [ "$fail_n" -gt 0 ]; then
     exit 1
 fi
 
-printf '\n%sÉtat conforme%s sur la couche couverte par ce script.\n' "$G" "$N"
-printf 'Couches futures à intégrer ici au fil des phases : '
-printf 'Cilium, Rook-Ceph, StorageClasses, workloads.\n'
+printf '\n%sÉtat conforme%s sur les 7 couches couvertes par ce script.\n' "$G" "$N"
 printf 'Consulter %sbootstrap/RUNBOOK.md%s pour la prochaine grande étape.\n' "$C" "$N"
