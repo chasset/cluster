@@ -250,6 +250,12 @@ ADR à rédiger (issus des décisions de ce plan) :
   OSDs + charges.
 - `0008-metadatadevice-nvme-spof-par-noeud.md` — NVMe unique block.db assumé.
 - **`0009-pourquoi-4-noeuds.md`** — discussion de dimensionnement (ci-dessous).
+- `0010-dashboard-cluster-admin.md` — Kubernetes Dashboard avec rôle
+  `cluster-admin` assumé (cluster mono-admin de recherche, pas de moindre
+  privilège imposé) ; cf. Workstream H.
+- `0011-registry-http-sans-auth.md` — registry interne en HTTP sans
+  authentification, fonde sa sécurité sur Tailscale + réseau pod confiance ; cf.
+  Workstream H.
 
 ### Discussion fondatrice : pourquoi 4 nœuds ?
 
@@ -394,6 +400,82 @@ Intel** pour l'étape x86_64. (Lima = repli plus stable en arm64 pur.)
 l'échelle** → compléter par une répétition x86_64 (VBox+Vagrant sur hôte Intel,
 ou VMs cloud x86_64) avant le rebuild définitif.
 
+## Workstream H — Plateforme (container registry + Kubernetes Dashboard)
+
+Audit ciblé sur `platform/` : deux composants applicatifs (registry interne et
+dashboard) qui présentent des écarts de sécurité, de reproductibilité et
+d'hygiène. Le détail est dans le commentaire d'audit ; les corrections sont
+regroupées ici pour intégration dans la Phase 5.
+
+### H1. Sécurité du Kubernetes Dashboard — 🔴
+
+- `platform/k8s-dashboard/bearer-token.yaml` : **supprimer**. Le secret de type
+  `kubernetes.io/service-account-token` (token long-lived) est l'anti-pattern
+  explicite depuis K8s 1.24 — ne rotate pas, persiste dans `etcd` non chiffré.
+- `platform/k8s-dashboard/credentials.sh` : remplacer la lecture du secret par
+  `kubectl -n kubernetes-dashboard create token admin-user --duration=8h` (token
+  éphémère, généré à la demande).
+- `platform/k8s-dashboard/cluster-role-binding.yaml` : pas de changement
+  technique (`cluster-admin` assumé) mais documenter dans l'ADR 0010 le choix «
+  dashboard = cluster-admin » et son risque (rôle le plus puissant du cluster).
+- `platform/k8s-dashboard/README.md` : expliquer comment ouvrir la dashboard
+  (commande de port-forward) et où coller le token.
+
+### H2. Reproductibilité Helm + image — 🟠
+
+- `platform/k8s-dashboard/manage.sh` : ajouter `--version <X.Y.Z>` figée
+  (dernière release stable du chart `kubernetes-dashboard`) et `--wait`.
+- Créer `platform/k8s-dashboard/values.yaml` versionné contenant **a minima**
+  les images pinnées et des `resources` (requests/limits) raisonnables pour
+  l'architecture multi-container du chart récent.
+- `platform/container-registry/deployment.yaml` (L18) : pinner
+  `image: registry:2` → `image: registry:2.8.3` (ou tag `2.8.3` + digest).
+
+### H3. Durcissement registry — 🟡
+
+- `platform/container-registry/deployment.yaml` :
+  - ajouter `readinessProbe`/`livenessProbe` sur `GET /v2/` (port 5000) ;
+  - ajouter `securityContext` au pod et au container : `runAsNonRoot: true`,
+    `runAsUser: 1000` (`registry:2.8.3` tourne sans root),
+    `readOnlyRootFilesystem: true` si possible (vérifier que `/var/lib/registry`
+    reste writable), `capabilities: drop: [ALL]` ;
+  - `seccompProfile: type: RuntimeDefault`.
+- Garbage collection : ajouter un `CronJob` mensuel
+  `platform/container-registry/garbage-collect-cronjob.yaml` qui exécute
+  `registry garbage-collect /etc/docker/registry/config.yml` dans une copie du
+  pod (besoin que `delete: enabled: true` soit posé dans la config du registry —
+  ajouter via `ConfigMap` + env `REGISTRY_STORAGE_DELETE_ENABLED=true`).
+
+### H4. Décisions documentées (cohérence avec ADR) — 📝
+
+- `platform/container-registry/README.md` :
+  - expliciter « HTTP + pas d'authentification » comme décision assumée
+    (cohérent avec
+    [`0003-pas-de-chiffrement-ceph-tailscale.md`](docs/decisions/0003-pas-de-chiffrement-ceph-tailscale.md))
+    et la nouvelle ADR 0011 ;
+  - documenter le SPOF `replicas: 1` (RBD = RWO) ;
+  - documenter la dépendance au **Tailscale operator** (les annotations
+    `tailscale.com/expose` et `tailscale.com/hostname` ne font rien sans lui) ;
+  - documenter la procédure de GC (déclenchement manuel + cron mensuel).
+
+### H5. Observabilité dans `state.sh` — 🟡
+
+- Ajouter une **couche 7 — Plateforme** dans `bootstrap/state.sh`
+  (kubectl-based) :
+  - `registry` namespace : Deployment `registry` Ready, PVC `registry-pvc`
+    Bound, Service exposé Tailscale visible (`kubectl get svc -n registry`) ;
+  - `kubernetes-dashboard` namespace : pods Ready, présence du
+    ClusterRoleBinding `admin-user`, **absence** du Secret legacy `bearer-token`
+    (migration H1 effective).
+
+### H6. (Optionnel) Kustomization — 🟢
+
+- Ajouter `kustomization.yaml` par composant (`platform/container-registry/` et
+  `platform/k8s-dashboard/`) pour permettre `kubectl apply -k <dir>` en un seul
+  appel. Non bloquant.
+
+---
+
 ## Phasage pas à pas (banc VBox → serveurs)
 
 Principe : **chaque phase est d'abord validée sur le banc VirtualBox/Vagrant**
@@ -488,15 +570,32 @@ incrémentale. Le banc VBox doit avoir validé ce même enchaînement au préala
 - **🖥️ Serveurs** : appliquer les SC (**défaut d'abord**). **Critère** : PVC
   test Bound, pools conformes.
 
-### Phase 5 — Workloads + object store
+### Phase 5 — Workloads + object store + plateforme (registry, dashboard)
 
-- **Dépôt** : PVC apps repointées → `rook-ceph-block-replicated` (rstudio,
-  container-registry, wordpress) ; datalake (object store, OBCs, users) ; C6
-  (`preservePoolsOnDelete` doc).
-- **✅ Banc** : déployer un workload bloc (wordpress) → PVC Bound + pod Running
-  ; object store → bucket créé + credentials extractibles ; snapshot.
+- **Dépôt** :
+  - PVC apps repointées → `rook-ceph-block-replicated` (rstudio,
+    container-registry, wordpress) ; datalake (object store, OBCs, users) ; C6
+    (`preservePoolsOnDelete` doc).
+  - **Workstream H** intégral : H1 (dashboard sécurité — supprimer
+    `bearer-token.yaml`, token éphémère, ADR 0010), H2 (pinner `registry:2.8.3`,
+    `--version` + `--wait` Helm, `values.yaml` dashboard), H3 (probes,
+    `securityContext` non-root, GC CronJob registry), H4 (README registry
+    documente HTTP/pas d'auth/Tailscale, SPOF, GC ; ADR 0011), H5 (couche 7 dans
+    `state.sh`), H6 (kustomization — optionnel).
+- **✅ Banc** :
+  - déployer un workload bloc (wordpress) → PVC Bound + pod Running ;
+  - object store → bucket créé + credentials extractibles ;
+  - registry : pod Ready avec probes OK, push/pull d'une image test via
+    Tailscale, GC CronJob créé (suspendu) ;
+  - dashboard : Helm install fige la version, token éphémère
+    (`kubectl create token`) ouvre la session, **aucun Secret legacy**
+    `bearer-token` dans `kubernetes-dashboard` ;
+  - `bootstrap/state.sh` couche 7 valide registry + dashboard ;
+  - snapshot.
 - **🖥️ Serveurs** : déployer apps/platform + datalake. **Critère** : PVC Bound
-  sur réplicat ×3, S3 accessible (via Tailscale).
+  sur réplicat ×3, S3 accessible (via Tailscale), registry pushable depuis un
+  poste Tailscale, dashboard accessible via `kubectl port-forward` avec token
+  éphémère.
 
 ### Phase 6 — Exploitation (sauvegarde etcd, durcissement)
 
