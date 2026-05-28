@@ -3,6 +3,14 @@
 Object store Ceph compatible S3, exposé via RGW (Rados Gateway). Sert de
 datalake pour les sources de données ingérées par le cluster.
 
+> ⚠️ **Comportement destructif** : `preservePoolsOnDelete: false` (cf.
+> [`datalake-ec.yaml:21`](datalake-ec.yaml#L21)) signifie que **supprimer le
+> `CephObjectStore` détruit aussi les pools `datalake.rgw.buckets.data` et
+> `datalake.rgw.buckets.index`** — donc **toutes les données et buckets** S3.
+> Décision assumée pour ce datalake de recherche (ré-ingestible depuis les
+> sources upstream). Pour conserver les pools, passer à
+> `preservePoolsOnDelete: true` **avant** toute suppression.
+
 ## Installation
 
 ```bash
@@ -10,8 +18,8 @@ kubectl apply -f datalake-ec.yaml
 kubectl apply -f storage-class.yaml
 ```
 
-Pour exposer le service via Tailscale, annoter le service
-`rook-ceph-rgw-datalake` créé automatiquement :
+Pour exposer le service via Tailscale (**si le Tailscale operator est
+déployé**), annoter le service `rook-ceph-rgw-datalake` créé automatiquement :
 
 ```yaml
 metadata:
@@ -19,6 +27,10 @@ metadata:
     tailscale.com/expose: 'true'
     tailscale.com/hostname: datalake
 ```
+
+Sans Tailscale, le service reste accessible depuis l'intérieur du cluster
+(`rook-ceph-rgw-datalake.rook-ceph:80`) ou via
+`kubectl -n rook-ceph port-forward svc/rook-ceph-rgw-datalake 8080:80`.
 
 ## Créer une bucket
 

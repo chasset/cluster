@@ -95,6 +95,12 @@ kubectl apply -f storageClass/datalake/object-bucket-claim-gdelt.yaml
 Voir [`storageClass/datalake/README.md`](storageClass/datalake/README.md) pour
 le détail des claims et l'extraction des credentials.
 
+> ⚠️ **Comportement destructif** : le `CephObjectStore` est configuré avec
+> `preservePoolsOnDelete: false` — supprimer l'objet **détruit les pools et
+> toutes les données S3**. Cohérent avec un datalake ré-ingestible. Si les
+> données doivent survivre à une suppression, basculer à
+> `preservePoolsOnDelete: true` avant.
+
 ## Chiffrement (décision assumée)
 
 Aucun chiffrement Ceph n'est activé : `network.connections.encryption.enabled`
