@@ -48,6 +48,71 @@ kubectl get secret "${BUCKET}" -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | bas
 echo
 ```
 
+## Smoke-test end-to-end
+
+[`smoke-test.sh`](smoke-test.sh) déroule un test fonctionnel complet :
+
+1. Applique [`user-smoke.yaml`](user-smoke.yaml) (un
+   `CephObjectStoreUser smoke` + un `ObjectBucketClaim smoke` dédié au test,
+   séparés des utilisateurs métier).
+2. Attend que le `Secret` de credentials soit posé par le provisioner Rook.
+3. Récupère `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
+4. **PUT** un fichier dans le bucket, **LIST** le bucket, **GET** le fichier,
+   **DIFF** : vérifie que le contenu lu est identique.
+5. Cleanup automatique (à désactiver via `KEEP=1`).
+
+Outil S3 utilisé : `mc` (MinIO client, prioritaire) ou `aws` (CLI v2).
+
+### Depuis le poste de contrôle (via port-forward)
+
+```bash
+# 1. Port-forward le service RGW dans un autre terminal :
+kubectl -n rook-ceph port-forward svc/rook-ceph-rgw-datalake 8080:80
+
+# 2. Lancer le smoke-test :
+ENDPOINT=http://localhost:8080 \
+  bash storage/ceph/storageClass/datalake/smoke-test.sh
+```
+
+### Depuis un pod du cluster (sans port-forward)
+
+```bash
+kubectl -n rook-ceph run smoke --rm -it --image=minio/mc -- sh -c "
+  apk add --no-cache bash curl
+  # … copier smoke-test.sh + user-smoke.yaml dans le pod, puis :
+  ENDPOINT=http://rook-ceph-rgw-datalake.rook-ceph:80 \
+    bash smoke-test.sh
+"
+```
+
+(En pratique on lance ça sur le poste de contrôle après port-forward — c'est
+plus simple.)
+
+### Lecture attendue
+
+```text
+[14:02:00] Apply storage/ceph/storageClass/datalake/user-smoke.yaml …
+[14:02:01] Attendre que le Secret de l'OBC soit créé (timeout 60s)…
+[14:02:08] Endpoint : http://localhost:8080  | Bucket : smoke  | KeyID : ABCD…
+[14:02:08] Outil : mc (MinIO client)
+[14:02:08] PUT  → smoke/smoke/upload.txt
+[14:02:08] LIST → smoke/smoke
+[2026-05-28 14:02:08 UTC]     58B upload.txt
+[14:02:08] GET  ← smoke/smoke/upload.txt
+[14:02:08] ✓ Contenu lu identique au contenu écrit.
+[14:02:08] Stat du bucket :
+…
+[14:02:08] ✓ Smoke-test datalake : OK
+[14:02:08] Cleanup : vide le bucket et supprime OBC + user…
+```
+
+Si l'OBC ne converge pas (`Secret smoke pas créé`), inspecter :
+
+```bash
+kubectl -n rook-ceph describe obc smoke
+kubectl -n rook-ceph logs -l app=rook-ceph-rgw,rook_object_store=datalake
+```
+
 ## Utilisateur global
 
 Après création d'un utilisateur (voir [`user.yaml`](user.yaml) ou
