@@ -263,11 +263,34 @@ le rôle `network/sshd` retouche `sshd`, ses changements doivent rester
 **cohérents** avec le drop-in (ordre alphanumérique des `*.conf` ; ce dernier
 gagne en cas de conflit de directive).
 
+Le playbook `secure.yml` est **progressif via tags Ansible** :
+
 ```bash
 cd bootstrap/security
 cp .env-example .env && $EDITOR .env       # MAIL_ROOT_REDIRECT, HOST_USER, …
 set -a; source .env; set +a
+
+# Couches SÛRES par défaut (comptes + unattended-upgrades + postfix + auditd + fail2ban)
+# — sshd, ssh-keys, UFW et upgrade-now sont taggés `never`, donc NON joués par défaut.
 ansible-playbook -i ../hosts.yaml secure.yml
+```
+
+Application **par couche** (recommandé pour valider l'impact) :
+
+```bash
+ansible-playbook -i ../hosts.yaml secure.yml --tags audit       # observer (auditd)
+ansible-playbook -i ../hosts.yaml secure.yml --tags alert       # postfix + redirection mail
+ansible-playbook -i ../hosts.yaml secure.yml --tags detection   # fail2ban
+ansible-playbook -i ../hosts.yaml secure.yml --tags os          # comptes + auto-updates
+```
+
+Et **opt-in** sur les couches sensibles ou redondantes :
+
+```bash
+ansible-playbook -i ../hosts.yaml secure.yml --tags upgrade     # apt full-upgrade + reboot (serial:1)
+ansible-playbook -i ../hosts.yaml secure.yml --tags sshd        # re-applique drop-in sshd (déjà fait)
+ansible-playbook -i ../hosts.yaml secure.yml --tags ssh-keys    # re-dépose les clés (déjà fait)
+ansible-playbook -i ../hosts.yaml secure.yml --tags ufw         # APRÈS bootstrap K8s — cf. ports
 ```
 
 > ⚠️ **UFW × Kubernetes** : le rôle `network/ufw.yml` durcit le pare-feu. Pour
