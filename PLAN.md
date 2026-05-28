@@ -3,7 +3,7 @@
 ## Contexte
 
 L'audit du dépôt `cluster` (IaC d'une plateforme expérimentale : 1 control plane
-`dirqual1` + 3 workers Debian 12, CNI Cilium 1.16.3, stockage hyperconvergé Rook
+`dirqual1` + 3 workers Debian 13, CNI Cilium 1.16.3, stockage hyperconvergé Rook
 1.16.5 / Ceph 19.2.1) a révélé un ensemble d'incohérences allant de bugs Ansible
 silencieux à des choix de stockage risqués pour les données réelles.
 
@@ -17,10 +17,11 @@ charges réelles reposent donc sur la classe de stockage la moins sûre.
 ### Vérité terrain : audit SSH + inventaire matériel (`audit/2026-05-27-k8s-cilium-rook-ceph.md`, `platform/hardware.md`)
 
 Un second audit, mené avec accès SSH réel, **corrobore** les constats statiques
-et ajoute des faits machine : nœuds en **Debian 12 bookworm** (kernel 6.1,
-cluster non encore déployé), **swap actif dans le fstab**, modules
-`br_netfilter`/`overlay` non chargés. L'inventaire matériel précise le contexte
-:
+et ajoute des faits machine : nœuds en **Debian 12 bookworm (kernel 6.1)** au
+moment de l'audit (état pré-rebuild — la cible actuelle est **Debian 13 /
+Trixie** en installation expert, cf. RUNBOOK), **swap actif dans le fstab**,
+modules `br_netfilter`/`overlay` non chargés. L'inventaire matériel précise le
+contexte :
 
 - **4 nœuds rigoureusement identiques** (HPE ProLiant XL420 Gen10+) : `dirqual1`
   = 10.67.2.11 (control plane), `dirqual2-4` = .12-.14 (workers), réseau cluster
@@ -36,15 +37,15 @@ L'homogénéité matérielle stricte **valide** l'usage de
 `metadataDevice: nvme1n1` + `useAllDevices`. Ces faits durcissent plusieurs
 items (CIDR, LVM `/var`, NVMe block.db) intégrés ci-dessous.
 
-### Contrainte majeure : rebuild greenfield sur Debian 12
+### Contrainte majeure : rebuild greenfield sur Debian 13
 
-Les 4 serveurs vont être **réinstallés en Debian 12 (Bookworm) avec effacement
+Les 4 serveurs vont être **réinstallés en Debian 13 (Trixie) avec effacement
 total des données**. Le cluster est donc reconstruit à neuf : **aucune migration
 de volume à chaud n'est nécessaire** — il suffit de déployer des manifestes
 pointant dès le départ vers les bonnes classes. Cela supprime la partie la plus
 risquée du plan (sauvegarde/copie/restore + nettoyage des PV `Retain`). Le wipe
 disques (`/var/lib/rook` inclus) sur les 4 nœuds devient une étape critique de
-pré-requis (sinon les `mon` Ceph refusent de démarrer). Debian 12 (noyau 6.1)
+pré-requis (sinon les `mon` Ceph refusent de démarrer). Debian 13 (noyau 6.12+)
 justifie aussi l'activation des fonctionnalités RBD complètes et du client
 CephFS kernel.
 
@@ -53,7 +54,7 @@ CephFS kernel.
 - **Périmètre** : complet (bugs + durcissement Ceph + durcissement archi hors HA
   control plane).
 - **Stockage bloc** : les workloads doivent être sur
-  `rook-ceph-block-replicated` (réplicat ×3). Le wipe Debian 12 rend toute
+  `rook-ceph-block-replicated` (réplicat ×3). Le wipe Debian 13 rend toute
   migration inutile → simple (re)déploiement greenfield sur la bonne classe.
 - **Control plane** : 1 seul nœud (SPOF **assumé**), **mais**
   `--control-plane-endpoint` posé dès l'init pour garder la HA future possible
@@ -64,7 +65,7 @@ CephFS kernel.
 - **Montée de versions** : profiter du rebuild pour aligner sur une matrice à
   jour et cohérente (K8s 1.34 / Cilium 1.19.x / Rook 1.19.x / Ceph Tentacle
   20.2.1 / containerd.io 2.x depuis le dépôt Docker) — cf. Workstream E.
-- **Test local** : banc de test **VirtualBox 7.2.8 + Vagrant** (VMs Debian 12
+- **Test local** : banc de test **VirtualBox 7.2.8 + Vagrant** (VMs Debian 13
   arm64) pour répéter tout le flux de bout en bout, + Molecule/Docker en CI pour
   les rôles — cf. Workstream G & section « Faisabilité ». Réserves assumées :
   arm64 (≠ x86_64 cible), échelle réduite (fonctionnel, pas perf) ; même
@@ -74,7 +75,7 @@ CephFS kernel.
 
 ### Résultat visé
 
-Un bootstrap Ansible idempotent et fiable sur Debian 12 propre (containerd.io
+Un bootstrap Ansible idempotent et fiable sur Debian 13 propre (containerd.io
 depuis le dépôt Docker, partitionnement sain, modules noyau, swap réellement
 désactivé), un réseau pods Cilium disjoint du réseau d'infra, des charges de
 production sur du stockage répliqué ×3 avec une StorageClass par défaut, une
@@ -89,11 +90,11 @@ sauvegarde etcd explicités).
 | #      | Fichier                                                                                     | Correction                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | ------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | A1     | `bootstrap/roles/k8s-pre-install/tasks/main.yaml` (L106-119) + `handlers/main.yaml`         | **Swap cassé** : la tâche `debug` n'est jamais « changed » donc le handler ne part jamais, et la condition `when: stdout == ""` est inversée. Remplacer par une tâche `command: swapoff -a` conditionnée à `output_swapon.stdout != ""` avec `changed_when`, et désactiver le swap dans `/etc/fstab` (déplacer la logique du handler vers une tâche déterministe).                                                                                                                                                                                                                                                                                                 |
-| A2     | `bootstrap/roles/k8s-install/tasks/main.yaml` (avant L15) + `k8s-CRI-install`               | **Répertoire keyrings absent** : ajouter `ansible.builtin.file: path=/etc/apt/keyrings state=directory mode=0755` avant le `gpg -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg` (échoue sinon sur Debian 12 minimal). Idem pour le keyring Docker dans `k8s-CRI-install` (cf. A10).                                                                                                                                                                                                                                                                                                                                                                               |
+| A2     | `bootstrap/roles/k8s-install/tasks/main.yaml` (avant L15) + `k8s-CRI-install`               | **Répertoire keyrings absent** : ajouter `ansible.builtin.file: path=/etc/apt/keyrings state=directory mode=0755` avant le `gpg -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg` (échoue sinon sur Debian 13 minimal). Idem pour le keyring Docker dans `k8s-CRI-install` (cf. A10).                                                                                                                                                                                                                                                                                                                                                                               |
 | A3     | `bootstrap/roles/k8s-initialization/tasks/main.yaml` (L13-18)                               | **`${HOME}` non interprété** par le module `file` → remplacer `path: ${HOME}/.kube` par `path: /home/debian/.kube`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | A4     | `bootstrap/roles/k8s-join-cluster/tasks/main.yaml` (L8, L13)                                | **Hostname codé en dur** `dirqual1` → `groups['control'][0]`. Augmenter `wait_for timeout: 1` → `30`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| A5     | `bootstrap/roles/k8s-pre-install/tasks/main.yaml` (L4-9)                                    | **Cible Debian 12 (Bookworm)** : remplacer le pin `== '12.11'` par `ansible_distribution == 'Debian' and ansible_distribution_major_version == '12'` (et non un simple assouplissement).                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| A10    | `bootstrap/roles/k8s-CRI-install/tasks/main.yaml` (L36-82)                                  | **CRI = containerd.io via dépôt Docker** (décision actée — Debian 12 ne fournit que containerd 1.6.x, déprécié) : créer `/etc/apt/keyrings`, télécharger la clé Docker via `get_url`, ajouter le dépôt `download.docker.com/linux/debian {{ release }} stable`, installer `containerd.io` (2.x). Générer `containerd config default` puis forcer `SystemdCgroup = true` via `copy` + `regex_replace` (idempotent, écrase le `config.toml` minimal du paquet qui désactive le plugin CRI), restart via handler.                                                                                                                                                     |
+| A5     | `bootstrap/roles/k8s-pre-install/tasks/main.yaml` (L4-9)                                    | **Cible Debian 13 (Trixie)** : remplacer le pin `== '12.11'` par `ansible_distribution == 'Debian' and ansible_distribution_major_version == '12'` (et non un simple assouplissement).                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| A10    | `bootstrap/roles/k8s-CRI-install/tasks/main.yaml` (L36-82)                                  | **CRI = containerd.io via dépôt Docker** (décision actée — Debian 13 ne fournit que containerd 1.7.x, déprécié en K8s 1.34 et retiré en 1.36) : créer `/etc/apt/keyrings`, télécharger la clé Docker via `get_url`, ajouter le dépôt `download.docker.com/linux/debian {{ release }} stable`, installer `containerd.io` (2.x). Générer `containerd config default` puis forcer `SystemdCgroup = true` via `copy` + `regex_replace` (idempotent, écrase le `config.toml` minimal du paquet qui désactive le plugin CRI), restart via handler.                                                                                                                       |
 | A6     | `bootstrap/roles/k8s-CRI-install/tasks/main.yaml` (L6-24)                                   | **Prérequis noyau manquants** : charger `overlay` + `br_netfilter` via `/etc/modules-load.d/k8s.conf` + `community.general.modprobe`, et ajouter `net.bridge.bridge-nf-call-iptables=1` / `-ip6tables=1` au sysctl k8s.conf (en plus de `ip_forward`). Corriger la comparaison `when: output_ipv4_forward == "..."` (compare un objet registre, jamais vrai) → `output_ipv4_forward.stdout`.                                                                                                                                                                                                                                                                       |
 | A7     | `bootstrap/roles/k8s-install/tasks/main.yaml` (L35-36) + `k8s-control-plane-nodes` (L11-12) | **Idempotence `apt-mark hold`** : remplacer le `command` par `ansible.builtin.dpkg_selections: name=... selection=hold` (idempotent).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | A8     | `bootstrap/roles/k8s-initialization/tasks/main.yaml` (L7)                                   | **Secrets dans `cluster-setup.log`** (token + hash CA) : restreindre les droits du fichier (`mode: 0600`, `owner: debian`) ou rediriger vers un fichier temporaire purgé.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -120,14 +121,14 @@ sauvegarde etcd explicités).
 
 ### C1. StorageClass par défaut + workloads sur réplicat ×3 (greenfield)
 
-Avec le rebuild Debian 12, **pas de migration** : on corrige les manifestes et
+Avec le rebuild Debian 13, **pas de migration** : on corrige les manifestes et
 on les déploie sur le cluster neuf.
 
 - `storage/ceph/storageClass/block-replicated.yaml` : ajouter l'annotation
   `storageclass.kubernetes.io/is-default-class: "true"`. Activer les
   `imageFeatures` complètes
   (`layering,fast-diff,object-map,deep-flatten,exclusive-lock`) — noyau Debian
-  12 (6.1) compatible.
+  13 (6.12+) compatible.
 - Repointer les PVC de `rook-ceph-block-ec` → `rook-ceph-block-replicated`
   (simple édition de manifeste, créées à neuf au déploiement) :
   - `apps/rstudio/persistent-volume-claim.yaml` (L12)
@@ -201,7 +202,7 @@ on les déploie sur le cluster neuf.
 | ----- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | D1    | `storage/ceph/cleanup.sh` (L22)                            | **Robustesse glob** : `for device in /dev/sd[a-z]` avorte sous `set -e` sur un nœud NVMe-only (glob non expansée). Ajouter `shopt -s nullglob` ou un garde d'existence. Mutualiser la logique dupliquée avec le bloc équivalent du `bootstrap/RUNBOOK.md` (extraire un script unique référencé par les deux).                                                                                                                                                                                                                                   |
 | D2    | `bootstrap/roles/k8s-pre-install/tasks/main.yaml` (L13-17) | **Assertion RAM cosmétique** : le plancher `>= 2048` Mo est très en-dessous du réel (251 GiB/nœud, RAM abondante pour 48 OSDs). Non bloquant — relever le seuil pour la cohérence et documenter le dimensionnement (~4-5 Go/OSD) dans le RUNBOOK.                                                                                                                                                                                                                                                                                               |
-| D5 🟠 | `bootstrap/RUNBOOK.md` (préparation OS)                    | **Repartitionnement du miroir boot NVMe 447 GiB** (vérité terrain : `/var` = 9 G, `/home` = 404 G inutilisé, `/` = 23 G). `/var` héberge `containerd` (images), logs et `/var/lib/etcd` → `DiskPressure` quasi certain. Profiter de la réinstallation Debian 12 pour **redistribuer l'espace** (réduire drastiquement `/home`, allouer l'essentiel à `/var` ou `/`). À documenter comme étape obligatoire de préparation, idéalement préseedée à l'installation. Ajouter un check `assert` sur la taille minimale de `/var` dans `checks.yaml`. |
+| D5 🟠 | `bootstrap/RUNBOOK.md` (préparation OS)                    | **Repartitionnement du miroir boot NVMe 447 GiB** (vérité terrain : `/var` = 9 G, `/home` = 404 G inutilisé, `/` = 23 G). `/var` héberge `containerd` (images), logs et `/var/lib/etcd` → `DiskPressure` quasi certain. Profiter de la réinstallation Debian 13 pour **redistribuer l'espace** (réduire drastiquement `/home`, allouer l'essentiel à `/var` ou `/`). À documenter comme étape obligatoire de préparation, idéalement préseedée à l'installation. Ajouter un check `assert` sur la taille minimale de `/var` dans `checks.yaml`. |
 | D3    | `bootstrap/RUNBOOK.md` (nouvelle section)                  | **SPOF assumé** : documenter explicitement que `dirqual1` est un point de défaillance unique (API/etcd), la procédure de restauration, et **ajouter une sauvegarde etcd régulière** (`etcdctl snapshot save` via cron/systemd timer, ou tâche Ansible dédiée) + procédure de restore.                                                                                                                                                                                                                                                           |
 | D4    | `README.md` racine / RUNBOOKs                              | **Politique de versions** : centraliser/documenter la matrice cible (cf. Workstream E : K8s 1.34, Cilium 1.19.x, Rook 1.19.x, Ceph Tentacle 20.2.1) et la procédure de bump (vérifier les compatibilités croisées avant toute montée).                                                                                                                                                                                                                                                                                                          |
 
@@ -219,7 +220,7 @@ compatibilités croisées : Cilium 1.19.x est testé jusqu'à K8s **1.34**, Rook
 | Cilium     | 1.16.3       | **1.19.x** (dernier patch)             | `bootstrap/cni.sh` (L14)                                              | 1.20 en pré-release → écarté. CLI figée (L5).                                                                                                                                                                                           |
 | Rook       | 1.16.5       | **1.19.x**                             | `storage/ceph/operator.yaml` (L611) **+ `crds.yaml` + `common.yaml`** | ⚠️ Ne pas changer que l'image : **re-télécharger `crds.yaml`, `common.yaml`, `operator.yaml` depuis la release Rook v1.19.x** (les CRDs/RBAC doivent matcher l'opérateur).                                                              |
 | Ceph       | 19.2.1       | **20.2.1 Tentacle** (décision actée)   | `storage/ceph/cluster.yaml` (L24)                                     | Squid v19.2 **EOL 09/2026** → Tentacle pour une install neuve. Éviter v20.2.0 (corruption read-affinity). Utiliser un tag build complet (ex. `v20.2.1-AAAAMMJJ`). `allowUnsupported: false` reste OK (Tentacle supporté par Rook 1.19). |
-| containerd | dépôt Docker | **`containerd.io` 2.x (dépôt Docker)** | `bootstrap/roles/k8s-CRI-install`                                     | cf. A10. Debian 12 natif = 1.6.x (déprécié) → on garde le dépôt Docker (validé sur banc : containerd.io 2.2.4 arm64).                                                                                                                   |
+| containerd | dépôt Docker | **`containerd.io` 2.x (dépôt Docker)** | `bootstrap/roles/k8s-CRI-install`                                     | cf. A10. Debian 13 natif = 1.7.x (déprécié K8s 1.34, retiré 1.36) → dépôt Docker (validé sur banc : containerd.io 2.2.4 arm64).                                                                                                         |
 | Cilium CLI | `stable.txt` | version figée                          | `bootstrap/cni.sh` (L5)                                               | cf. B1.                                                                                                                                                                                                                                 |
 
 Vérifier après bump : `kubeconform` re-passe (CRDs Rook 1.19),
@@ -242,7 +243,7 @@ ADR à rédiger (issus des décisions de ce plan) :
 - `0004-erasure-coding-2plus1-datalake.md` — EC réservé au datalake, compromis
   capacité/durabilité.
 - `0005-cri-containerd-via-depot-docker.md` — `containerd.io` du dépôt Docker
-  (Debian 12 natif = 1.6.x déprécié).
+  (Debian 13 natif = 1.7.x déprécié).
 - `0006-matrice-de-versions-et-politique-de-bump.md` — K8s 1.34 / Cilium 1.19 /
   Rook 1.19 / Ceph Tentacle.
 - `0007-hyperconvergence-control-plane-osd.md` — control-plane détainté portant
@@ -281,7 +282,7 @@ une répétition de bout en bout.
 
 | Aspect                                         | Faisable sous Docker ? | Détail                                                                                                                                                                                |
 | ---------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Syntaxe / lint / idempotence des rôles         | ✅ Oui                 | Via **Molecule + driver Docker** sur image Debian 12 systemd-enabled. Couvre install paquets (containerd, kubeadm/kubelet/kubectl), keyrings, config sysctl/containerd, version pins. |
+| Syntaxe / lint / idempotence des rôles         | ✅ Oui                 | Via **Molecule + driver Docker** sur image Debian 13 systemd-enabled. Couvre install paquets (containerd, kubeadm/kubelet/kubectl), keyrings, config sysctl/containerd, version pins. |
 | `swapoff` / fstab (A1)                         | ⚠️ Partiel             | Pas de swap dans un conteneur → logique testable mais non représentative.                                                                                                             |
 | Modules noyau `br_netfilter`/`overlay` (A6)    | ❌ Non                 | Modules partagés avec l'hôte, non chargeables depuis le conteneur.                                                                                                                    |
 | Tâches `reboot` (swap, upgrade-os)             | ❌ Non                 | Incompatibles conteneur → à mocker/skipper en test.                                                                                                                                   |
@@ -296,7 +297,7 @@ une répétition de bout en bout.
    cluster).
 2. **Répétition de bout en bout sur VMs** (Vagrant + libvirt/QEMU, ou multipass)
    avec disques virtuels attachés → seule façon fidèle de tester `kubeadm` +
-   Cilium + Ceph mono-nœud avant le rebuild Debian 12.
+   Cilium + Ceph mono-nœud avant le rebuild Debian 13.
 
 Conclusion : **Docker = oui pour les tests de rôles, non pour l'intégration
 cluster** ; prévoir des VMs pour la validation finale.
@@ -310,7 +311,7 @@ cluster** ; prévoir des VMs pour la validation finale.
 | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Molecule + Docker/Podman (présents)                                                                          | conteneurs **arm64**                                                                                                        | ✅ tests de rôles uniquement (idem section Docker), pas de cluster réel                                             |
 | **VirtualBox 7.2.8 + Vagrant** (présent, à jour) — VMs Debian arm64 + disques + **NVMe virtuel** + snapshots | invité **arm64** mûr en 7.2 ; **invités x86_64 toujours non supportés** sur hôte Apple Silicon (émulation Intel désactivée) | ✅ **backend retenu** (multi-VM/snapshots/NVMe natifs ; même `Vagrantfile` rejouable sur hôte Intel pour le x86_64) |
-| **Lima** (`brew install lima`) — VMs Debian 12 **arm64** + disques attachés                                  | 3-4 VMs (2-4 Go RAM ch.), OSDs sur petits disques virtuels                                                                  | ⚠️ repli mac-natif (très stable arm64) ; réseau multi-VM via `socket_vmnet`                                         |
+| **Lima** (`brew install lima`) — VMs Debian 13 **arm64** + disques attachés                                  | 3-4 VMs (2-4 Go RAM ch.), OSDs sur petits disques virtuels                                                                  | ⚠️ repli mac-natif (très stable arm64) ; réseau multi-VM via `socket_vmnet`                                         |
 | multipass (présent)                                                                                          | **Ubuntu only**                                                                                                             | ❌ diverge de Debian → non fidèle                                                                                   |
 | QEMU **x86_64** émulé (archi fidèle)                                                                         | TCG, très lent                                                                                                              | ❌ impraticable pour un cluster + Ceph                                                                              |
 
@@ -333,7 +334,7 @@ définitif. Ne pas se reposer sur multipass (Ubuntu) ni sur l'émulation x86_64.
 ## Workstream G — Banc de test local (rehearsal de bout en bout)
 
 Objectif : répéter **tout le flux** (bootstrap Ansible → kubeadm → Cilium →
-Rook-Ceph → liaison PVC) sur des VMs locales **avant** le rebuild Debian 12,
+Rook-Ceph → liaison PVC) sur des VMs locales **avant** le rebuild Debian 13,
 comme garde-fou ; + tests de rôles automatisés en CI.
 
 **Backend VM retenu : VirtualBox 7.2.8 + Vagrant** (décision actée ; Lima =
@@ -345,13 +346,13 @@ repli) :
   pour émuler `nvme1n1`/block.db.
 - Réseau **host-only/internal** simulant `10.67.2.0/22` ; **snapshots** pour
   réinitialiser entre runs.
-- Box **Debian 12 arm64** à fournir (importer une box, ou build via
+- Box **Debian 13 arm64** à fournir (importer une box, ou build via
   `packer`/install ISO) — principal effort de mise en place.
 - Invités **arm64** (7.2 mûr) ; invités **x86_64 non supportés** sur Apple
   Silicon → le **même `Vagrantfile` resservira sur hôte Intel** pour la fidélité
   x86_64.
 
-**Comparatif des backends** (cas : 3-4 VMs Debian 12 arm64 sur M3 Max 48 Go) :
+**Comparatif des backends** (cas : 3-4 VMs Debian 13 arm64 sur M3 Max 48 Go) :
 
 | Critère                          | Lima                     | VirtualBox 7.2.8 + Vagrant         |
 | -------------------------------- | ------------------------ | ---------------------------------- |
@@ -372,7 +373,7 @@ Intel** pour l'étape x86_64. (Lima = repli plus stable en arm64 pur.)
 
 **Éléments communs (indépendants du backend)** :
 
-- **3-4 VMs Debian 12** (1 control + 2-3 workers) : 3 suffisent à exercer le
+- **3-4 VMs Debian 13** (1 control + 2-3 workers) : 3 suffisent à exercer le
   quorum mon (3), le réplicat ×3 et l'EC 2+1 ; 4 collent à la topologie réelle.
   ~6-8 Go RAM/VM tiennent dans 48 Go.
 - Par VM : **2-3 disques data virtuels** (~10 Go) + 1 « NVMe » virtuel optionnel
@@ -419,7 +420,7 @@ sous deux conditions :
 
 Séquence concrète :
 
-1. **Canari `dirqual1`** : Phases 1-2 de bout en bout (réinstall Debian 12 +
+1. **Canari `dirqual1`** : Phases 1-2 de bout en bout (réinstall Debian 13 +
    partitionnement + wipe → bootstrap bas niveau → `kubeadm init` + endpoint →
    Cilium). **Gate** : 1-node cluster Ready, `cilium connectivity test` vert.
    C'est le point où l'on débusque les soucis OS/matériel **avant** de toucher
@@ -437,21 +438,21 @@ incrémentale. Le banc VBox doit avoir validé ce même enchaînement au préala
 ### Phase 0 — Banc de test (pré-requis)
 
 - **Dépôt** : Workstream G (`Vagrantfile` multi-VM, inventaire
-  `bootstrap/inventories/local.yaml`, box Debian 12 arm64, disques + NVMe
+  `bootstrap/inventories/local.yaml`, box Debian 13 arm64, disques + NVMe
   virtuels). Optionnel : Molecule en CI.
-- **✅ Banc** : `vagrant up` → 3-4 VMs Debian 12 bootent ; Ansible atteint les
+- **✅ Banc** : `vagrant up` → 3-4 VMs Debian 13 bootent ; Ansible atteint les
   VMs ; `vagrant snapshot save clean` ; `vagrant destroy && up` reproductible.
 - **🖥️ Serveurs** : n/a (outillage).
 
 ### Phase 1 — Préparation OS & runtime (bootstrap bas niveau)
 
-- **Dépôt** : A5 (Debian 12), A2 (keyrings Docker+K8s), A10 (containerd.io via
+- **Dépôt** : A5 (Debian 13), A2 (keyrings Docker+K8s), A10 (containerd.io via
   Docker), A6 (modules noyau), A1 (swap), A7 (holds idempotents), A9 (checks
   réels), D2 (RAM), D5 (partitionnement), E (containerd/K8s repo 1.34).
 - **✅ Banc** : `upgrade→checks→cri→kubeadm` ; **idempotence** (2e run = 0
   changed) ; `containerd` actif + `SystemdCgroup=true` ; swap off ;
   `br_netfilter`/`overlay` chargés ; snapshot.
-- **🖥️ Serveurs** : réinstallation Debian 12 + partitionnement sain (`/var`) +
+- **🖥️ Serveurs** : réinstallation Debian 13 + partitionnement sain (`/var`) +
   wipe disques (`/var/lib/rook`) ; playbooks bas niveau. **Critère** : nœuds
   prêts, `kubeadm`/`kubelet` installés, containerd up.
 
@@ -537,7 +538,7 @@ shellcheck bootstrap/cni.sh storage/ceph/cleanup.sh
 Validations supplémentaires recommandées :
 
 - **Bootstrap** : `ansible-playbook --syntax-check` sur chaque playbook. Sur le
-  parc Debian 12 réinstallé, vérifier l'idempotence (2e run = 0 changed) sur
+  parc Debian 13 réinstallé, vérifier l'idempotence (2e run = 0 changed) sur
   `checks.yaml`, `cri.yaml`, `kubeadm.yaml`, et confirmer que `containerd.io`
   (depuis le dépôt Docker, cf. A10) démarre avec `SystemdCgroup=true`.
 - **Cluster reconstruit** : `kubectl get nodes` (4 Ready),

@@ -9,7 +9,7 @@ export default defineConfig({
   srcDir: '..',
   title: 'Cluster',
   description:
-    'Cluster Kubernetes hyperconvergé — Debian 12, Cilium, Rook-Ceph',
+    'Cluster Kubernetes hyperconvergé — Debian 13, Cilium, Rook-Ceph',
   lang: 'fr-FR',
   cleanUrls: true,
   lastUpdated: true,

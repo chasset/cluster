@@ -1,7 +1,7 @@
 # Runbook — Installation de Kubernetes
 
 Procédure complète d'installation d'un cluster Kubernetes à partir de serveurs
-Debian Bookworm (12), depuis la préparation OS jusqu'à la jonction des workers.
+Debian Trixie (13), depuis la préparation OS jusqu'à la jonction des workers.
 
 ## Préparation des serveurs
 
@@ -71,13 +71,56 @@ nvme1n1                 259:5    0   2,9T  0 disk
 
 ### Installation du système d’exploitation
 
-Pour installer le système d’exploitation, utilisez l’image Debian Bookworm (12)
-et suivez les instructions suivantes :
+Image ISO : **Debian Trixie (13)** **avec firmware non-libre** (DVD officiel ou
+netinst « with firmware »). Le firmware non-libre est obligatoire pour activer
+les cartes réseau **Broadcom BCM57416** ; il est intégré aux ISO officielles
+depuis Debian 12.4.
 
-1. **Téléchargez l’image ISO** de Debian Bookworm (12) depuis le site officiel.
-2. **Attachez l’image ISO** à la machine virtuelle ou au serveur physique.
-3. **Démarrez l’installation** en sélectionnant l’image ISO comme périphérique
-   de démarrage.
+1. **Téléchargez l’image ISO** de Debian Trixie (13) avec firmware.
+2. **Attachez l’image ISO** au serveur (KVM iLO / clé USB).
+3. **Démarrez en mode expert** : au menu de boot, choisir **« Advanced options »
+   → « Expert install »**. Le mode expert est nécessaire sur ce matériel pour
+   pouvoir choisir manuellement l’interface câblée et saisir une IP statique
+   (cf. ci-dessous).
+
+#### Procédure réseau en mode expert (IP statique sur Broadcom BCM57416)
+
+Le BIOS énumère 4 ports 10 GbE — seul **`ens10f0np0`** est câblé sur le réseau
+cluster `10.67.2.0/22`. Il n’y a **pas de serveur DHCP** sur ce réseau, donc
+toute autoconfiguration échoue : il faut configurer l’IP **manuellement**.
+
+1. **Charger les composants d’installation** (étape « Load installer components
+   from CD ») : laisser les défauts ; cocher éventuellement `network-console` si
+   tu veux poursuivre l’install via SSH.
+2. **Détecter le matériel réseau** : si l’installateur signale « **Firmware
+   manquant : `bnxt/…`** », répondre **Oui, charger le firmware**. Avec l’ISO «
+   with firmware » il est trouvé sur le média lui-même. Le pilote noyau
+   **`bnxt_en`** est ensuite chargé automatiquement.
+3. **Si rien n’est détecté**, basculer en console (`Alt+F2`) pour diagnostic :
+   ```bash
+   lspci -nn | grep -i ethernet   # doit lister le BCM57416 (vendor 14e4)
+   modprobe bnxt_en               # force le chargement du pilote
+   dmesg | tail -30               # cherche les erreurs de firmware
+   ```
+   Revenir à l’installateur (`Alt+F1`) et relancer « Détecter le matériel réseau
+   ».
+4. **Choix de l’interface** (l’installateur le demande en mode expert s’il y en
+   a plusieurs) → choisir **`ens10f0np0`** (le port câblé ; les 3 autres ports
+   n’ont pas de lien).
+5. **Configuration automatique du réseau** : le DHCP va échouer (~30 s de
+   timeout) — c’est attendu. Annuler dès qu’il propose un menu.
+6. Au menu suivant, choisir **« Configurer le réseau manuellement »**, puis
+   saisir :
+   - Adresse IP : `10.67.2.11` (puis `.12`, `.13`, `.14` pour les workers)
+   - Masque : `255.255.252.0` (= `/22`)
+   - Passerelle : la passerelle réelle du `/22`
+   - DNS : ton résolveur
+   - Nom de machine : `dirqual1` (puis 2/3/4)
+   - Domaine : **vide**
+
+> Si l’écran « manuel » n’apparaît jamais : soit le DHCP a abouti sur un autre
+> port (revenir au menu principal et relancer « Configurer le réseau »), soit
+> l’interface n’a pas été détectée (cf. firmware, étape 3).
 
 ### Partitionnement du disque de démarrage
 
@@ -94,7 +137,7 @@ donc le disque de boot ainsi (control plane `dirqual1`) :
 | Partition / LV | Taille   | Montage         | FS    | Rôle                                                                |
 | -------------- | -------- | --------------- | ----- | ------------------------------------------------------------------- |
 | ESP            | 512 MiB  | `/boot/efi`     | FAT32 | amorçage EFI                                                        |
-| `boot`         | 1 GiB    | `/boot`         | ext4  | noyaux + initramfs (marge Debian 12)                                |
+| `boot`         | 1 GiB    | `/boot`         | ext4  | noyaux + initramfs (marge Debian 13)                                |
 | `lv_root`      | 40 GiB   | `/`             | ext4  | OS, `/usr`, paquets                                                 |
 | `lv_etcd`      | 10 GiB   | `/var/lib/etcd` | ext4  | isole etcd (control plane) : I/O dédiées, protégé d’un `/var` plein |
 | `lv_var`       | ~360 GiB | `/var`          | ext4  | `containerd`, `kubelet`, `/var/log`, `/var/lib/rook` (mon)          |
@@ -335,8 +378,8 @@ k get pods --all-namespaces
 Installer tailscale sur tous les nœuds.
 
 ```bash
-curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list
+curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list
 sudo apt-get update
 sudo apt-get install tailscale
 sudo tailscale up --ssh

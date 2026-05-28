@@ -2,7 +2,7 @@
 
 Canari **mono-nœud** permettant de rejouer les **phases 1-2 du bootstrap**
 (préparation OS, runtime containerd, `kubeadm init`, CNI Cilium) sur du **vrai
-Debian 12 arm64**, dans une VM jetable, **avant** de toucher les serveurs.
+Debian 13 arm64**, dans une VM jetable, **avant** de toucher les serveurs.
 
 ## Réserves connues
 
@@ -25,7 +25,7 @@ Debian 12 arm64**, dans une VM jetable, **avant** de toucher les serveurs.
 | Ansible (core)                | 2.20.5         | `brew install ansible`                                |
 | shellcheck _(pour les hooks)_ | 0.11           | `brew install shellcheck`                             |
 
-La box `bento/debian-12` arm64 (~600 Mo) est téléchargée par Vagrant au premier
+La box `bento/debian-13` arm64 (~600 Mo) est téléchargée par Vagrant au premier
 `vagrant up`.
 
 ## 1. Démarrer la VM
@@ -51,7 +51,7 @@ ssh -p 2222 -i ~/.vagrant.d/insecure_private_keys/vagrant.key.ed25519 \
     debian@127.0.0.1 'cat /etc/os-release | head -2'
 ```
 
-Tu dois voir `Debian GNU/Linux 12 (bookworm)`.
+Tu dois voir `Debian GNU/Linux 12 (trixie)`.
 
 ## 2. Générer l'inventaire Ansible du banc
 
@@ -99,7 +99,7 @@ done
 
 | Playbook              | Ce qu'il fait                                                                                                                                                |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `checks.yaml`         | asserts OS (Debian 12), RAM, CPU, hostname, UUID ; désactive le swap                                                                                         |
+| `checks.yaml`         | asserts OS (Debian 13), RAM, CPU, hostname, UUID ; désactive le swap                                                                                         |
 | `cri.yaml`            | charge `overlay`/`br_netfilter`, pose les sysctl, ajoute le dépôt **Docker**, installe `containerd.io`, génère `config.toml` avec **`SystemdCgroup = true`** |
 | `kubeadm.yaml`        | dépôt `pkgs.k8s.io/v1.34`, installe `kubelet`+`kubeadm`, mappe `cluster-api → IP control plane` dans `/etc/hosts`                                            |
 | `control-planes.yaml` | installe `kubectl` (control plane uniquement)                                                                                                                |
@@ -187,7 +187,7 @@ rm -f inventory.yaml      # gitignoré, mais on nettoie
 
 | Composant               | Version                                                                              |
 | ----------------------- | ------------------------------------------------------------------------------------ |
-| Box                     | `bento/debian-12` v202510.26.0 arm64                                                 |
+| Box                     | `bento/debian-13` v202510.26.0 arm64                                                 |
 | Noyau                   | 6.1.0-40-arm64                                                                       |
 | containerd              | **containerd.io 2.2.4** (dépôt Docker) — `SystemdCgroup=true`, plugin CRI activé     |
 | kubeadm/kubelet/kubectl | **v1.34.8** (`pkgs.k8s.io/v1.34`)                                                    |
@@ -205,4 +205,4 @@ séquence attendue en prod (à l'IP près).
   `--apiserver-advertise-address`. Ne pas démarrer Rook tant que tu n'as pas ≥ 3
   nœuds Ready.
 - **Fidélité x86_64** : rejouer ce `Vagrantfile` sur un hôte Intel (Mac/Linux).
-  La box `bento/debian-12` existe aussi en amd64 et la même config fonctionne.
+  La box `bento/debian-13` existe aussi en amd64 et la même config fonctionne.
