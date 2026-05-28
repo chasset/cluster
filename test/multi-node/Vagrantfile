@@ -68,7 +68,15 @@ Vagrant.configure("2") do |config|
 
   # Provision commun à toutes les VMs : crée le compte `debian` (sudo
   # NOPASSWD + même clé SSH que vagrant) pour rejouer les rôles Ansible
-  # tels quels.
+  # tels quels, et pose une route persistante pour le CIDR services K8s
+  # (10.96.0.0/12) via eth1.
+  #
+  # Pourquoi cette route ? Sans elle, les workers ne peuvent pas joindre
+  # l'API service ClusterIP (10.96.0.1) : leur route par défaut va via
+  # eth0 (NAT Vagrant 10.0.2.x), donc le SYN sort avec source IP NAT et
+  # l'API ne peut pas y répondre. Cf. drift #7 dans test/RESULTS.md.
+  # En prod, ce problème n'existe pas car les nœuds n'ont qu'une seule
+  # interface réseau (eth0 = 10.67.2.X).
   config.vm.provision "shell", inline: <<-SHELL
     set -eu
     id debian >/dev/null 2>&1 || useradd -m -s /bin/bash debian
@@ -78,6 +86,16 @@ Vagrant.configure("2") do |config|
     chmod 600 /home/debian/.ssh/authorized_keys
     echo 'debian ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/debian
     chmod 440 /etc/sudoers.d/debian
+
+    # Route persistante via systemd-networkd drop-in
+    install -d /etc/systemd/network/10-eth1.network.d
+    cat > /etc/systemd/network/10-eth1.network.d/k8s-services-route.conf <<'NET'
+[Route]
+Destination=10.96.0.0/12
+Scope=link
+NET
+    # Pose immédiatement sans attendre le reboot
+    ip route replace 10.96.0.0/12 dev eth1 || true
   SHELL
 
   DIRQUAL_HOSTS.each do |host|

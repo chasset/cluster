@@ -218,3 +218,98 @@ le redéploiement banc sur la plage `192.168.67.0/24`.
 qui rendent les rôles compatibles avec un réseau multi-IP sans surcharger la
 prod (variables optionnelles), soit (#6) une erreur de conception du banc qui a
 corrigée la plage IP.
+
+---
+
+## Run #2 (2026-05-28 après-midi) — banc sur 192.168.67.0/24
+
+Relance du banc après les correctifs précédents. **3 nouveaux drifts détectés**,
+dont **deux qui impactent la prod** (architecture Rook 1.19+).
+
+### ✅ Validé sur ce run
+
+- 3 VMs Debian 13 arm64 sur `192.168.67.0/24` (drift #6 résolu).
+- Phase 1 idempotente (`changed=0` au 2ᵉ run).
+- Phase 2 : `kubeadm init` avec `control_plane_ip=192.168.67.11`, workers
+  joints, `kubelet_node_ip` opérationnel.
+- Cilium 1.19.4 + 3 agents Running après ajout de la route
+  `10.96.0.0/12 dev eth1` (drift #7).
+- Rook v1.19.6 + **CephCluster HEALTH_OK** après ajout du `ceph-csi-operator`
+  (drift #8). 3 mons quorum + 2 mgr + 3 OSDs up.
+- Image `quay.io/ceph/ceph:v20.2.1` disponible en **arm64** ✓.
+
+### 🔴 #7 — Workers ne peuvent pas joindre ClusterIP API (corrigé, banc-only)
+
+**Cause** : route par défaut workers via NAT eth0 → `curl 10.96.0.1` part avec
+source IP NAT `10.0.2.15`, l'API à `192.168.67.11` ne peut pas y répondre.
+Conntrack montre `UNREPLIED`.
+
+**Correctif** : route `10.96.0.0/12 dev eth1` posée par le provisioner
+[Vagrantfile](multi-node/Vagrantfile) via systemd-networkd drop-in.
+
+**Statut prod** : non-applicable — eth0 prod = interface cluster unique.
+
+### 🔴 #8 — Rook 1.19+ : CRDs `csi.ceph.io` manquants (impact PROD)
+
+**Cause** : à partir de Rook 1.19, le provisioning CSI est délégué à un
+opérateur séparé
+[`ceph-csi-operator`](https://github.com/ceph/ceph-csi-operator). Les CRDs
+`cephconnections.csi.ceph.io`, `clientprofiles.csi.ceph.io`,
+`drivers.csi.ceph.io`, etc. **ne sont plus dans le `crds.yaml` de Rook**.
+
+**Symptôme** : `CephCluster Progressing` →
+`no matches for kind "CephConnection" in version "csi.ceph.io/v1"`.
+
+**Correctif appliqué (banc)** :
+
+```bash
+kubectl apply --server-side -f \
+    https://raw.githubusercontent.com/ceph/ceph-csi-operator/v0.3.0/deploy/all-in-one/install.yaml
+```
+
+**Statut prod** : **bloquant** — le drift se reproduira identique en prod.
+Action requise : ajouter `storage/ceph/csi-operator.yaml` au dépôt + documenter
+dans le RUNBOOK Ceph qu'il faut l'appliquer **avant** `cluster.yaml`.
+
+### 🟠 #9 — Driver CSI pas instancié → PVC pending (impact PROD)
+
+**Cause** : `ceph-csi-operator` ne déploie pas les plugins `csi-rbdplugin` /
+`csi-cephfsplugin` automatiquement — il faut créer des objets `Driver` (CR).
+Sans eux : `PVC` reste `Pending` avec
+`Waiting for external provisioner 'rook-ceph.rbd.csi.ceph.com'`.
+
+**Statut** : non corrigé dans ce run. À documenter pour Phase 3 prod :
+`storage/ceph/csi-drivers.yaml` qui pose les Driver CRs RBD + CephFS.
+
+### 🟠 #10 — OSDs Pending : `osd.requests.memory=2Gi` (banc-spécifique)
+
+**Cause** : sur banc 5 GiB/VM × 12 OSDs créés, seuls 3 schedulables (1 par
+hôte). HEALTH_OK quand même car suffit pour réplicat ×3 + `failureDomain: host`.
+
+**Statut prod** : OK (251 GiB/nœud). À vérifier via le scénario
+[`08-resource-limits-audit.sh`](scenarios/08-resource-limits-audit.sh) que la
+réservation cumulée ne pose pas problème quand d'autres workloads cohabitent.
+
+---
+
+## Suite de scénarios reproductibles
+
+Suivant les questions opérationnelles posées, une
+[suite de 8 scénarios](scenarios/README.md) a été écrite — chacun
+auto-documenté, idempotent, avec cleanup automatique :
+
+| #   | Scénario                        | Question opérationnelle adressée                   |
+| --- | ------------------------------- | -------------------------------------------------- |
+| 01  | Stockage bloc PVC write/read    | Le stockage bloc fonctionne-t-il ?                 |
+| 02  | Reschedule pod                  | Que se passe-t-il si on détruit un replica (pod) ? |
+| 03  | Perte d'un worker               | Rook-Ceph résiste-t-il à la perte d'un worker ?    |
+| 04  | Perte du control plane          | Que se passe-t-il si le control plane plante ?     |
+| 05  | Bump réplication ×3 → ×N        | Que se passe-t-il si on augmente la réplication ?  |
+| 06  | Datalake smoke-test S3          | Le stockage objet fonctionne-t-il ?                |
+| 07  | Cilium connectivity test        | Tests Cilium                                       |
+| 08  | Audit requests/limits Rook-Ceph | Dimensionnement vs scheduling                      |
+
+**État** : les 8 scripts sont **écrits, shellcheck vert, prêts à dérouler**.
+Leur **exécution complète sur le banc** est gated par le drift #9 (Driver CSI).
+En prod, ils tourneront de bout en bout après que `csi-operator.yaml` +
+`csi-drivers.yaml` soient appliqués.
