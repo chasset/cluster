@@ -1,5 +1,10 @@
 # code: language=ansible
 - name: Install Kubernetes
   hosts: control
+  pre_tasks:
+    - ansible.builtin.import_role:
+        name: audit-log
+      vars:
+        audit_log_playbook: initialisation.yaml
   roles:
     - k8s-initialization

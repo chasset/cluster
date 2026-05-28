@@ -101,6 +101,35 @@ if [ "$reachable_n" -eq 0 ]; then
     exit 2
 fi
 
+# ─── Couche 0 — Registre Ansible (audit-log /var/log/cluster-bootstrap.log) ─
+# Le rôle `audit-log` appose chaque exécution de playbook dans
+# /var/log/cluster-bootstrap.log. Cette couche affiche le dernier
+# enregistrement par nœud et signale les nœuds joignables mais jamais touchés
+# par Ansible — drift potentiel entre OS installé et bootstrap appliqué.
+section "Registre Ansible (audit-log par nœud)"
+for h in "${reachable[@]}"; do
+    last_line=$(ssh_q "$h" 'sudo tail -n 1 /var/log/cluster-bootstrap.log 2>/dev/null')
+    if [ -z "$last_line" ]; then
+        mark fail "$h : aucune trace de playbook (audit-log absent)" \
+                  "lancer au minimum bootstrap/checks.yaml (rôle audit-log posera la 1re ligne)"
+        continue
+    fi
+    last_ts=$(awk '{print $1}' <<<"$last_line")
+    last_play=$(awk -F'playbook=' '{print $2}' <<<"$last_line" | awk '{print $1}')
+    # Calcul de l'âge côté serveur (GNU date) pour rester portable mac↔linux.
+    age=$(ssh_q "$h" "
+        last=\$(sudo tail -n 1 /var/log/cluster-bootstrap.log 2>/dev/null | awk '{print \$1}')
+        if [ -n \"\$last\" ]; then
+            now=\$(date -u +%s)
+            le=\$(date -d \"\$last\" +%s 2>/dev/null || echo 0)
+            if [ \"\$le\" -gt 0 ]; then
+                echo \$(( (now - le) / 60 ))
+            fi
+        fi
+    ")
+    mark ok "$h : dernier playbook=${last_play:-?} à ${last_ts:-?} (il y a ${age:-?} min)"
+done
+
 # ─── Couche 1 — Premier accès / sshd hardening ─────────────────────────────
 section "Premier accès SSH (bootstrap/first-access.sh)"
 for h in "${reachable[@]}"; do

@@ -6,5 +6,10 @@
 - name: Sauvegarde etcd (control-plane uniquement)
   hosts: control
   become: true
+  pre_tasks:
+    - ansible.builtin.import_role:
+        name: audit-log
+      vars:
+        audit_log_playbook: etcd-backup.yaml
   roles:
     - etcd-backup

@@ -413,6 +413,83 @@ sudo tailscale up --ssh
 
 Voir [`storage/ceph/RUNBOOK.md`](../storage/ceph/RUNBOOK.md).
 
+## Audit-log et rollback (Workstream I)
+
+### Audit-log : qui a fait quoi quand sur chaque nœud
+
+Chaque playbook bootstrap invoque en `pre_tasks` le rôle
+[`audit-log`](roles/audit-log/), qui pose une ligne dans
+`/var/log/cluster-bootstrap.log` du nœud cible :
+
+```text
+2026-05-28T14:32:01Z playbook=cri.yaml from=pierre@laptop ssh-as=debian
+```
+
+Format : timestamp UTC ISO-8601, nom du playbook, identité de l'opérateur sur le
+poste de contrôle (`$USER@hostname`), nom du compte SSH côté serveur (`debian`).
+
+Lecture :
+
+```bash
+ssh debian@dirqual1 'sudo tail -n 20 /var/log/cluster-bootstrap.log'
+```
+
+[`bootstrap/state.sh`](state.sh) **couche 0** lit ce journal et affiche par nœud
+:
+
+- le dernier playbook joué + son âge → suivi rapide.
+- l'absence totale de trace → drift potentiel : OS installé mais aucun bootstrap
+  appliqué, ou rotation/effacement du log.
+
+### Rollback du bootstrap K8s
+
+[`rollback.yaml`](rollback.yaml) ramène un nœud à un état "Debian 13 +
+utilisateur debian + first-access" — comme si aucun playbook K8s n'avait été
+joué :
+
+```bash
+# Sur le banc (exige confirmation explicite)
+ansible-playbook -i ../test/multi-node/inventory.yaml rollback.yaml \
+  -e confirm=yes --limit dirqual1
+```
+
+Ce que le rollback fait :
+
+- `kubeadm reset --force`
+- stoppe + désactive `kubelet` et `containerd`
+- `apt purge` des paquets K8s et `containerd.io`, autoremove
+- supprime `/etc/kubernetes`, `/etc/cni`, `/etc/containerd`,
+  `/var/lib/{kubelet,etcd,cni}`, `/opt/cni`, les drop-ins `modules-load.d` et
+  `sysctl.d` posés par le bootstrap, et les dépôts APT correspondants
+- décharge les modules `overlay` et `br_netfilter`
+
+Ce que le rollback **ne** touche **pas** :
+
+- [`first-access.sh`](first-access.sh) (drop-in sshd + sudoers + clé SSH) ;
+- [`security/secure.yml`](security/) (hardening opt-in : auditd, fail2ban, mises
+  à jour automatiques) ;
+- [le partitionnement et l'installation OS](#partitionnement-du-disque-de-démarrage)
+  ;
+- les **disques Ceph** + `/var/lib/rook` → utiliser
+  [`storage/ceph/cleanup.sh`](../storage/ceph/cleanup.sh).
+
+Cas d'usage typique sur le banc :
+
+```bash
+# 1. Bootstrap complet
+for p in checks cri kubeadm control-planes initialisation; do
+  ansible-playbook -i inventory.yaml ../../bootstrap/$p.yaml
+done
+
+# 2. Rollback
+ansible-playbook -i inventory.yaml ../../bootstrap/rollback.yaml -e confirm=yes
+
+# 3. Re-bootstrap (test d'idempotence à blanc)
+for p in checks cri kubeadm control-planes initialisation; do
+  ansible-playbook -i inventory.yaml ../../bootstrap/$p.yaml
+done
+```
+
 ## Maintenance
 
 ### Mise à jour des systèmes d’exploitation

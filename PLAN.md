@@ -492,6 +492,52 @@ regroupées ici pour intégration dans la Phase 5.
   ouverture externe) — bascule sur auth `PASSWORD` via Secret, ou outil
   multi-utilisateurs (JupyterHub, Posit Workbench).
 
+## Workstream I — Audit-log et rollback du bootstrap
+
+Audit (mai 2026) du bootstrap pour identifier les capacités d'audit (« qui a
+fait quoi quand ») et de rollback (« comment annuler »). État initial :
+
+- Côté serveur : `auditd` (couche `--tags audit` opt-in) capture les syscalls
+  privilégiés mais sans identité humaine ; `journalctl` voit les `sudo` mais
+  c'est dispersé.
+- Côté contrôle : `ansible-playbook` n'a aucun log persistant — la sortie vit
+  dans le terminal puis disparaît.
+- Rollback : seul `kubeadm reset` existe ; aucun script pour ramener un nœud à
+  un état neutre.
+
+### I1. Audit-log par nœud (rôle Ansible `audit-log`) — 🟠
+
+- [`bootstrap/roles/audit-log/`](bootstrap/roles/audit-log/) : appose une ligne
+  timestampée dans `/var/log/cluster-bootstrap.log` à chaque exécution de
+  playbook (timestamp UTC, nom du playbook, opérateur `$USER@hostname` côté
+  contrôle, compte SSH côté serveur).
+- Chaque playbook
+  (`checks/cri/kubeadm/control-planes/initialisation/ join-workers/upgrade/etcd-backup/rollback`)
+  inclut le rôle en `pre_tasks`.
+
+### I2. Rollback du bootstrap K8s — 🟠
+
+- [`bootstrap/rollback.yaml`](bootstrap/rollback.yaml) +
+  [`bootstrap/roles/k8s-rollback/`](bootstrap/roles/k8s-rollback/) :
+  `kubeadm reset` + `apt purge` K8s/containerd + supprime configs noyau et
+  dépôts APT. Confirmation explicite via `-e confirm=yes`.
+- Hors périmètre : `first-access.sh`, `secure.yml`, partitionnement, disques
+  Ceph (cf. `storage/ceph/cleanup.sh`).
+
+### I3. Corrélation audit-log ↔ state.sh — 🟡
+
+- [`bootstrap/state.sh`](bootstrap/state.sh) **couche 0** lit
+  `/var/log/cluster-bootstrap.log` et affiche par nœud :
+  - dernier playbook joué + âge en minutes,
+  - drift : nœud joignable sans aucune trace de playbook (= OS installé mais
+    bootstrap pas appliqué).
+
+### I4. Documentation — 📝
+
+- [`bootstrap/RUNBOOK.md`](bootstrap/RUNBOOK.md) — section « Audit-log et
+  rollback (Workstream I) » : usage, format du journal, cas d'usage typique
+  (bootstrap → rollback → re-bootstrap = test d'idempotence à blanc).
+
 ---
 
 ## Phasage pas à pas (banc VBox → serveurs)

@@ -3,5 +3,10 @@
   hosts:
     - cloud
     - vm
+  pre_tasks:
+    - ansible.builtin.import_role:
+        name: audit-log
+      vars:
+        audit_log_playbook: upgrade.yaml
   roles:
     - upgrade-os
