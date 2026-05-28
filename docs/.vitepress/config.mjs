@@ -89,7 +89,25 @@ export default defineConfig({
       },
       {
         text: 'Banc de test (VirtualBox)',
-        items: [{ text: 'Guide canari', link: '/test/' }],
+        items: [
+          { text: "Vue d'ensemble", link: '/test/' },
+          { text: 'Mono-nœud (Phase 1-2)', link: '/test/single-node/' },
+          { text: 'Multi-nœuds (Phase 1-5 + Ceph)', link: '/test/multi-node/' },
+        ],
+      },
+      {
+        text: 'Décisions (ADR)',
+        items: [
+          { text: 'Index', link: '/docs/decisions/' },
+          {
+            text: '0010 — Dashboard cluster-admin',
+            link: '/docs/decisions/0010-dashboard-cluster-admin',
+          },
+          {
+            text: '0011 — Registry HTTP sans auth',
+            link: '/docs/decisions/0011-registry-http-sans-auth',
+          },
+        ],
       },
     ],
     search: { provider: 'local' },

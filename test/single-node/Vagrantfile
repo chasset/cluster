@@ -1,9 +1,14 @@
 # Banc de test local (VirtualBox) — canari mono-nœud.
+#
 # Valide les phases 1-2 du bootstrap (OS/runtime + kubeadm init + Cilium) sur
 # du vrai Debian 13 arm64, avant le rebuild des serveurs.
 #
-#   cd test && vagrant up
-#   ../bootstrap puis: ansible-playbook -i inventory.yaml <playbook>  (cf. README.md)
+#   cd test/single-node && vagrant up
+#   (puis playbooks Ansible avec inventory.yaml — cf. README.md)
+#
+# Périmètre :
+#   - 1 VM, pas de disque additionnel → pas de Ceph
+#   - Pour tester Rook-Ceph (Phase 3+), utiliser `test/multi-node`
 #
 # Réserves : arm64 (≠ x86_64 cible), échelle réduite (fonctionnel, pas perf).
 Vagrant.configure("2") do |config|

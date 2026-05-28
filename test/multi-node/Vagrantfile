@@ -1,0 +1,104 @@
+# Banc de test local (VirtualBox) — multi-nœuds avec disques pour Ceph.
+#
+# Valide les Phases 1-3 du PLAN (bootstrap + kubeadm join workers + Rook-Ceph)
+# sur du vrai Debian 13 arm64, avant le rebuild des serveurs.
+#
+#   cd test && vagrant up
+#   ../bootstrap puis: ansible-playbook -i inventory.yaml <playbook>  (cf. README.md)
+#
+# Topologie reproduisant la prod (à l'arch et à l'échelle près) :
+#   - 3 VMs Debian 13 (dirqual1 control + dirqual2/3 workers)
+#   - Réseau privé 10.67.2.0/24 (mêmes IPs que la prod : .11/.12/.13)
+#   - Par VM : 3 HDD virtuels 10 GiB (sdb/sdc/sdd) + 1 NVMe virtuel 5 GiB
+#     (simulent les 12 HDD SAS + 1 NVMe block.db de la prod, en miniature)
+#
+# Réserves : arm64 (≠ x86_64 cible), échelle réduite (fonctionnel, pas perf).
+# Pré-requis hôte : VBox doit autoriser le réseau host-only 10.67.2.0/24 —
+# ajouter dans /etc/vbox/networks.conf (cf. test/README.md).
+
+require 'fileutils'
+
+DIRQUAL_HOSTS = [
+  { name: "dirqual1", ip: "10.67.2.11", role: "control" },
+  { name: "dirqual2", ip: "10.67.2.12", role: "worker"  },
+  { name: "dirqual3", ip: "10.67.2.13", role: "worker"  },
+].freeze
+
+# Disques additionnels stockés à côté du Vagrantfile, gitignorés.
+DISKS_DIR = File.join(File.dirname(__FILE__), ".vagrant", "ceph-disks")
+HDD_SIZE_MB = 10_240   # 10 GiB par HDD virtuel
+NVMe_SIZE_MB = 5_120   # 5 GiB pour le block.db NVMe
+HDD_COUNT = 3          # par VM (prod = 12, on réduit pour le banc)
+
+FileUtils.mkdir_p(DISKS_DIR)
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "bento/debian-13"
+  config.vm.box_architecture = "arm64"
+  config.ssh.insert_key = false
+
+  # Provision commun à toutes les VMs : crée le compte `debian` (sudo
+  # NOPASSWD + même clé SSH que vagrant) pour rejouer les rôles Ansible
+  # tels quels.
+  config.vm.provision "shell", inline: <<-SHELL
+    set -eu
+    id debian >/dev/null 2>&1 || useradd -m -s /bin/bash debian
+    install -d -m 700 -o debian -g debian /home/debian/.ssh
+    cp /home/vagrant/.ssh/authorized_keys /home/debian/.ssh/authorized_keys
+    chown debian:debian /home/debian/.ssh/authorized_keys
+    chmod 600 /home/debian/.ssh/authorized_keys
+    echo 'debian ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/debian
+    chmod 440 /etc/sudoers.d/debian
+  SHELL
+
+  DIRQUAL_HOSTS.each do |host|
+    config.vm.define host[:name] do |node|
+      node.vm.hostname = host[:name]
+      node.vm.network "private_network", ip: host[:ip]
+
+      node.vm.provider "virtualbox" do |vb|
+        vb.name = host[:name]
+        vb.cpus = 2
+        vb.memory = 5120  # 5 GiB / VM × 3 VMs = 15 GiB total
+
+        # ── HDD virtuels (sdb/sdc/sdd) ────────────────────────────
+        # Attachés au contrôleur SATA déjà présent dans la box.
+        # Ports 1..N (port 0 = disque OS).
+        (1..HDD_COUNT).each do |i|
+          disk = File.join(DISKS_DIR, "#{host[:name]}-hdd#{i}.vdi")
+          unless File.exist?(disk)
+            vb.customize ["createhd", "--filename", disk,
+                          "--size", HDD_SIZE_MB, "--format", "VDI"]
+          end
+          vb.customize ["storageattach", :id,
+                        "--storagectl", "SATA Controller",
+                        "--port", i.to_s, "--device", "0",
+                        "--type", "hdd", "--medium", disk]
+        end
+
+        # ── NVMe virtuel (block.db) ───────────────────────────────
+        # Sur un nouveau contrôleur NVMe dédié. Le device apparaîtra
+        # comme /dev/nvme0n1 (banc) vs /dev/nvme1n1 (prod, où le disque
+        # OS est aussi sur NVMe). state.sh accepte CEPH_BLOCK_DEVICE
+        # via variable d'env pour cette différence.
+        nvme = File.join(DISKS_DIR, "#{host[:name]}-nvme.vdi")
+        unless File.exist?(nvme)
+          vb.customize ["createhd", "--filename", nvme,
+                        "--size", NVMe_SIZE_MB, "--format", "VDI"]
+        end
+        # `storagectl ... --add` échoue si déjà créé : on tolère via
+        # un flag fichier par VM (idempotent multi-up).
+        nvme_ctl_flag = File.join(DISKS_DIR, "#{host[:name]}-nvme-ctl.flag")
+        unless File.exist?(nvme_ctl_flag)
+          vb.customize ["storagectl", :id, "--name", "NVMe",
+                        "--add", "pcie", "--controller", "NVMe",
+                        "--portcount", "1"]
+          FileUtils.touch(nvme_ctl_flag)
+        end
+        vb.customize ["storageattach", :id,
+                      "--storagectl", "NVMe", "--port", "0",
+                      "--type", "hdd", "--medium", nvme]
+      end
+    end
+  end
+end
