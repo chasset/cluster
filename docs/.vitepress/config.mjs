@@ -95,6 +95,7 @@ export default defineConfig({
           { text: "Vue d'ensemble", link: '/test/' },
           { text: 'Mono-nœud (Phase 1-2)', link: '/test/single-node/' },
           { text: 'Multi-nœuds (Phase 1-5 + Ceph)', link: '/test/multi-node/' },
+          { text: 'Résultats du dernier banc', link: '/test/RESULTS' },
         ],
       },
       {

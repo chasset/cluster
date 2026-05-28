@@ -4,10 +4,16 @@
     - name: Initialize the control plane
       become: true
       become_method: ansible.builtin.sudo
+      # `--apiserver-advertise-address` est posé automatiquement si la
+      # variable `control_plane_ip` est définie (typiquement sur le banc
+      # multi-node : annoncer l'IP du réseau privé inter-VM au lieu du
+      # NAT par défaut). En prod, on laisse la variable vide et kubeadm
+      # détecte l'IP de l'interface principale.
       ansible.builtin.command: >-
         kubeadm init
         --control-plane-endpoint {{ control_plane_endpoint }}:{{ control_plane_port }}
         --upload-certs
+        {{ '--apiserver-advertise-address=' ~ control_plane_ip if control_plane_ip | default('') | length > 0 else '' }}
       args:
         creates: /etc/kubernetes/admin.conf
 
