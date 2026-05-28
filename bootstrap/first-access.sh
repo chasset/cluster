@@ -60,25 +60,55 @@ for h in "${hosts[@]}"; do
     # du script comme mot de passe.)
     ssh "$USER_REMOTE@$h" 'cat > /tmp/cluster-first-access.sh' <<'REMOTE'
 #!/bin/bash
+# Idempotent : on n'écrit chaque drop-in qu'en cas de différence de contenu
+# ou de mode, et on ne reload sshd que si son drop-in a changé.
 set -euo pipefail
 
-install -m 0440 /dev/stdin /etc/sudoers.d/90-debian-nopasswd <<'SUDOERS'
-debian ALL=(ALL) NOPASSWD: ALL
-SUDOERS
+write_if_changed() {
+    # write_if_changed MODE DEST CONTENT
+    # Retourne 0 si le fichier a été (ré)écrit, 1 s'il était déjà conforme.
+    local mode=$1 dest=$2 content=$3
+    local want_mode=${mode#0}
+    if [ -f "$dest" ]; then
+        local cur cur_mode
+        cur=$(cat "$dest")
+        cur_mode=$(stat -c '%a' "$dest")
+        if [ "$cur" = "$content" ] && [ "$cur_mode" = "$want_mode" ]; then
+            return 1
+        fi
+    fi
+    install -m "$mode" -D /dev/stdin "$dest" <<<"$content"
+    return 0
+}
 
-install -m 0644 -D /dev/stdin /etc/ssh/sshd_config.d/00-hardening.conf <<'SSHD'
-# Géré par cluster/bootstrap/first-access.sh — ne pas éditer à la main.
+sudoers_content='debian ALL=(ALL) NOPASSWD: ALL'
+
+sshd_content='# Géré par cluster/bootstrap/first-access.sh — ne pas éditer à la main.
 PasswordAuthentication no
 PubkeyAuthentication yes
 PermitRootLogin no
 AllowUsers debian
 MaxAuthTries 3
 ClientAliveInterval 300
-ClientAliveCountMax 3
-SSHD
-systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+ClientAliveCountMax 3'
 
-echo "  → sudo NOPASSWD + sshd durci"
+changed=0
+if write_if_changed 0440 /etc/sudoers.d/90-debian-nopasswd "$sudoers_content"; then
+    echo "  → sudo NOPASSWD posé"
+    changed=1
+fi
+
+if write_if_changed 0644 /etc/ssh/sshd_config.d/00-hardening.conf "$sshd_content"; then
+    echo "  → sshd drop-in posé"
+    systemctl reload ssh 2>/dev/null || systemctl reload sshd 2>/dev/null || true
+    changed=1
+fi
+
+if [ "$changed" -eq 0 ]; then
+    echo "  → déjà conforme, rien à faire"
+else
+    echo "  → hardening appliqué"
+fi
 REMOTE
 
     ssh -t "$USER_REMOTE@$h" \
