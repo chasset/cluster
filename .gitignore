@@ -22,3 +22,7 @@ secrets/
 # Temp
 tmp/
 *.tmp
+
+# Vagrant test bench (local state + machine-specific inventory)
+test/.vagrant/
+test/inventory.yaml
