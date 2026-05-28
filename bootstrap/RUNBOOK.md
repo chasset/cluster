@@ -214,16 +214,16 @@ documentés dans le dépôt).
 > (`/etc/systemd/network/*.network`) ou NetworkManager
 > (`/etc/NetworkManager/system-connections/*.nmconnection`).
 
-## Premier accès et durcissement initial
+## Premier accès SSH
 
-Le script [`first-access.sh`](first-access.sh) automatise, depuis le poste de
-contrôle, le hardening minimal de chaque nœud fraîchement installé : dépôt de la
-clé SSH (`ssh-copy-id`), `sudo NOPASSWD` pour `debian`, durcissement du service
-SSH (`PasswordAuthentication off`, `PermitRootLogin no`, `AllowUsers debian`,
-`MaxAuthTries 3`, etc.), et activation des mises à jour de sécurité
-(`unattended-upgrades`).
+Le script [`first-access.sh`](first-access.sh) automatise le **strict minimum**
+nécessaire pour qu'Ansible puisse ensuite piloter les nœuds sans mot de passe :
+dépôt de la clé publique de l'opérateur (`ssh-copy-id`) et règle `sudo NOPASSWD`
+pour `debian`. Tout le reste du durcissement est délégué au dépôt
+[`server-security`](https://github.com/univ-lehavre/server-security) (cf.
+section suivante).
 
-Pré-requis : avoir une clé SSH locale.
+Pré-requis : disposer d'une clé SSH locale.
 
 ```bash
 ssh-keygen -t ed25519               # si absent
@@ -241,36 +241,34 @@ NEW_DEBIAN_PASSWORD='choisir-un-mot-de-passe-robuste' \
   bash bootstrap/first-access.sh
 ```
 
-Le script demande **deux fois** le mot de passe SSH par hôte la 1re passe
-(`ssh-copy-id` puis `sudo`) ; les runs suivants sont silencieux et idempotents.
-À l'issue, Ansible (et le dépôt
-[`server-security`](https://github.com/univ-lehavre/server-security)) peuvent
-piloter les nœuds sans mot de passe.
+La 1re passe demande **deux fois** le mot de passe par hôte (`ssh-copy-id` puis
+`sudo`). Les runs suivants sont silencieux et idempotents.
 
-### Désactiver le swap
+## Durcissement de l'OS (server-security)
 
-Kubernetes refuse de s'installer si le swap est actif.
-
-```bash
-sudo lvdisplay
-sudo umount /dev/control1-vg/swap_1
-sudo lvremove /dev/control1-vg/swap_1
-sudo lvdisplay
-```
-
-### Pare-feu
+Le dépôt [`server-security`](https://github.com/univ-lehavre/server-security)
+porte les rôles Ansible de durcissement complet : `sshd` (clés seulement, root
+off, etc.), `unattended-upgrades`, **UFW**, `fail2ban`, `auditd`, `postfix`
+(redirection des mails système), gestion du compte admin (expiration mot de
+passe). Source unique de vérité pour la sécurité de base.
 
 ```bash
-# Paramétrer le firewall
-# Attention : ce paramétrage bloque l’accès au cluster IP
-sudo apt-get update
-sudo apt-get install ufw
-sudo ufw default deny incoming
-sudo ufw default allow outgoing
-sudo ufw allow ssh
-sudo ufw enable
-sudo ufw status verbose
+git clone https://github.com/univ-lehavre/server-security.git
+cd server-security
+cp .env.example .env && $EDITOR .env       # MAIL_ROOT_REDIRECT, HOST_USER, …
+set -a; source .env; set +a
+ansible-playbook secure.yml
 ```
+
+> ⚠️ **UFW × Kubernetes** : le rôle `network/ufw.yml` durcit le pare-feu. Pour
+> que les workers puissent joindre le control plane et que Cilium fonctionne, il
+> faut autoriser les ports K8s/Cilium (`6443/tcp`, `10250/tcp`, `2379-2380/tcp`,
+> `30000-32767/tcp`, VXLAN `8472/udp`, Cilium health `4240/tcp`) — soit en
+> étendant `roles/network/files/ufw.yml`, soit en reportant l'activation d'UFW à
+> après le bootstrap du cluster.
+
+La désactivation du swap n'apparaît plus ici : elle est gérée automatiquement
+par le rôle Ansible `k8s-pre-install` du présent dépôt (`checks.yaml`).
 
 ## Installation de k8s
 
