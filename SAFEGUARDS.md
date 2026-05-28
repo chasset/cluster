@@ -59,6 +59,16 @@ Posés par [Lefthook](https://lefthook.dev/) au premier `pnpm install` (config :
 - À chaque push sur `main` : build + déploiement sur
   [GitHub Pages](https://univ-lehavre.github.io/cluster/).
 
+[`.github/workflows/release.yml`](.github/workflows/release.yml) :
+
+- À chaque push sur `main` :
+  [release-please](https://github.com/googleapis/release-please) ouvre (ou met à
+  jour) une PR de release qui bumpe `package.json` et `CHANGELOG.md` d'après les
+  Conventional Commits. Le merge de cette PR pousse le tag `vX.Y.Z` et publie
+  une [GitHub Release](https://github.com/univ-lehavre/cluster/releases). →
+  Aucune version flottante en main, et chaque tag est lié à un set de commits
+  explicitement validé par un opérateur.
+
 ## Bancs d'essai Vagrant
 
 [`test/`](test/) — deux topologies pour valider sur **vrai Debian 13** avant de

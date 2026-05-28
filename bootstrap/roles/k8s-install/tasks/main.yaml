@@ -48,6 +48,24 @@
         - kubelet
         - kubeadm
 
+    - name: Configure KUBELET_EXTRA_ARGS for --node-ip when needed
+      # `kubelet_node_ip` (optionnel) surcharge l'IP que kubelet annonce
+      # comme INTERNAL-IP du nœud. Utile sur le banc multi-node où chaque
+      # VM a deux interfaces (NAT eth0 + privée eth1) : sans ça, kubelet
+      # prend le NAT, et Cilium agent ne peut pas joindre l'API depuis
+      # les workers. En prod, on laisse vide → kubelet détecte l'IP de
+      # l'interface cluster (10.67.2.X).
+      ansible.builtin.copy:
+        dest: /etc/default/kubelet
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          # Géré par bootstrap/roles/k8s-install — ne pas éditer à la main.
+          KUBELET_EXTRA_ARGS="--node-ip={{ kubelet_node_ip }}"
+      when: kubelet_node_ip | default('') | length > 0
+      notify: Restart kubelet
+
     - name: Enable and start kubernetes service
       ansible.builtin.systemd_service:
         name: kubelet

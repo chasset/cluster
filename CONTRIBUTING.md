@@ -69,3 +69,31 @@ avant de toucher les serveurs :
   Ceph).
 - [`test/multi-node/`](test/multi-node/) — Phase 1-5 multi-VM avec disques +
   réseau privé `10.67.2.0/24` (~15 min, exerce Rook-Ceph).
+
+Résultats du dernier banc : [`test/RESULTS.md`](test/RESULTS.md).
+
+## Versionnement (release-please)
+
+Le versionnement est **automatique** via le workflow
+[`.github/workflows/release.yml`](.github/workflows/release.yml) qui utilise
+[release-please](https://github.com/googleapis/release-please).
+
+À chaque push sur `main`, release-please :
+
+1. Parcourt les commits depuis le dernier tag ;
+2. Calcule le prochain semver à partir des préfixes Conventional Commits
+   (`feat:` → minor, `fix:`/`perf:` → patch, `feat!:` ou `BREAKING CHANGE:` →
+   major) ;
+3. Crée (ou met à jour) une **PR de release** intitulée `chore(release): vX.Y.Z`
+   qui contient :
+   - bump de `package.json` ;
+   - mise à jour du `CHANGELOG.md` ;
+   - mise à jour du `.release-please-manifest.json`.
+
+Quand vous mergez cette PR, release-please pousse le tag `vX.Y.Z` et crée une
+[GitHub Release](https://github.com/univ-lehavre/cluster/releases) avec le
+changelog généré. Aucun bump manuel à faire.
+
+Le script `pnpm release` (commit-and-tag-version) reste disponible pour un bump
+manuel hors workflow GitHub, mais ce chemin doit rester exceptionnel — la source
+de vérité est release-please.
