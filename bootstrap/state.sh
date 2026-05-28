@@ -108,17 +108,18 @@ fi
 # par Ansible — drift potentiel entre OS installé et bootstrap appliqué.
 section "Registre Ansible (audit-log par nœud)"
 for h in "${reachable[@]}"; do
-    last_line=$(ssh_q "$h" 'sudo tail -n 1 /var/log/cluster-bootstrap.log 2>/dev/null')
+    # `|| true` car ssh_q peut renvoyer non-zero (sudo demande mdp,
+    # fichier inexistant) — on veut juste une chaîne vide dans ce cas.
+    last_line=$(ssh_q "$h" 'sudo -n tail -n 1 /var/log/cluster-bootstrap.log 2>/dev/null' || true)
     if [ -z "$last_line" ]; then
         mark fail "$h : aucune trace de playbook (audit-log absent)" \
-                  "lancer au minimum bootstrap/checks.yaml (rôle audit-log posera la 1re ligne)"
+                  "ansible-playbook -i bootstrap/hosts.yaml bootstrap/audit-log-baseline.yaml --limit $h"
         continue
     fi
     last_ts=$(awk '{print $1}' <<<"$last_line")
     last_play=$(awk -F'playbook=' '{print $2}' <<<"$last_line" | awk '{print $1}')
-    # Calcul de l'âge côté serveur (GNU date) pour rester portable mac↔linux.
     age=$(ssh_q "$h" "
-        last=\$(sudo tail -n 1 /var/log/cluster-bootstrap.log 2>/dev/null | awk '{print \$1}')
+        last=\$(sudo -n tail -n 1 /var/log/cluster-bootstrap.log 2>/dev/null | awk '{print \$1}')
         if [ -n \"\$last\" ]; then
             now=\$(date -u +%s)
             le=\$(date -d \"\$last\" +%s 2>/dev/null || echo 0)
@@ -126,7 +127,7 @@ for h in "${reachable[@]}"; do
                 echo \$(( (now - le) / 60 ))
             fi
         fi
-    ")
+    " || true)
     mark ok "$h : dernier playbook=${last_play:-?} à ${last_ts:-?} (il y a ${age:-?} min)"
 done
 
@@ -165,19 +166,34 @@ for h in "${reachable[@]}"; do
     # (= premier boot post-install). L'arithmétique se fait côté serveur
     # (GNU date) pour rester compatible avec un poste de contrôle macOS.
     pw_result=$(ssh_script "$h" <<'REMOTE'
-last=$(chage -l debian 2>/dev/null | awk -F: '/Last password change/{print $2}' | xargs)
+# Forcer la locale C : sinon chage et `date -d` lisent le format français
+# (ex. "Dernière modification du mot de passe : mai 28, 2026") qui n'est
+# pas parsable par GNU date en mode anglais.
+last=$(LANG=C LC_ALL=C chage -l debian 2>/dev/null | awk -F: '/Last password change/{print $2}' | xargs)
 install=$(stat -c '%y' /etc/machine-id 2>/dev/null | cut -d' ' -f1)
-le=$(date -d "$last" +%s 2>/dev/null || echo 0)
-ie=$(date -d "$install" +%s 2>/dev/null || echo 0)
+if [ -z "$last" ] || [ -z "$install" ]; then
+    echo "UNKNOWN 0"
+    exit 0
+fi
+le=$(LANG=C date -d "$last" +%s 2>/dev/null || echo 0)
+ie=$(LANG=C date -d "$install" +%s 2>/dev/null || echo 0)
 if [ "$le" -eq 0 ] || [ "$ie" -eq 0 ]; then
     echo "UNKNOWN 0"
+    exit 0
+fi
+now=$(date +%s)
+install_age_days=$(( (now - ie) / 86400 ))
+diff_days=$(( (le - ie) / 86400 ))
+# `chage` stocke la date au jour près (pas l'heure). Si l'install date
+# du jour même (ou d'hier), un passwd fait dans la foulée donne la même
+# date que machine-id → ambigu. On ne se prononce qu'à partir de
+# install_age >= 2 jours.
+if [ "$install_age_days" -lt 2 ]; then
+    echo "AMBIGUOUS $install_age_days"
+elif [ "$diff_days" -le 1 ]; then
+    echo "NEVER $diff_days"
 else
-    days=$(( (le - ie) / 86400 ))
-    if [ "$days" -le 1 ]; then
-        echo "NEVER $days"
-    else
-        echo "MOD $days"
-    fi
+    echo "MOD $diff_days"
 fi
 REMOTE
     )
@@ -189,6 +205,9 @@ REMOTE
         NEVER)
             mark fail "$h : mot de passe debian JAMAIS modifié depuis l'install" \
                       "ssh $h sudo passwd debian (ou NEW_DEBIAN_PASSWORD=... bash bootstrap/first-access.sh $h)"
+            ;;
+        AMBIGUOUS)
+            mark skip "$h : install récent (${pw_days} j) — check passwd ambigu, re-vérifier dans 2 jours"
             ;;
         *)
             mark skip "$h : impossible de lire les dates passwd/install (sudo ? chage ? machine-id ?)"

@@ -455,6 +455,22 @@ ssh debian@dirqual1 'sudo tail -n 20 /var/log/cluster-bootstrap.log'
 - l'absence totale de trace → drift potentiel : OS installé mais aucun bootstrap
   appliqué, ou rotation/effacement du log.
 
+#### Initialiser le journal sur des nœuds existants (baseline)
+
+Si les nœuds ont été installés/durcis manuellement **avant** l'introduction du
+rôle `audit-log`, le fichier `/var/log/cluster-bootstrap.log` n'existe pas →
+state.sh signale un drift sur la couche 0. Pour matérialiser « état initial
+reconnu après le fait » sans rejouer tout le bootstrap :
+
+```bash
+cd bootstrap
+ansible-playbook -i hosts.yaml audit-log-baseline.yaml
+```
+
+[`audit-log-baseline.yaml`](audit-log-baseline.yaml) appose une ligne « baseline
+» et débloque la couche 0. Les playbooks suivants ajouteront des lignes normales
+par-dessus.
+
 ### Rollback du bootstrap K8s
 
 [`rollback.yaml`](rollback.yaml) ramène un nœud à un état "Debian 13 +
