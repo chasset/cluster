@@ -373,6 +373,20 @@ bash ./cni.sh
 cilium connectivity test
 ```
 
+#### Optionnel — `kubeProxyReplacement` (Workstream B3)
+
+Cilium peut remplacer `kube-proxy` (mode IPVS+eBPF), avec de meilleures perfs
+réseau et moins de composants à maintenir. **Non activé par défaut** dans
+[`cni.sh`](cni.sh) — décision conservatrice (l'install nominale est plus simple
+à dépanner).
+
+Pour l'activer plus tard sur un cluster déjà bootstrapé, repasser
+`cilium install` avec
+`--set kubeProxyReplacement=true --set k8sServiceHost=cluster-api --set k8sServicePort=6443`,
+puis retirer `kube-proxy`
+(`kubectl -n kube-system delete daemonset kube-proxy + iptables-save | grep KUBE | iptables-restore -n`).
+Tester sur le banc multi-nœuds avant.
+
 ### Join workers to cluster
 
 ```bash

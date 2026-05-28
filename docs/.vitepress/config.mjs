@@ -97,8 +97,42 @@ export default defineConfig({
       },
       {
         text: 'Décisions (ADR)',
+        collapsed: true,
         items: [
           { text: 'Index', link: '/docs/decisions/' },
+          {
+            text: '0001 — Réplication ×3 (bloc)',
+            link: '/docs/decisions/0001-replication-x3-pour-workloads-bloc',
+          },
+          {
+            text: '0002 — Control plane unique',
+            link: '/docs/decisions/0002-control-plane-unique-avec-endpoint',
+          },
+          {
+            text: '0003 — Pas de chiffrement Ceph',
+            link: '/docs/decisions/0003-pas-de-chiffrement-ceph-tailscale',
+          },
+          {
+            text: '0004 — Erasure coding 2+1 datalake',
+            link: '/docs/decisions/0004-erasure-coding-2plus1-datalake',
+          },
+          {
+            text: '0005 — containerd dépôt Docker',
+            link: '/docs/decisions/0005-cri-containerd-via-depot-docker',
+          },
+          {
+            text: '0006 — Matrice de versions',
+            link: '/docs/decisions/0006-matrice-de-versions-et-politique-de-bump',
+          },
+          {
+            text: '0007 — Hyperconvergence',
+            link: '/docs/decisions/0007-hyperconvergence-control-plane-osd',
+          },
+          {
+            text: '0008 — NVMe block.db SPOF',
+            link: '/docs/decisions/0008-metadatadevice-nvme-spof-par-noeud',
+          },
+          { text: '0009 — Pourquoi 4 nœuds', link: '/docs/decisions/0009-pourquoi-4-noeuds' },
           {
             text: '0010 — Dashboard cluster-admin',
             link: '/docs/decisions/0010-dashboard-cluster-admin',
@@ -107,10 +141,7 @@ export default defineConfig({
             text: '0011 — Registry HTTP sans auth',
             link: '/docs/decisions/0011-registry-http-sans-auth',
           },
-          {
-            text: '0012 — RStudio sans auth',
-            link: '/docs/decisions/0012-rstudio-disable-auth',
-          },
+          { text: '0012 — RStudio sans auth', link: '/docs/decisions/0012-rstudio-disable-auth' },
         ],
       },
     ],
