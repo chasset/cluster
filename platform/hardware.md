@@ -76,6 +76,15 @@ Rôles définis dans [`bootstrap/hosts.yaml`](../bootstrap/hosts.yaml).
 ## À compléter
 
 Le détail des barrettes mémoire (rang, vitesse, slots peuplés, fabricant,
-référence) n'a pas pu être relevé : `dmidecode -t memory` nécessite les
-privilèges root et `sudo` sans mot de passe n'est pas configuré sur les nœuds.
-Les totaux RAM proviennent de `free`.
+référence) reste à relever. La limitation `sudo` qui empêchait initialement la
+collecte n'existe plus depuis que `bootstrap/first-access.sh` pose
+`sudo NOPASSWD` sur le compte `debian`. À actualiser en lançant :
+
+```bash
+for h in dirqual1 dirqual2 dirqual3 dirqual4; do
+    echo "=== $h ==="
+    ssh debian@$h 'sudo dmidecode -t memory' | grep -E 'Locator|Size|Speed|Manufacturer|Part Number' | head -40
+done
+```
+
+Les totaux RAM proviennent actuellement de `free`.

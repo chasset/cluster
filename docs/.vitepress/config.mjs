@@ -47,6 +47,8 @@ export default defineConfig({
         items: [
           { text: 'Accueil', link: '/' },
           { text: 'Plan de reconstruction', link: '/PLAN' },
+          { text: 'Garde-fous', link: '/SAFEGUARDS' },
+          { text: 'Contribuer', link: '/CONTRIBUTING' },
           { text: 'Inventaire matériel', link: '/platform/hardware' },
         ],
       },

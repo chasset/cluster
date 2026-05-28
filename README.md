@@ -20,37 +20,28 @@ publiée automatiquement depuis `main` par
 | [`platform/`](platform/)         | Services transverses (dashboard, registry)    |
 | [`apps/`](apps/)                 | Charges applicatives (RStudio)                |
 
-## Développement
+## Qualité — garde-fous en place
 
-Outillage géré par [Lefthook](https://lefthook.dev/) (hooks git),
-[Prettier](https://prettier.io/) (format),
-[yamllint](https://yamllint.readthedocs.io/),
-[shellcheck](https://www.shellcheck.net/),
-[kubeconform](https://github.com/yannh/kubeconform) et
-[ansible-lint](https://ansible-lint.readthedocs.io/). Les messages de commit
-suivent la convention
-[Conventional Commits](https://www.conventionalcommits.org/).
+À chaque étape, des contrôles automatiques empêchent qu'une régression atteigne
+la prod :
 
-### Installation
+- **Avant le commit** : hooks Lefthook (prettier, yamllint, shellcheck) + sujet
+  de commit Conventional Commits + interdiction d'email dans le message.
+- **Avant le push** : tout le dépôt revalidé (`kubeconform`, `ansible-lint`,
+  `shellcheck` complet, prettier complet) + interdiction de push direct sur
+  `main`.
+- **En CI GitHub Actions** : 8 jobs en parallèle (formats, lint, `jscpd` ≤ 5 %
+  duplication, build VitePress).
+- **Sur les serveurs** : [`bootstrap/state.sh`](bootstrap/state.sh) (7 couches
+  de drift detection) +
+  [`bootstrap/security/report.sh`](bootstrap/security/report.sh) (visibilité
+  hardening) + audit-log par nœud + sauvegarde etcd + rollback scripté.
+- **Avant la prod** : banc d'essai Vagrant
+  ([`test/multi-node/`](test/multi-node/)) qui exerce Phase 1-5 sur 3 VMs Debian
+  13 avec disques Ceph.
 
-```bash
-pnpm install                                         # installe lefthook + prettier + commitlint
-brew install yamllint shellcheck kubeconform ansible-lint
-```
-
-`pnpm install` exécute automatiquement `lefthook install` qui pose les hooks git
-(pre-commit, pre-push, commit-msg).
-
-### Commandes utiles
-
-```bash
-pnpm format         # applique Prettier
-pnpm lint           # vérifie format + yaml + shell
-pnpm lint:k8s       # valide les manifests via kubeconform
-pnpm lint:ansible   # lint les playbooks Ansible
-pnpm release        # bump version + met à jour CHANGELOG + crée tag git
-pnpm release:dry    # aperçu de la prochaine release sans rien modifier
-```
+Inventaire complet et détaillé : [SAFEGUARDS.md](SAFEGUARDS.md). Comment
+contribuer / outillage local : [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Trademarks
 
