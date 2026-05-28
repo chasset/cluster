@@ -214,67 +214,38 @@ documentés dans le dépôt).
 > (`/etc/systemd/network/*.network`) ou NetworkManager
 > (`/etc/NetworkManager/system-connections/*.nmconnection`).
 
-### Accès SSH par clef asymétrique
+## Premier accès et durcissement initial
 
-Une fois le système d’exploitation installé, il est recommandé de configurer
-l’accès SSH par clef asymétrique pour une sécurité renforcée. Voici les étapes à
-suivre :
+Le script [`first-access.sh`](first-access.sh) automatise, depuis le poste de
+contrôle, le hardening minimal de chaque nœud fraîchement installé : dépôt de la
+clé SSH (`ssh-copy-id`), `sudo NOPASSWD` pour `debian`, durcissement du service
+SSH (`PasswordAuthentication off`, `PermitRootLogin no`, `AllowUsers debian`,
+`MaxAuthTries 3`, etc.), et activation des mises à jour de sécurité
+(`unattended-upgrades`).
 
-Tout d’abord, connectez-vous au serveur via SSH en utilisant le mot de passe
-initial.
-
-```bash
-ssh debian@control1
-```
-
-Une fois que la machine est enregistrée dans votre fichier `~/.ssh/known_hosts`,
-vous pouvez configurer l’accès SSH par clef asymétrique. Déconnectez-vous.
-
-Si vous n’avez pas de clef, générez-la et transférez-la :
+Pré-requis : avoir une clé SSH locale.
 
 ```bash
-ssh-keygen -t ed25519 -C "votre_email@example.com"
-ssh-copy-id -i ~/.ssh/id_ed25519 control1
+ssh-keygen -t ed25519               # si absent
+bash bootstrap/first-access.sh      # cibles par défaut : dirqual1..dirqual4
 ```
 
-## Préparation du système d’exploitation des serveurs
-
-Les opérations suivantes sont à réaliser sur tous les nœuds du cluster.
-
-### Changer le mot de passe de l’utilisateur `debian`
+Variantes :
 
 ```bash
-passwd
+# Sélectionner les nœuds explicitement
+bash bootstrap/first-access.sh dirqual1 dirqual2
+
+# Changer le mot de passe debian dans la foulée
+NEW_DEBIAN_PASSWORD='choisir-un-mot-de-passe-robuste' \
+  bash bootstrap/first-access.sh
 ```
 
-### Autoriser l’utilisateur en sudo sans mot de passe
-
-```bash
-sudo visudo
-```
-
-Il est nécessaire d’ajouter la ligne : `debian ALL=(ALL) NOPASSWD: ALL`
-
-### Sécurisation du protocole SSH
-
-Modifier le fichier `/etc/ssh/sshd_config` :
-
-```bash
-PasswordAuthentication no
-AllowUsers debian
-PermitRootLogin no
-PubkeyAuthentication yes
-MaxAuthTries 3
-Protocol 2
-ClientAliveInterval 300
-ClientAliveCountMax 3
-```
-
-Et relancer le service :
-
-```bash
-sudo systemctl restart sshd
-```
+Le script demande **deux fois** le mot de passe SSH par hôte la 1re passe
+(`ssh-copy-id` puis `sudo`) ; les runs suivants sont silencieux et idempotents.
+À l'issue, Ansible (et le dépôt
+[`server-security`](https://github.com/univ-lehavre/server-security)) peuvent
+piloter les nœuds sans mot de passe.
 
 ### Désactiver le swap
 
