@@ -48,7 +48,10 @@ export default defineConfig({
       },
       {
         text: 'Durcissement OS',
-        items: [{ text: "Vue d'ensemble (server-security)", link: '/bootstrap/security/' }],
+        items: [
+          { text: "Vue d'ensemble (server-security)", link: '/bootstrap/security/' },
+          { text: 'Implications par couche', link: '/bootstrap/security/IMPLICATIONS' },
+        ],
       },
       {
         text: 'Stockage Rook-Ceph',

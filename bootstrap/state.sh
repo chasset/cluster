@@ -52,6 +52,12 @@ ssh_ok() {
         "${USER_REMOTE}@$1" "$2" >/dev/null 2>&1
 }
 
+kubectl_q() { kubectl "$@" 2>/dev/null; }
+
+kubectl_ready() {
+    command -v kubectl >/dev/null 2>&1 && kubectl version --request-timeout=3s >/dev/null 2>&1
+}
+
 mark() {
     # mark ok|fail|skip "label" ["remedy"]
     local status=$1 label=$2 remedy=${3:-}
@@ -117,21 +123,27 @@ for h in "${reachable[@]}"; do
     fi
 done
 
-# ─── Couche 2 — Hardening OS (server-security, progressif) ─────────────────
-section "Hardening OS (bootstrap/security/secure.yml)"
+# ─── Couche 2 — Hardening OS (opt-in par couche) ───────────────────────────
+# Le hardening est volontairement OPT-IN (voir bootstrap/security/IMPLICATIONS.md) :
+# un service absent n'est PAS un drift, c'est une couche non encore activée.
+# Le drift n'arrive que si la couche est partiellement activée (ex. paquet
+# installé mais service inactif), ou si une protection a régressé.
+section "Hardening OS (opt-in — bootstrap/security/secure.yml)"
 for h in "${reachable[@]}"; do
     for svc in unattended-upgrades postfix auditd fail2ban; do
+        local_tag="os"
+        case "$svc" in
+            postfix) local_tag=alert ;;
+            auditd)  local_tag=audit ;;
+            fail2ban) local_tag=detection ;;
+        esac
         if ssh_ok "$h" "systemctl is-active --quiet $svc"; then
-            mark ok "$h : $svc actif"
-        else
-            local_tag="os"
-            case "$svc" in
-                postfix) local_tag=alert ;;
-                auditd)  local_tag=audit ;;
-                fail2ban) local_tag=detection ;;
-            esac
-            mark fail "$h : $svc non actif" \
+            mark ok "$h : $svc actif (couche $local_tag)"
+        elif ssh_ok "$h" "systemctl list-unit-files --no-legend $svc.service | grep -q ."; then
+            mark fail "$h : $svc installé mais inactif" \
                       "(cd bootstrap/security && ansible-playbook -i ../hosts.yaml secure.yml --tags $local_tag --limit $h)"
+        else
+            mark skip "$h : $svc non installé — opt-in : --tags $local_tag (voir IMPLICATIONS.md)"
         fi
     done
 done
@@ -169,6 +181,123 @@ for h in "${reachable[@]}"; do
         mark skip "$h : kubeadm init pas encore joué"
     fi
 done
+
+# ─── Couche 4 — CNI Cilium (cluster-level) ─────────────────────────────────
+section "CNI Cilium (kubectl)"
+if ! kubectl_ready; then
+    mark skip "kubectl indisponible (binaire absent ou cluster injoignable)"
+else
+    if [ "$(kubectl_q -n kube-system get deploy cilium-operator -o jsonpath='{.status.readyReplicas}')" = "1" ]; then
+        mark ok "cilium-operator Ready"
+    else
+        mark fail "cilium-operator non Ready" "scp bootstrap/cni.sh control:/tmp && ssh control 'bash /tmp/cni.sh'"
+    fi
+
+    desired=$(kubectl_q -n kube-system get ds cilium -o jsonpath='{.status.desiredNumberScheduled}')
+    ready=$(kubectl_q -n kube-system get ds cilium -o jsonpath='{.status.numberReady}')
+    if [ -n "$desired" ] && [ "$desired" = "$ready" ] && [ "$desired" != "0" ]; then
+        mark ok "cilium DaemonSet : ${ready}/${desired} agents Ready"
+    else
+        mark fail "cilium DaemonSet : ${ready:-0}/${desired:-?} agents Ready" \
+                  "kubectl -n kube-system describe ds cilium"
+    fi
+
+    not_ready=$(kubectl_q get nodes --no-headers | awk '$2 != "Ready" {print $1}' | tr '\n' ' ')
+    if [ -z "$not_ready" ]; then
+        ready_n=$(kubectl_q get nodes --no-headers | wc -l | tr -d ' ')
+        mark ok "tous les nœuds Ready (${ready_n})"
+    else
+        mark fail "nœuds non Ready : $not_ready" "kubectl describe node $not_ready"
+    fi
+
+    cilium_cidr=$(kubectl_q -n kube-system get cm cilium-config -o jsonpath='{.data.cluster-pool-ipv4-cidr}')
+    if [ "$cilium_cidr" = "10.244.0.0/16" ]; then
+        mark ok "pod CIDR Cilium = 10.244.0.0/16 (disjoint nœuds)"
+    elif [ -z "$cilium_cidr" ]; then
+        mark skip "pod CIDR Cilium non lisible"
+    else
+        mark fail "pod CIDR = $cilium_cidr (attendu 10.244.0.0/16)" \
+                  "réinstaller cilium avec --set ipam.operator.clusterPoolIPv4PodCIDRList=10.244.0.0/16"
+    fi
+fi
+
+# ─── Couche 5 — Rook-Ceph (cluster-level) ──────────────────────────────────
+section "Rook-Ceph (kubectl)"
+if ! kubectl_ready; then
+    mark skip "kubectl indisponible"
+else
+    if [ "$(kubectl_q -n rook-ceph get deploy rook-ceph-operator -o jsonpath='{.status.readyReplicas}')" = "1" ]; then
+        mark ok "rook-ceph-operator Ready"
+    else
+        mark fail "rook-ceph-operator non Ready" \
+                  "kubectl create -f storage/ceph/crds.yaml -f storage/ceph/common.yaml -f storage/ceph/operator.yaml"
+    fi
+
+    health=$(kubectl_q -n rook-ceph get cephcluster -o jsonpath='{.items[0].status.ceph.health}')
+    case "$health" in
+        HEALTH_OK)
+            mark ok "CephCluster HEALTH_OK"
+            ;;
+        HEALTH_WARN)
+            mark fail "CephCluster HEALTH_WARN" \
+                      "kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph status"
+            ;;
+        HEALTH_ERR)
+            mark fail "CephCluster HEALTH_ERR" \
+                      "kubectl -n rook-ceph exec deploy/rook-ceph-tools -- ceph status"
+            ;;
+        *)
+            mark skip "CephCluster non créé (kubectl create -f storage/ceph/cluster.yaml)"
+            ;;
+    esac
+
+    osd_up=$(kubectl_q -n rook-ceph get pods -l app=rook-ceph-osd --no-headers | grep -c Running || true)
+    osd_total=$(kubectl_q -n rook-ceph get pods -l app=rook-ceph-osd --no-headers | wc -l | tr -d ' ')
+    if [ "$osd_total" -gt 0 ] && [ "$osd_up" = "$osd_total" ]; then
+        mark ok "${osd_up}/${osd_total} OSD Running"
+    elif [ "$osd_total" = "0" ]; then
+        mark skip "pas encore d'OSD (CephCluster pas appliqué)"
+    else
+        mark fail "${osd_up}/${osd_total} OSD Running" \
+                  "kubectl -n rook-ceph get pods -l app=rook-ceph-osd"
+    fi
+fi
+
+# ─── Couche 6 — StorageClasses et PVC applicatives (cluster-level) ─────────
+section "StorageClasses et PVC (kubectl)"
+if ! kubectl_ready; then
+    mark skip "kubectl indisponible"
+else
+    default_sc=$(kubectl_q get storageclass | awk '/\(default\)/ {print $1; exit}')
+    if [ "$default_sc" = "rook-ceph-block-replicated" ]; then
+        mark ok "StorageClass par défaut = rook-ceph-block-replicated"
+    elif [ -z "$default_sc" ]; then
+        mark fail "aucune StorageClass par défaut" \
+                  "kubectl apply -f storage/ceph/storageClass/block-replicated.yaml"
+    else
+        mark fail "défaut = $default_sc (attendu rook-ceph-block-replicated)" \
+                  "kubectl annotate sc $default_sc storageclass.kubernetes.io/is-default-class-"
+    fi
+
+    not_bound=$(kubectl_q get pvc --all-namespaces --no-headers | awk '$3 != "Bound" {print $1"/"$2}' | tr '\n' ' ')
+    total_pvc=$(kubectl_q get pvc --all-namespaces --no-headers | wc -l | tr -d ' ')
+    if [ "$total_pvc" = "0" ]; then
+        mark skip "aucune PVC créée"
+    elif [ -z "$not_bound" ]; then
+        mark ok "${total_pvc} PVC Bound"
+    else
+        mark fail "PVC non Bound : $not_bound" "kubectl describe pvc ${not_bound%% *}"
+    fi
+
+    # PVC applicatives qui devraient être sur la classe par défaut (réplicat ×3)
+    apps_on_ec=$(kubectl_q get pvc --all-namespaces -o jsonpath='{range .items[?(@.spec.storageClassName=="rook-ceph-block-ec")]}{.metadata.namespace}/{.metadata.name} {end}')
+    if [ -z "$apps_on_ec" ]; then
+        mark ok "aucune PVC applicative résiduelle sur rook-ceph-block-ec"
+    else
+        mark fail "PVC encore sur rook-ceph-block-ec : $apps_on_ec" \
+                  "éditer la PVC pour passer storageClassName: rook-ceph-block-replicated (ou recréer)"
+    fi
+fi
 
 # ─── Résumé ────────────────────────────────────────────────────────────────
 section "Résumé"

@@ -263,35 +263,48 @@ le rôle `network/sshd` retouche `sshd`, ses changements doivent rester
 **cohérents** avec le drop-in (ordre alphanumérique des `*.conf` ; ce dernier
 gagne en cas de conflit de directive).
 
-Le playbook `secure.yml` est **progressif via tags Ansible** :
+Le playbook `secure.yml` est **entièrement opt-in** : sans `--tags`, il ne
+touche à rien (il charge juste les variables). Voir
+[`bootstrap/security/IMPLICATIONS.md`](security/IMPLICATIONS.md) pour, couche
+par couche, ce qui change, ce qui est protégé, le compromis assumé, et la
+commande pour s'en convaincre soi-même.
 
 ```bash
 cd bootstrap/security
 cp .env-example .env && $EDITOR .env       # MAIL_ROOT_REDIRECT, HOST_USER, …
 set -a; source .env; set +a
-
-# Couches SÛRES par défaut (comptes + unattended-upgrades + postfix + auditd + fail2ban)
-# — sshd, ssh-keys, UFW et upgrade-now sont taggés `never`, donc NON joués par défaut.
-ansible-playbook -i ../hosts.yaml secure.yml
 ```
 
-Application **par couche** (recommandé pour valider l'impact) :
+**Menu** — chaque commande active une seule couche (et seulement celle-là) :
 
 ```bash
-ansible-playbook -i ../hosts.yaml secure.yml --tags audit       # observer (auditd)
-ansible-playbook -i ../hosts.yaml secure.yml --tags alert       # postfix + redirection mail
-ansible-playbook -i ../hosts.yaml secure.yml --tags detection   # fail2ban
-ansible-playbook -i ../hosts.yaml secure.yml --tags os          # comptes + auto-updates
-```
-
-Et **opt-in** sur les couches sensibles ou redondantes :
-
-```bash
-ansible-playbook -i ../hosts.yaml secure.yml --tags upgrade     # apt full-upgrade + reboot (serial:1)
-ansible-playbook -i ../hosts.yaml secure.yml --tags sshd        # re-applique drop-in sshd (déjà fait)
-ansible-playbook -i ../hosts.yaml secure.yml --tags ssh-keys    # re-dépose les clés (déjà fait)
+ansible-playbook -i ../hosts.yaml secure.yml --tags os          # mises à jour auto + expiration mot de passe
+ansible-playbook -i ../hosts.yaml secure.yml --tags alert       # postfix + redirection mail root
+ansible-playbook -i ../hosts.yaml secure.yml --tags audit       # auditd + règles
+ansible-playbook -i ../hosts.yaml secure.yml --tags detection   # fail2ban (anti-brute-force SSH)
+ansible-playbook -i ../hosts.yaml secure.yml --tags sshd        # re-applique drop-in sshd (déjà fait par first-access.sh)
+ansible-playbook -i ../hosts.yaml secure.yml --tags ssh-keys    # re-dépose les clés
+ansible-playbook -i ../hosts.yaml secure.yml --tags upgrade     # apt full-upgrade + reboot (serial:1) — opérationnel
 ansible-playbook -i ../hosts.yaml secure.yml --tags ufw         # APRÈS bootstrap K8s — cf. ports
 ```
+
+Tout faire d'un coup (sauf upgrade et ufw) :
+
+```bash
+ansible-playbook -i ../hosts.yaml secure.yml --tags os,alert,audit,detection
+```
+
+**Voir ce qui est en place** — tableau de bord agrégé par hôte :
+
+```bash
+bash bootstrap/security/report.sh                    # tous les hôtes
+bash bootstrap/security/report.sh dirqual1           # un hôte
+```
+
+Le rapport affiche les preuves observables : services actifs/inactifs/absents,
+sortie de `sshd -T`, dernier `unattended-upgrades.log`, alias root, IPs bannies
+par fail2ban, règles auditd chargées, état UFW, expiration mot de passe. Lecture
+seule, ne modifie rien.
 
 > ⚠️ **UFW × Kubernetes** : le rôle `network/ufw.yml` durcit le pare-feu. Pour
 > que les workers puissent joindre le control plane et que Cilium fonctionne, il

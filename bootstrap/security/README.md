@@ -8,6 +8,14 @@
 > sections « Installation / Lancement » ci-dessous décrivent l'usage **autonome
 > historique** (avant fusion) et sont conservées pour mémoire.
 
+**👉 Avant d'activer une couche, lire les [implications](IMPLICATIONS.md)** —
+chaque couche est désormais opt-in explicite (sans `--tags`, le playbook ne
+touche à rien). Le menu des commandes y est aussi listé.
+
+**👉 Pour voir ce qui est actuellement actif sur les nœuds :** lancer
+[`report.sh`](report.sh) — il agrège, par hôte, les preuves observables
+(services, sshd sondé, IPs bannies, dernier log unattended-upgrades, etc.).
+
 ## Objectif
 
 - Mettre en place une politique de cybersécurité
