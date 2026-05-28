@@ -28,7 +28,7 @@
   vars:
     audit_log_playbook: rollback.yaml (k8s-rollback)
 
-- name: kubeadm reset --force (si kubeadm est installé)
+- name: Kubeadm reset --force (si kubeadm est installé)
   become: true
   ansible.builtin.command: kubeadm reset --force
   register: kubeadm_reset

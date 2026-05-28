@@ -7,7 +7,8 @@
   hosts: control
   become: true
   pre_tasks:
-    - ansible.builtin.import_role:
+    - name: Audit-log — record playbook execution
+      ansible.builtin.import_role:
         name: audit-log
       vars:
         audit_log_playbook: etcd-backup.yaml
