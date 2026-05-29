@@ -42,3 +42,17 @@ multi-VM et les disques Ceph.
 
 Voir le README spécifique de chaque banc pour les détails (réseau host-only VBox
 à autoriser pour `multi-node/`, etc.).
+
+## Nettoyage
+
+Pour basculer entre bancs, libérer du disque, ou repartir d'un état frais :
+
+```bash
+./test/prune.sh           # détruit toutes les VMs dirqual*, libère les
+                          # disques VBox enregistrés (drift #0c), efface
+                          # les .vagrant/ et les logs VBoxHeadless
+./test/prune.sh --help    # options et garde-fous
+```
+
+Le script refuse de tourner si une VM `dirqual*` est en cours (`--force` pour
+passer outre).

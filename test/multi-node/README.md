@@ -170,9 +170,11 @@ kubectl apply -f cluster.yaml                          # ← surcharger metadata
 ## 6. Démolir
 
 ```bash
-vagrant destroy -f
-rm -rf .vagrant/ceph-disks/   # supprime les VDI orphelins si nécessaire
+./test/prune.sh   # depuis la racine du repo — détruit VMs + disques VBox + .vagrant/
 ```
+
+Voir [`test/README.md`](../README.md#nettoyage) pour les options (`--force`,
+`--help`) et les garde-fous.
 
 ## Dépannage
 
