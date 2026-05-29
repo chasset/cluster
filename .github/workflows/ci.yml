@@ -72,6 +72,7 @@ jobs:
       - uses: ansible/ansible-lint@main
         with:
           working_directory: bootstrap/
+          requirements_file: requirements.yml
 
   jscpd:
     runs-on: ubuntu-latest
