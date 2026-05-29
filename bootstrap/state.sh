@@ -295,9 +295,10 @@ for h in "${reachable[@]}"; do
 set -u
 
 # 1) HDD bruts (pas le disque OS) : disques data sans partition ni FS.
-#    Le glob (${CEPH_HDD_GLOB}, interpolé localement) cible sd* en prod et
-#    vd[b-z] sur le banc VirtIO. On considère "brut" si aucune partition
-#    ET aucune signature wipefs.
+#    La variable ${CEPH_HDD_GLOB} (défaut prod /sys/block/sd*) est substituée
+#    localement dans ce heredoc, mais le GLOB lui-même (ex. vd[b-z]) reste
+#    littéral et n'est expansé que par le shell DISTANT — c'est lui qui voit
+#    /sys. On considère "brut" si aucune partition ET aucune signature wipefs.
 hdd_total=0
 hdd_dirty=0
 hdd_clean=0
