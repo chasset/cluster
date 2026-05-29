@@ -19,6 +19,8 @@ pnpm release       # bump + tag + commit
 
 ### Documentation
 
+* **audit:** ajoute le rapport d'audit complet du dépôt ([b8571f3](https://github.com/univ-lehavre/cluster/commit/b8571f33b770192717f18a0e55f9fb15ce6b09ae))
+* **audit:** rapport d'audit complet du dépôt ([f5f6c68](https://github.com/univ-lehavre/cluster/commit/f5f6c68298a399bf95c0119a31d41dd0df2fe741))
 * **test:** clarifie l'expansion du glob state.sh + exporte les surcharges cleanup banc ([13ae846](https://github.com/univ-lehavre/cluster/commit/13ae846bf312557f4cc702601decf1a9a1560a46))
 * **test:** clarifie state.sh + exporte les surcharges cleanup banc ([0ef70ef](https://github.com/univ-lehavre/cluster/commit/0ef70efb9ce065decae876f1571717e23ceb8f38))
 
