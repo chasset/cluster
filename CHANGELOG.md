@@ -14,6 +14,19 @@ pnpm release:dry   # aperçu
 pnpm release       # bump + tag + commit
 ```
 
+## [2.1.0](https://github.com/univ-lehavre/cluster/compare/v2.0.1...v2.1.0) (2026-05-29)
+
+
+### Features
+
+* **test:** orchestrateur run-phases.sh pour valider les phases 1-6 sur le banc ([b1deee8](https://github.com/univ-lehavre/cluster/commit/b1deee807af058459487d3717cd923e6668cb7bd))
+
+
+### Bug Fixes
+
+* **bootstrap,storage:** rend le déploiement Ceph + outils OS testables sur banc virtio ([80f2bbb](https://github.com/univ-lehavre/cluster/commit/80f2bbb7754bb34100d481e2dda406632339f59a))
+* **bootstrap,storage:** rend le déploiement Ceph + outils OS testables sur banc virtio ([1bc5a17](https://github.com/univ-lehavre/cluster/commit/1bc5a1750e363f53f9ead5b79569986d7da006b1))
+
 ## [2.0.1](https://github.com/univ-lehavre/cluster/compare/v2.0.0...v2.0.1) (2026-05-29)
 
 
