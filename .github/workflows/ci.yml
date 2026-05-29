@@ -69,10 +69,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Install Ansible collections in user path
+        run: ansible-galaxy collection install --force -r bootstrap/requirements.yml -p ~/.ansible/collections
       - uses: ansible/ansible-lint@main
         with:
           working_directory: bootstrap/
-          requirements_file: requirements.yml
 
   jscpd:
     runs-on: ubuntu-latest
