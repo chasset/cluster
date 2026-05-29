@@ -35,10 +35,15 @@ NODES=(192.168.67.11 192.168.67.12 192.168.67.13)
 SSH_OPTS=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR)
 SSH_KEY="${HOME}/.vagrant.d/insecure_private_keys/vagrant.key.ed25519"
 
-# Surcharges banc pour state.sh / cleanup.sh
-export CEPH_HDD_GLOB='/sys/block/vd[b-z]'
-export CEPH_BLOCK_DEVICE=vde
+# Surcharges banc (devices VirtIO vd* au lieu de sd*/nvme1n1 prod).
+# state.sh : détection des disques bruts (couche 3b).
+export CEPH_HDD_GLOB='/sys/block/vd[b-z]'   # HDD data (jamais vda = OS)
+export CEPH_BLOCK_DEVICE=vde                 # block.db (4e disque VirtIO)
 export CEPH_MIN_HDD=3
+# cleanup.sh (si lancé à la main pour repartir à neuf) : mêmes devices.
+# /dev/vd[b-z] exclut vda (OS) ; /dev/vde = block.db.
+export DATA_DEVICE_GLOB='/dev/vd[b-z]'
+export NVME_BLOCK_DEVICE=/dev/vde
 
 KUBECTL=(kubectl --kubeconfig "${KUBECONFIG_LOCAL}")
 
