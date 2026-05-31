@@ -6,11 +6,11 @@
 
 ## Topologie testée
 
-| VM       | IP NAT         | IP privée  | Rôle          | Disques                                     |
-| -------- | -------------- | ---------- | ------------- | ------------------------------------------- |
-| dirqual1 | 127.0.0.1:2222 | 10.67.2.11 | control plane | sda=OS 64G, sdb-sdd=HDD 10G ×3, sde=NVMe 5G |
-| dirqual2 | 127.0.0.1:2200 | 10.67.2.12 | worker        | (idem, ordre différent)                     |
-| dirqual3 | 127.0.0.1:2201 | 10.67.2.13 | worker        | (idem, ordre différent)                     |
+| VM       | IP NAT         | IP privée     | Rôle          | Disques                                     |
+| -------- | -------------- | ------------- | ------------- | ------------------------------------------- |
+| dirqual1 | 127.0.0.1:2222 | 192.168.67.11 | control plane | sda=OS 64G, sdb-sdd=HDD 10G ×3, sde=NVMe 5G |
+| dirqual2 | 127.0.0.1:2200 | 192.168.67.12 | worker        | (idem, ordre différent)                     |
+| dirqual3 | 127.0.0.1:2201 | 192.168.67.13 | worker        | (idem, ordre différent)                     |
 
 Box : `bento/debian-13` arm64 v202510.26.0, kernel `6.12.48+deb13-arm64`.
 
@@ -31,6 +31,12 @@ Box : `bento/debian-13` arm64 v202510.26.0, kernel `6.12.48+deb13-arm64`.
 | 10  | `rollback.yaml --limit dirqual3 -e confirm=yes` | ✅ kubeadm + containerd + configs supprimés                       | n/a                      |
 
 ## Phases non encore testées (gap connu)
+
+> ℹ️ **Mis à jour par le Run #3 (2026-05-31)** : les Phases 3 (Rook-Ceph), 4
+> (StorageClasses) et 5 (workloads + datalake) **ont depuis été validées** de
+> bout en bout (cf. [Run #3](#run-3-2026-05-31--relance-banc-intégral)). Le
+> tableau ci-dessous reflète l'état aux Runs #1/#2 et est conservé pour
+> l'historique.
 
 | Phase                                                 | Pourquoi pas testé                                                                                                                                                             |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -289,6 +295,136 @@ hôte). HEALTH_OK quand même car suffit pour réplicat ×3 + `failureDomain: ho
 **Statut prod** : OK (251 GiB/nœud). À vérifier via le scénario
 [`08-resource-limits-audit.sh`](scenarios/08-resource-limits-audit.sh) que la
 réservation cumulée ne pose pas problème quand d'autres workloads cohabitent.
+
+---
+
+## Run #3 (2026-05-31) — relance banc intégral
+
+Relance de `run-phases.sh all` sur 3 VMs fraîches. **5 drifts détectés
+(#11-#15)** ; **#13 et #14 impactent la prod** (backup etcd). Après correctifs,
+**Phases 0 à 6 franchies de bout en bout** — première fois qu'un `all` complet
+passe.
+
+- ✅ **Phase 0** : gate disques `^sdb` OK après #11.
+- ✅ **Phase 1-2** : bootstrap + Cilium, 3 nœuds Ready (drifts #4/#7 ne se
+  reproduisent plus — `kubelet_node_ip` + route ClusterIP en place).
+- ✅ **Phase 3** : Rook-Ceph **HEALTH_OK**, `metadataDevice: sde`, pas d'erreur
+  CSI (drift #8 résolu via `csi-operator`).
+- ✅ **Phase 4** : 1 seule SC default, PVC test Bound.
+- ✅ **Phase 5** : WordPress + MySQL Running ; **smoke-test datalake S3 vert**
+  (PUT/LIST/GET/DIFF) après #12. 5 OBC applicatifs créés.
+- ✅ **Phase 6** : snapshot etcd **19 MB, intégrité etcdutl vérifiée**, timer
+  activé — après #13, #14 et #15. C'est la première validation réelle du backup
+  etcd (l'audit notait justement « restauration etcd jamais testée »).
+
+### 🔴 #11 — `run-phases.sh` câblé sur `/dev/vd*` alors que VirtioSCSI expose `/dev/sd*`
+
+- **Fichiers** : [`run-phases.sh`](multi-node/run-phases.sh) (gate Phase 0,
+  `CEPH_HDD_GLOB`, `CEPH_BLOCK_DEVICE`, surcharge `metadataDevice`,
+  `DATA_DEVICE_GLOB`, `NVME_BLOCK_DEVICE`),
+  [`Vagrantfile`](multi-node/Vagrantfile) (commentaires),
+  [README multi-node](multi-node/README.md).
+- **Symptôme** : le gate `lsblk … | grep "^vdb"` ne matche jamais ; les 3 VMs
+  bootent pourtant avec leurs disques. `lsblk` sur dirqual1 montre `sda` (OS) +
+  `sdb/sdc/sdd` (HDD) + `sde` (block.db) — **aucun `vd*`**.
+- **Cause** : le contrôleur de la box `bento/debian-13` est de type
+  **`VirtioSCSI`** (vérifié : `VBoxManage showvminfo dirqual1` →
+  `storagecontrollertype0="VirtioSCSI"`). VirtioSCSI présente ses disques au
+  noyau comme du **SCSI** → `/dev/sd*`. Seul `virtio-blk` produirait `/dev/vd*`.
+  L'hypothèse « VirtioSCSI ⇒ `vd*` » des drifts 0a/0b et de `run-phases.sh`
+  était fausse. Le Run #2 avait d'ailleurs déjà observé `sd*` (cf. table
+  topologie).
+- **À noter** : l'audit du 2026-05-29 ([02-tests.md](../docs/audit/02-tests.md))
+  avait le diagnostic **à l'envers** — il qualifiait les commentaires `sd*` de
+  vestige obsolète « contredit par le code VirtIO `vd*` ». C'est l'inverse : le
+  code `vd*` était la régression, les commentaires `sd*` (et le drift 0b ligne
+  76, « `/dev/sde` ») avaient raison.
+- **Correctif appliqué** : `run-phases.sh` repasse sur `sd*` partout (gate
+  `^sdb`, `CEPH_HDD_GLOB=/sys/block/sd[b-z]`, `CEPH_BLOCK_DEVICE=sde`,
+  `metadataDevice: 'sde'`, `DATA_DEVICE_GLOB=/dev/sd[b-z]`,
+  `NVME_BLOCK_DEVICE=/dev/sde`). `/sys/block/sd[b-z]` exclut naturellement `sda`
+  (OS) — même schéma de nommage HDD que la prod ; seul le block.db diffère
+  (`sde` banc vs `nvme1n1` prod). Commentaires Vagrantfile + README alignés.
+- **Statut prod** : non-applicable (régression purement banc). En prod les
+  défauts `/sys/block/sd*` + `nvme1n1` restent corrects.
+
+### 🟠 #12 — Smoke-test datalake : course RGW + endpoint non résolvable depuis le poste
+
+- **Fichiers** :
+  [`storage/ceph/storageClass/datalake/smoke-test.sh`](../storage/ceph/storageClass/datalake/smoke-test.sh),
+  [README datalake](../storage/ceph/storageClass/datalake/README.md).
+- **Symptôme** : gate Phase 5 `smoke-test datalake échoué`. En le déroulant à la
+  main, deux échecs successifs et distincts :
+  1. `Secret smoke pas créé` — l'OBC ne convergeait pas dans les 60 s.
+  2. une fois l'attente corrigée :
+     `mc: dial tcp: lookup rook-ceph-rgw-datalake.rook-ceph.svc: no such host`.
+- **Causes** :
+  1. **Course au démarrage** : le script attendait le Secret de l'OBC, mais
+     l'OBC ne peut converger qu'une fois le **RGW joignable**. Sur banc arm64 le
+     RGW met **80-120 s** à démarrer après le `CephObjectStore` ; pendant ce
+     temps le provisioner OBC boucle sur `connection refused`. Le timeout de 60
+     s expirait avant.
+  2. **Endpoint interne** : le script promettait (en commentaire) un fallback
+     port-forward mais ne l'implémentait pas — il retombait sur `BUCKET_HOST`
+     (DNS interne `*.svc`), non résolvable depuis le poste de contrôle.
+- **Correctif appliqué** :
+  1. Attendre `CephObjectStore` Ready **puis** un pod RGW Ready (`kubectl wait`)
+     **avant** le Secret ; timeouts réglables (`RGW_TIMEOUT=240`,
+     `SECRET_TIMEOUT=120`).
+  2. Vrai fallback **port-forward** automatique sur le service RGW (port local
+     `38080`, réglable) quand l'hôte n'est pas résolvable et qu'aucun `ENDPOINT`
+     n'est fourni ; fermé via `trap EXIT`.
+  3. **Pré-requis poste** : un client S3 (`mc` via `brew install minio-mc`, ou
+     `aws`). Documenté dans le README datalake.
+- **Statut prod** : non-applicable. En prod le RGW est exposé via Tailscale
+  (`ENDPOINT=` explicite) et le démarrage x86_64 est plus rapide — mais
+  l'attente RGW-Ready ajoutée est un durcissement utile partout.
+
+### 🔴 #13 — `crictl` jamais installé → backup etcd fantôme (impact PROD)
+
+- **Fichier** : [`k8s-install`](../bootstrap/roles/k8s-install/tasks/main.yaml).
+- **Symptôme** : gate Phase 6
+  `etcd-snapshot: crictl introuvable (containerd requis)`. Le timer
+  `etcd-snapshot.timer` est pourtant posé et activé.
+- **Cause** : le bootstrap installe `containerd.io` + `kubelet`/`kubeadm` mais
+  **jamais `cri-tools`** — donc pas de `crictl`. Or `etcd-snapshot.sh` repose
+  sur `crictl exec` dans le static pod etcd, et le RUNBOOK utilise `crictl` pour
+  la récupération. **Le timer tourne mais chaque snapshot échoue** : un backup
+  qui ne se produit jamais.
+- **Correctif** : ajouter `cri-tools` à l'install + au `hold` du rôle
+  `k8s-install` (même dépôt `pkgs.k8s.io/v1.34`, version `1.34.0-1.1` alignée).
+- **Statut prod** : **bloquant, se reproduit identique en prod** (mêmes rôles).
+
+### 🔴 #14 — `etcd-snapshot.sh` : `env`/`sh` absents de l'image etcd distroless (impact PROD)
+
+- **Fichier** :
+  [`etcd-snapshot.sh.j2`](../bootstrap/roles/etcd-backup/templates/etcd-snapshot.sh.j2).
+- **Symptôme** (révélé une fois #13 corrigé) :
+  `OCI runtime exec failed: exec: "env": executable file not found in $PATH`,
+  puis `etcdctl snapshot save a échoué`.
+- **Cause** : le script faisait `crictl exec … env ETCDCTL_API=3 etcdctl …`.
+  L'image etcd de kubeadm (`registry.k8s.io/etcd`) est **distroless** : ni `env`
+  ni `sh` (vérifié sur le nœud). Le bloc de vérif d'intégrité avait le même
+  défaut via `sh -c` (masqué car best-effort).
+- **Correctif** : invoquer `etcdctl`/`etcdutl` **directement** (etcdctl 3.6 →
+  API v3 par défaut, `ETCDCTL_API=3` inutile). Vérif d'intégrité réécrite en
+  appels directs (`etcdutl` puis repli `etcdctl`).
+- **Validation** : snapshot **19 MB**,
+  `intégrité du snapshot vérifiée (etcdutl)`.
+- **Statut prod** : **bloquant, se reproduit identique en prod.**
+
+### 🟢 #15 — Gate Phase 6 : `$(ls …)` hors du `sudo` → faux négatif (banc-only)
+
+- **Fichier** : [`run-phases.sh`](multi-node/run-phases.sh).
+- **Symptôme** :
+  `ls: cannot access '/var/lib/etcd-backups/etcd-*.db': Permission denied` →
+  `GATE ÉCHOUÉ: aucun snapshot etcd produit` alors que le snapshot venait d'être
+  écrit.
+- **Cause** : `sudo test -s "$(ls -1t /var/lib/etcd-backups/…)"` — le `sudo` ne
+  couvre que `test` ; la substitution `$(ls …)` tourne en `debian` sur un
+  dossier `root:root 0700` → vide → `test -s ""` échoue.
+- **Correctif** : envelopper tout le pipeline dans `sudo sh -c "…"`.
+- **Statut prod** : non-applicable (gate de test uniquement).
 
 ---
 
