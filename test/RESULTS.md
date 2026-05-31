@@ -292,11 +292,21 @@ réservation cumulée ne pose pas problème quand d'autres workloads cohabitent.
 
 ---
 
-## Run #3 (2026-05-31) — relance banc intégral, gate Phase 0 rouge
+## Run #3 (2026-05-31) — relance banc intégral
 
-Relance de `run-phases.sh all` sur 3 VMs fraîches. **Gate Phase 0 échoué
-immédiatement** : `192.168.67.11 : disques data absents`. **1 drift détecté
-(#11), banc-only** — une régression de nommage introduite après le Run #2.
+Relance de `run-phases.sh all` sur 3 VMs fraîches. **2 drifts détectés (#11,
+#12), tous deux banc-only.** Après correctifs, **Phases 0 à 5 franchies** (gate
+disques, 3 nœuds Ready, Ceph HEALTH_OK, StorageClasses + PVC Bound, WordPress
+Running, datalake S3 PUT/GET vérifié).
+
+- ✅ **Phase 0** : gate disques `^sdb` OK après #11.
+- ✅ **Phase 1-2** : bootstrap + Cilium, 3 nœuds Ready (drifts #4/#7 ne se
+  reproduisent plus — `kubelet_node_ip` + route ClusterIP en place).
+- ✅ **Phase 3** : Rook-Ceph **HEALTH_OK**, `metadataDevice: sde`, pas d'erreur
+  CSI (drift #8 résolu via `csi-operator`).
+- ✅ **Phase 4** : 1 seule SC default, PVC test Bound.
+- ✅ **Phase 5** : WordPress + MySQL Running ; **smoke-test datalake S3 vert**
+  (PUT/LIST/GET/DIFF) après #12. 5 OBC applicatifs créés.
 
 ### 🔴 #11 — `run-phases.sh` câblé sur `/dev/vd*` alors que VirtioSCSI expose `/dev/sd*`
 
@@ -328,6 +338,38 @@ immédiatement** : `192.168.67.11 : disques data absents`. **1 drift détecté
   (`sde` banc vs `nvme1n1` prod). Commentaires Vagrantfile + README alignés.
 - **Statut prod** : non-applicable (régression purement banc). En prod les
   défauts `/sys/block/sd*` + `nvme1n1` restent corrects.
+
+### 🟠 #12 — Smoke-test datalake : course RGW + endpoint non résolvable depuis le poste
+
+- **Fichiers** :
+  [`storage/ceph/storageClass/datalake/smoke-test.sh`](../storage/ceph/storageClass/datalake/smoke-test.sh),
+  [README datalake](../storage/ceph/storageClass/datalake/README.md).
+- **Symptôme** : gate Phase 5 `smoke-test datalake échoué`. En le déroulant à la
+  main, deux échecs successifs et distincts :
+  1. `Secret smoke pas créé` — l'OBC ne convergeait pas dans les 60 s.
+  2. une fois l'attente corrigée :
+     `mc: dial tcp: lookup rook-ceph-rgw-datalake.rook-ceph.svc: no such host`.
+- **Causes** :
+  1. **Course au démarrage** : le script attendait le Secret de l'OBC, mais
+     l'OBC ne peut converger qu'une fois le **RGW joignable**. Sur banc arm64 le
+     RGW met **80-120 s** à démarrer après le `CephObjectStore` ; pendant ce
+     temps le provisioner OBC boucle sur `connection refused`. Le timeout de 60
+     s expirait avant.
+  2. **Endpoint interne** : le script promettait (en commentaire) un fallback
+     port-forward mais ne l'implémentait pas — il retombait sur `BUCKET_HOST`
+     (DNS interne `*.svc`), non résolvable depuis le poste de contrôle.
+- **Correctif appliqué** :
+  1. Attendre `CephObjectStore` Ready **puis** un pod RGW Ready (`kubectl wait`)
+     **avant** le Secret ; timeouts réglables (`RGW_TIMEOUT=240`,
+     `SECRET_TIMEOUT=120`).
+  2. Vrai fallback **port-forward** automatique sur le service RGW (port local
+     `38080`, réglable) quand l'hôte n'est pas résolvable et qu'aucun `ENDPOINT`
+     n'est fourni ; fermé via `trap EXIT`.
+  3. **Pré-requis poste** : un client S3 (`mc` via `brew install minio-mc`, ou
+     `aws`). Documenté dans le README datalake.
+- **Statut prod** : non-applicable. En prod le RGW est exposé via Tailscale
+  (`ENDPOINT=` explicite) et le démarrage x86_64 est plus rapide — mais
+  l'attente RGW-Ready ajoutée est un durcissement utile partout.
 
 ---
 
