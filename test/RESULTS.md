@@ -32,6 +32,12 @@ Box : `bento/debian-13` arm64 v202510.26.0, kernel `6.12.48+deb13-arm64`.
 
 ## Phases non encore testées (gap connu)
 
+> ℹ️ **Mis à jour par le Run #3 (2026-05-31)** : les Phases 3 (Rook-Ceph), 4
+> (StorageClasses) et 5 (workloads + datalake) **ont depuis été validées** de
+> bout en bout (cf. [Run #3](#run-3-2026-05-31--relance-banc-intégral)). Le
+> tableau ci-dessous reflète l'état aux Runs #1/#2 et est conservé pour
+> l'historique.
+
 | Phase                                                 | Pourquoi pas testé                                                                                                                                                             |
 | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Phase 3 — Rook-Ceph                                   | Bloqué par drift #4 — workers `NotReady` à cause de l'INTERNAL-IP NAT (Cilium agent ne peut pas joindre l'API). Pas un bug du dépôt — limitation propre au banc Vagrant arm64. |
