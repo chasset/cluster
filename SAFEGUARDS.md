@@ -104,11 +104,6 @@ Posés par [Lefthook](https://lefthook.dev/) au premier `pnpm install` (config :
 > # 3. Vérifier qu'un run propre ne repropose plus rien
 > gh workflow run release.yml && gh run list --workflow release.yml -L 1
 > ```
->
-> **Alternative durable** si l'org refuse le réglage : passer un PAT
-> fine-grained (`Contents: RW` + `Pull requests: RW`, scope = ce repo) en secret
-> `RELEASE_PLEASE_TOKEN` et l'injecter via `with: token:` dans `release.yml`
-> (penser à la rotation — un PAT expire).
 
 ## Bancs d'essai Vagrant
 
