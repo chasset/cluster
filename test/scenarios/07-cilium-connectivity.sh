@@ -23,7 +23,15 @@ log "État Cilium"
 cilium status --wait --wait-duration 1m
 
 log "Suite connectivité"
-args=()
+args=(
+    # Ne vérifier les logs d'agent QUE pour la fenêtre des tests. Sinon le
+    # check-log-errors échoue sur des warns antérieurs et bénins — typiquement
+    # « CEP was deleted externally … will recreate on next iteration » émis au
+    # bootstrap quand les pods canary mon de Rook-Ceph churnent. Ce ne sont pas
+    # des erreurs de connectivité ; les scoper au temps de test les écarte sans
+    # désactiver le check.
+    --log-check-only-test-time
+)
 if [ "$FAST" = "1" ]; then
     args+=( --include-conn-disrupt-test=false )
 fi
