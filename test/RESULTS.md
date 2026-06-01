@@ -457,9 +457,49 @@ auto-documenté, idempotent, avec cleanup automatique :
 | 07  | Cilium connectivity test        | Tests Cilium                                       |
 | 08  | Audit requests/limits Rook-Ceph | Dimensionnement vs scheduling                      |
 
-**État** : les 8 scripts sont **écrits, shellcheck vert, prêts à dérouler**. Le
-blocage CSI (drift #9) qui empêchait leur exécution est **levé** depuis
-`ROOK_USE_CSI_OPERATOR: "false"` (cf. #8/#9) : le Run #3 a validé PVC Bound +
-smoke-test S3, donc le stockage bloc et objet répond. Reste à **les dérouler
-01-08 de bout en bout et consigner les exit codes réels** (prochaine session de
-banc) — c'est désormais possible.
+### Déroulé réel des scénarios (2026-06-01, banc sain : 9 OSD, HEALTH_OK)
+
+Une fois le blocage CSI levé (`ROOK_USE_CSI_OPERATOR: "false"`, #8/#9) et le
+banc correctement dimensionné (#10 → `osd.requests=512Mi`), les scénarios ont
+été déroulés sur le poste de contrôle :
+
+| #   | Exit | Verdict                                                                  |
+| --- | ---- | ------------------------------------------------------------------------ |
+| 01  | 0    | ✅ PVC RBD Bound + write/read identique                                  |
+| 02  | 0    | ✅ donnée survit au reschedule de pod                                    |
+| 06  | 0    | ✅ object store S3 PUT/GET/DIFF                                          |
+| 07  | 0    | ✅ connectivité Cilium (après fix faux-positif log-scan, cf. ci-dessous) |
+| 08  | 0/1  | ✅ portable + assertion OSD Pending (strict=prod / `ALLOW_PENDING_OSD`)  |
+| 03  | 1\*  | ⚠️ **résilience Ceph OK** ; échec sur **artefact banc** (cf. encadré)    |
+| 04  | —    | non déroulé (même classe d'artefacts banc que 03 au restore)             |
+| 05  | —    | skip attendu (< 5 hôtes)                                                 |
+
+**Trois bugs de scénarios corrigés en chemin** (commits `test/`) :
+
+- **07** : `check-log-errors` échouait sur des `warn` Ceph antérieurs et bénins
+  (`CEP was deleted externally`, pods canary mon) →
+  `--log-check-only-test-time`. La connectivité réelle était 100 % verte (79/80,
+  le 1 échec = ce log-scan).
+- **08** : `column -N` (util-linux) cassait sur le `column` BSD de macOS →
+  en-tête émis manuellement ; + assertion OSD Pending que l'audit réclamait.
+- **banc** : `osd.requests=512Mi` (sinon 1 OSD/hôte → peering figé, cf. #10).
+
+> ⚠️ **Périmètre 03/04 — résilience prouvée, restore = artefact banc (PAS
+> prod).** Le scénario 03 (perte de `dirqual3`) valide la **vraie** question :
+> Ceph passe proprement en `HEALTH_WARN` (`1 host down`, `3 osds down`, 33 %
+> degraded), les **6 OSD survivants restent up et les I/O continuent** (réplica
+> ×3, `failureDomain: host`, `min_size 2`). **Cette résilience est valable en
+> prod.** L'`exit 1` provient de la phase **restore** du banc, sur des artefacts
+> **propres au multi-VM Vagrant arm64, inexistants sur les 4 serveurs HPE** :
+>
+> - **route ClusterIP `10.96/12 dev eth1` perdue au reboot** (drift #7) → agent
+>   Cilium pas Ready → taint `node.cilium.io/agent-not-ready` → OSD `Pending` ;
+> - **clock skew** sur le mon de la VM rallumée (pas de RTC fiable) ;
+> - **`vboxsf`** (montage `/vagrant`) qui fait échouer le `vagrant up`.
+>
+> Aucun de ces trois n'existe en prod (interface cluster unique, NTP/chrony, pas
+> de VirtualBox). **Réparer ces artefacts dans les scénarios serait de la
+> sur-adaptation au banc** : on ne le fait pas. La leçon : sur le banc, le cycle
+> halt/up d'un nœud exige de reposer la route + resync NTP **hors scénario** ;
+> la prod n'en a pas besoin. À terme, scinder 03 en « perte » (assertion prod)
+> et « restore » (best-effort banc).
