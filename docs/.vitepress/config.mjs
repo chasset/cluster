@@ -38,6 +38,7 @@ export default defineConfig({
   themeConfig: {
     nav: [
       { text: 'Accueil', link: '/' },
+      { text: 'Par où commencer', link: '/docs/demarrage' },
       { text: 'Glossaire', link: '/docs/glossaire' },
       { text: "Plan d'action", link: '/docs/audit/12-plan-action' },
       { text: 'Banc de test', link: '/test/' },
@@ -47,6 +48,7 @@ export default defineConfig({
         text: 'Pour démarrer',
         items: [
           { text: 'Accueil', link: '/' },
+          { text: 'Par où commencer', link: '/docs/demarrage' },
           { text: 'Glossaire', link: '/docs/glossaire' },
           { text: 'Garde-fous', link: '/SAFEGUARDS' },
           { text: 'Contribuer', link: '/CONTRIBUTING' },
@@ -151,6 +153,23 @@ export default defineConfig({
           {
             text: '0013 — Sauvegarde données applicatives',
             link: '/docs/decisions/0013-sauvegarde-donnees-applicatives',
+          },
+          {
+            text: '0014 — Durcissement kubeadm',
+            link: '/docs/decisions/0014-durcissement-kubeadm-init',
+          },
+          {
+            text: "0015 — Stratégie d'upgrade K8s",
+            link: '/docs/decisions/0015-strategie-upgrade-kubernetes',
+          },
+          { text: '0016 — Observabilité', link: '/docs/decisions/0016-observabilite' },
+          {
+            text: '0017 — Langage des scripts',
+            link: '/docs/decisions/0017-langage-des-scripts',
+          },
+          {
+            text: '0018 — Rook-Ceph vs Longhorn',
+            link: '/docs/decisions/0018-rook-ceph-vs-longhorn',
           },
         ],
       },

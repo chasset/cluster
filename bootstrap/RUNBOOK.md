@@ -97,13 +97,16 @@ toute autoconfiguration échoue : il faut configurer l’IP **manuellement**.
    with firmware » il est trouvé sur le média lui-même. Le pilote noyau
    **`bnxt_en`** est ensuite chargé automatiquement.
 3. **Si rien n’est détecté**, basculer en console (`Alt+F2`) pour diagnostic :
+
    ```bash
    lspci -nn | grep -i ethernet   # doit lister le BCM57416 (vendor 14e4)
    modprobe bnxt_en               # force le chargement du pilote
    dmesg | tail -30               # cherche les erreurs de firmware
    ```
+
    Revenir à l’installateur (`Alt+F1`) et relancer « Détecter le matériel réseau
    ».
+
 4. **Choix de l’interface** (l’installateur le demande en mode expert s’il y en
    a plusieurs) → choisir **`ens10f0np0`** (le port câblé ; les 3 autres ports
    n’ont pas de lien).
@@ -448,6 +451,16 @@ Chaque playbook bootstrap invoque en `pre_tasks` le rôle
 
 Format : timestamp UTC ISO-8601, nom du playbook, identité de l'opérateur sur le
 poste de contrôle (`$USER@hostname`), nom du compte SSH côté serveur (`debian`).
+
+> ⚠️ **Ce n'est pas une preuve de non-répudiation** (audit P6). L'identité
+> opérateur (`$USER@hostname`) provient de variables d'environnement **côté
+> contrôle** — falsifiables par celui qui lance le playbook. Ce journal est un
+> outil d'**exploitation** (« quel playbook a tourné quand »), pas une preuve
+> opposable. Pour la traçabilité forte, s'appuyer sur ce qui est journalisé
+> **côté serveur** et non falsifiable par l'opérateur : `sshd` en
+> **`LogLevel VERBOSE`** (déjà posé par le rôle sshd — empreinte de clé publique
+> à chaque connexion) et **`auditd`** (couche `--tags audit` — syscalls
+> privilégiés). Corréler les deux donne « quelle clé, quand, quels actes ».
 
 Lecture :
 

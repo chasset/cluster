@@ -12,11 +12,26 @@ Rook-Ceph et le CNI Cilium se comportent comme attendu en nominal et en panne.
 
 ## Conventions
 
-Chaque scénario est un script bash auto-documenté :
+## Tout lancer d'un coup — `run-all.sh`
+
+```bash
+test/scenarios/run-all.sh                  # tous les scénarios + récap PASS/FAIL
+SKIP='03 04' test/scenarios/run-all.sh     # exclure des scénarios (par n°)
+ONLY='01 02 07' test/scenarios/run-all.sh  # n'exécuter que ceux-là
+```
+
+Le runner exécute les scénarios dans l'ordre, **consigne le code de sortie** de
+chacun dans un tableau récapitulatif, et attend le retour à `HEALTH_OK` entre
+les scénarios destructifs (03/04/05). Il sort `1` si l'un des scénarios joués
+échoue. **Sur le banc**, exclure 03/04 (`SKIP='03 04'`) : leur phase « restore »
+ne s'y valide pas (cf. avertissement plus bas).
+
+Chaque scénario est aussi un script bash auto-documenté, lançable seul :
 
 ```text
 test/scenarios/
 ├── README.md                         ← ce fichier
+├── run-all.sh                        ← runner agrégé (PASS/FAIL)
 ├── 01-block-rwx-write-read.sh        ← test de base PVC RBD
 ├── 02-pod-rescheduling.sh            ← résilience perte pod
 ├── 03-worker-loss.sh                 ← résilience perte worker
@@ -61,7 +76,7 @@ Chaque script :
 > `etcd-client`) doit être présent sur le control plane — le scénario l'installe
 > au besoin ; en prod, l'ajouter au provisionnement si la restauration doit être
 > rapide.
-
+>
 > ⚠️ **03 / 04 — la phase « restore » d'un nœud ne se valide PAS sur ce banc.**
 > Ne pas y retourner. La phase **« perte »** est utile et valable en prod (Ceph
 > passe en `HEALTH_WARN`, les OSD survivants tiennent les I/O — réplicat ×3 /

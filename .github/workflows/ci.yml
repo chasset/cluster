@@ -35,6 +35,26 @@ jobs:
         with:
           severity: warning
 
+  # Scripts qui échappent au job shellcheck par leur extension (audit P3 #36) :
+  # le template `.sh.j2` (corps bash, sans jinja) et le script Perl `.pl`.
+  scripts-extra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck du template etcd-snapshot.sh.j2
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck --severity=warning --shell=bash \
+            bootstrap/roles/etcd-backup/templates/etcd-snapshot.sh.j2
+      - name: perl -c des scripts Perl
+        run: |
+          rc=0
+          for f in $(git ls-files '*.pl'); do
+            echo "== perl -c $f =="
+            perl -c "$f" || rc=1
+          done
+          exit $rc
+
   kubeconform:
     runs-on: ubuntu-latest
     steps:
@@ -65,6 +85,29 @@ jobs:
         with:
           working_directory: bootstrap/
 
+  # Vérification de syntaxe des playbooks (audit P2 / 02-tests) : complète
+  # ansible-lint (qui valide les bonnes pratiques) par un `--syntax-check` qui
+  # garantit que chaque playbook se PARSE (includes, rôles, templating).
+  ansible-syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ansible-core
+        run: pipx install ansible-core
+      - name: Install collections
+        run: ansible-galaxy collection install --force -r bootstrap/requirements.yml
+      - name: Syntax-check des playbooks
+        working-directory: bootstrap
+        run: |
+          rc=0
+          for p in *.yaml; do
+            # hosts.yaml est un inventaire, pas un playbook → on le saute.
+            [ "$p" = "hosts.yaml" ] && continue
+            echo "== syntax-check $p =="
+            ansible-playbook -i hosts.yaml --syntax-check "$p" || rc=1
+          done
+          exit $rc
+
   jscpd:
     runs-on: ubuntu-latest
     steps:
@@ -89,6 +132,28 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:shell
+
+  # Lint Markdown (structure) — config tolérante (.markdownlint-cli2.yaml) :
+  # cible les vrais défauts, pas le style typographique géré par prettier.
+  markdownlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v20
+        with:
+          globs: '**/*.md'
+
+  # Vérification des liens (lychee) — mode hors-ligne : ne valide que les liens
+  # internes / fichiers (les liens externes sont flaky en CI et hors de notre
+  # contrôle). Couvre les liens cassés vers des fichiers/ancres du dépôt.
+  lychee:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: lycheeverse/lychee-action@v2
+        with:
+          args: '--offline --no-progress "**/*.md"'
+          fail: true
 
   # Scan de posture sécurité IaC (manifestes K8s, Dockerfile-like, config).
   # Échoue sur HIGH/CRITICAL. Les compromis actés sont listés, CIBLÉS PAR
