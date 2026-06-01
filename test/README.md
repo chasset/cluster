@@ -31,6 +31,12 @@ multi-VM et les disques Ceph.
   (mode expert, partitionnement LVM, firmware bnxt, IP statique) n'est **pas**
   rejouée. Cette étape se valide à la main lors du rebuild serveurs (cf.
   [`bootstrap/RUNBOOK.md`](../bootstrap/RUNBOOK.md)).
+- **Restore d'un nœud (halt → `vagrant up`) non fidèle** : le retour d'une VM
+  exerce des artefacts banc (route ClusterIP perdue au reboot, clock skew,
+  `vboxsf`) **absents de la prod**. La _perte_ de nœud reste un test de
+  résilience valable ; le _restore_, non — ne pas chercher à le « réparer » sur
+  le banc. Détail : [`scenarios/README.md`](scenarios/README.md) (03/04) et
+  [`RESULTS.md`](RESULTS.md).
 
 ## Pré-requis communs
 

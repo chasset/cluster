@@ -49,6 +49,18 @@ Chaque script :
 | 07  | Cilium connectivity   | `cilium connectivity test` standard + Hubble si activé  | ~10 min | Réseau Pod-to-Pod, E/W, NetworkPolicy  |
 | 08  | Resource limits audit | Inspection des `requests`/`limits` actuels vs banc/prod | ~10s    | Cohérence dimensionnement              |
 
+> ⚠️ **03 / 04 — la phase « restore » d'un nœud ne se valide PAS sur ce banc.**
+> Ne pas y retourner. La phase **« perte »** est utile et valable en prod (Ceph
+> passe en `HEALTH_WARN`, les OSD survivants tiennent les I/O — réplicat ×3 /
+> `failureDomain: host` / `min_size 2`). Mais le **retour** du nœud
+> (`vagrant up`) bute sur des artefacts **propres au banc Vagrant/arm64, absents
+> des 4 serveurs HPE** : route ClusterIP `10.96/12` perdue au reboot (drift #7),
+> **clock skew** de la VM rallumée (pas de RTC), montage **`vboxsf`** en échec.
+> Les « réparer » dans le scénario = **sur-adaptation au banc** (sans valeur
+> prod) : on s'en abstient délibérément. Le restore réel se teste **en prod**,
+> au rebuild des serveurs, où ces artefacts n'existent pas. Déroulé et analyse
+> complète : [../RESULTS.md](../RESULTS.md) (section déroulé scénarios + #7).
+
 ## Réponses aux questions opérationnelles
 
 ### Que se passe-t-il si on détruit un replica ?
