@@ -44,6 +44,11 @@ test/**/inventory.yaml
 test/**/*.vdi
 test/*.log
 
+# Archives de runs de validation (logs bruts GÉNÉRISÉS, preuves ADR 0023) —
+# versionnées par exception à la règle *.log ci-dessus (honnêteté des Runs).
+!test/lima/runs/
+!test/lima/runs/*.log
+
 # Lima test bench (per-run state : configs VM rendues, inventaire, kubeconfig)
 test/**/.work/
 

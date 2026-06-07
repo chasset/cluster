@@ -27,6 +27,9 @@ gateway_api_version: '1.4.1'
 # Base des CRDs standard Gateway API au tag ci-dessus (sources figées).
 gateway_api_crd_base: >-
   https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v{{ gateway_api_version }}/config/crd/standard
+# Répertoire tmp où télécharger les CRDs avant apply (drift L23 : get_url puis
+# apply local, pour respecter le CA système hors cluster).
+gateway_api_crd_tmp: /tmp/gateway-api-crds
 
 # Timeouts des gates (alignés sur les prédicats du shell dataops-chain).
 registry_ready_retries: 30

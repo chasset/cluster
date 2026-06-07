@@ -53,8 +53,13 @@ setup() {
     [[ "$output" == *"0 → 1"* ]]
 }
 
-@test "classify_marquez_ingest égal → fail" {
+@test "classify_marquez_ingest égal mais présent → ok (idempotence, L32)" {
     run classify_marquez_ingest 2 2
+    [[ "$output" == ok\|* ]]
+}
+
+@test "classify_marquez_ingest after=0 → fail (rien ingéré)" {
+    run classify_marquez_ingest 0 0
     [[ "$output" == fail\|* ]]
 }
 

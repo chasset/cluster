@@ -3,42 +3,59 @@
 #
 # Construit (arm64) ou re-tague (x86) les images maison de la chaîne DataOps vers
 # le registry interne. S'exécute sur UN nœud builder (run_once). Drift L18 :
-# git + buildkit requis.
+# git + buildkit requis. Drift L27 : le banc Lima ne monte PAS le home hôte
+# (mounts: []) → les sources du dépôt sont COPIÉES sur le nœud avant build.
 
 platform_repo_dir: '{{ playbook_dir }}/..'
 
 # Registry interne cible (cf. rôle platform-registry).
 build_registry_host: registry:80
 
+# Répertoire de build sur le nœud (sources copiées depuis l'hôte / clone Marquez).
+build_workdir: /tmp/dataops-build
+
 # Versions figées (ADR 0006) — verrou chart↔image 1:1.
 dagster_version: '1.13.7'
 marquez_version: '0.51.1'
 
-# Source upstream Marquez (clone pour build API Java + UI React).
+# Source upstream Marquez (clone pour build API Java + UI React, sur le nœud).
 marquez_git_repo: https://github.com/MarquezProject/marquez.git
+marquez_src_dir: /tmp/marquez-src
 
 # Émetteur OpenLineage jetable : harnais e2e (#148), PAS une brique prod
-# (ADR 0022). Non construit par défaut ; activé seulement pour la validation banc.
+# (ADR 0022). Non construit par défaut ; activé (build_emitter_image=true) UNIQUEMENT
+# pour la preuve lineage du banc. Ajouté à build_images via main.yaml si activé.
 build_emitter_image: false
+emitter_image:
+  name: dagster-openlineage-emit
+  tag: dev
+  src_context: '{{ platform_repo_dir }}/platform/dagster/image-openlineage/'
+  build_context: '{{ build_workdir }}/emitter'
+  dockerfile: '{{ build_workdir }}/emitter/Dockerfile'
 
-# Images maison de la chaîne. arch_image = image officielle amd64 à re-taguer sur
-# x86 (skip build) ; context/dockerfile = build arm64 interne.
+# Images maison de la chaîne. Chaque entrée :
+#   official_image : image amd64 officielle à re-taguer sur x86 (skip build).
+#   src_context    : contexte sur l'HÔTE à copier vers le nœud (Dockerfile + co).
+#   build_context  : contexte effectif sur le NŒUD (où nerdctl build).
+#   dockerfile     : chemin du Dockerfile sur le NŒUD.
+# Dagster : contexte local (Dockerfile pur Python). Marquez : Dockerfile versionné
+# copié, mais contexte = clone source upstream (gradle/web) déjà sur le nœud.
 build_images:
   - name: dagster-celery-k8s
     tag: '{{ dagster_version }}'
     official_image: 'docker.io/dagster/dagster-celery-k8s:{{ dagster_version }}'
-    context: '{{ platform_repo_dir }}/platform/dagster/image'
-    dockerfile: '{{ platform_repo_dir }}/platform/dagster/image/Dockerfile'
-    source: local # contexte local (pur Python)
+    src_context: '{{ platform_repo_dir }}/platform/dagster/image/'
+    build_context: '{{ build_workdir }}/dagster'
+    dockerfile: '{{ build_workdir }}/dagster/Dockerfile'
   - name: marquez
     tag: '{{ marquez_version }}'
     official_image: 'docker.io/marquezproject/marquez:{{ marquez_version }}'
-    dockerfile: '{{ platform_repo_dir }}/platform/marquez/image/Dockerfile'
-    source: marquez-clone # contexte = racine du clone source
-    clone_subdir: ''
+    src_dockerfile: '{{ platform_repo_dir }}/platform/marquez/image/Dockerfile'
+    build_context: '{{ marquez_src_dir }}'
+    dockerfile: '{{ build_workdir }}/marquez/Dockerfile'
   - name: marquez-web
     tag: '{{ marquez_version }}'
     official_image: 'docker.io/marquezproject/marquez-web:{{ marquez_version }}'
-    dockerfile: '{{ platform_repo_dir }}/platform/marquez/image-web/Dockerfile'
-    source: marquez-clone # contexte = sous-dossier web/ du clone
-    clone_subdir: web
+    src_dockerfile: '{{ platform_repo_dir }}/platform/marquez/image-web/Dockerfile'
+    build_context: '{{ marquez_src_dir }}/web'
+    dockerfile: '{{ build_workdir }}/marquez-web/Dockerfile'

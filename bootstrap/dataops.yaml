@@ -20,21 +20,37 @@
 - name: Plateforme DataOps — étape cluster (manifestes figés)
   hosts: "{{ dataops_k8s_host | default('localhost') }}"
   gather_facts: false
+  # PAS d'audit-log ici : ce rôle écrit un log SYSTÈME (`/var/log`, sudo) sur un
+  # NŒUD ; or dataops.yaml pilote l'API k8s depuis le poste de contrôle
+  # (localhost) — y faire `become` exigerait un sudo sans objet (drift L21/L22).
+  # L'audit-log reste sur les playbooks qui configurent des nœuds (bootstrap).
+  #
+  # SSL_CERT_FILE (drift L23) : le Python d'Ansible (ex. Homebrew) n'utilise pas
+  # toujours le CA système → les requêtes HTTPS (get_url des CRDs, module k8s)
+  # échouent en SSL. On pointe le bundle certifi de CE python (résolu en pré-tâche).
+  environment:
+    SSL_CERT_FILE: '{{ dataops_ca_bundle | default(omit) }}'
   pre_tasks:
-    - name: Audit-log — record playbook execution
-      ansible.builtin.import_role:
-        name: audit-log
-      vars:
-        audit_log_playbook: dataops.yaml
-    # kubernetes.core exige la lib Python `kubernetes` sur l'exécuteur.
-    - name: Ensure the Python kubernetes client is present
+    # kubernetes.core exige la lib Python `kubernetes` ; certifi fournit le CA.
+    - name: Ensure the Python client libraries are present
       ansible.builtin.pip:
-        name: kubernetes
+        name:
+          - kubernetes
+          - certifi
         state: present
+    # Résout le bundle CA avec le MÊME interpréteur que les modules Ansible.
+    - name: Resolve the certifi CA bundle path
+      ansible.builtin.command: "{{ ansible_python_interpreter | default('python3') }} -c 'import certifi; print(certifi.where())'"
+      register: dataops_certifi
+      changed_when: false
+    - name: Set the CA bundle for HTTPS requests
+      ansible.builtin.set_fact:
+        dataops_ca_bundle: '{{ dataops_certifi.stdout | trim }}'
   tasks:
     - name: Registry interne + CRDs Gateway API
       ansible.builtin.import_role:
         name: platform-registry
+        tasks_from: cluster
       tags: registry-cluster
 
     # cert-manager AVANT cnpg : le plugin Barman exige le TLS plugin↔operator.
@@ -56,6 +72,7 @@
     - name: Configuration containerd pour le registry interne
       ansible.builtin.import_role:
         name: platform-registry
+        tasks_from: node
       tags: registry-node
 
     # Build (arm64) / re-tag (x86) des images maison vers registry:80, APRÈS la

@@ -1,0 +1,2634 @@
+
+[1;36m[14:12:35] Phase 0 — VMs Lima + disques bruts[0m
+
+[1;36m[14:12:35] Création du disque Lima brut 'cp1-hdd1' (10GiB)[0m
+time="2026-06-07T14:12:35+02:00" level=info msg="Creating qcow2 disk `cp1-hdd1` with size 10GiB"
+
+[1;36m[14:12:35] Création du disque Lima brut 'cp1-hdd2' (10GiB)[0m
+time="2026-06-07T14:12:35+02:00" level=info msg="Creating qcow2 disk `cp1-hdd2` with size 10GiB"
+
+[1;36m[14:12:35] Création du disque Lima brut 'cp1-hdd3' (10GiB)[0m
+time="2026-06-07T14:12:35+02:00" level=info msg="Creating qcow2 disk `cp1-hdd3` with size 10GiB"
+
+[1;36m[14:12:35] Création du disque Lima brut 'cp1-blockdb' (5GiB)[0m
+time="2026-06-07T14:12:35+02:00" level=info msg="Creating qcow2 disk `cp1-blockdb` with size 5GiB"
+
+[1;36m[14:12:35] Création + démarrage de la VM Lima 'cp1'[0m
+time="2026-06-07T14:12:35+02:00" level=info msg="Terminal is not available, proceeding without opening an editor"
+time="2026-06-07T14:12:35+02:00" level=warning msg="local username \"<user>\" is not a valid Linux username (must match \"^[a-z_][a-z0-9_-]*$\"); using \"lima\" instead"
+time="2026-06-07T14:12:36+02:00" level=info msg="Starting the instance \"cp1\" with internal VM driver \"vz\""
+time="2026-06-07T14:12:36+02:00" level=info msg="Attempting to download the image" arch=aarch64 digest="sha512:b4f9240559da2c044953418d0632cee4d45e3d447a0ec6a9129ef7946e39ec4135ec9e085c176f8dc77af6536d7279c03487e9aa61fd6c628fb493886e23aef5" location="https://cloud.debian.org/images/cloud/trixie/20260525-2489/debian-13-genericcloud-arm64-20260525-2489.qcow2"
+time="2026-06-07T14:12:36+02:00" level=info msg="Using cache `~/Library/Caches/lima/download/by-url-sha256/44e8a685f9ff249718b06ac79193893d437846ce1b94661c525972d3157ebca6/data`"
+time="2026-06-07T14:12:36+02:00" level=info msg="Converting \"~/.lima/cp1/image\" (qcow2) to a raw disk \"~/.lima/cp1/disk\""
+time="2026-06-07T14:12:37+02:00" level=info msg="Expanding to 20GiB"
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] hostagent socket created at ~/.lima/cp1/ha.sock"
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] Starting VZ (hint: to watch the boot progress, see `~/.lima/cp1/serial*.log`)"
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] Mounting disk `cp1-hdd1` on `/mnt/lima-cp1-hdd1`"
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/cp1-hdd1/datadisk\" (raw) to a raw disk \"~/.lima/_disks/cp1-hdd1/datadisk\""
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] Mounting disk `cp1-hdd2` on `/mnt/lima-cp1-hdd2`"
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/cp1-hdd2/datadisk\" (raw) to a raw disk \"~/.lima/_disks/cp1-hdd2/datadisk\""
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] Mounting disk `cp1-hdd3` on `/mnt/lima-cp1-hdd3`"
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/cp1-hdd3/datadisk\" (raw) to a raw disk \"~/.lima/_disks/cp1-hdd3/datadisk\""
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] Mounting disk `cp1-blockdb` on `/mnt/lima-cp1-blockdb`"
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/cp1-blockdb/datadisk\" (raw) to a raw disk \"~/.lima/_disks/cp1-blockdb/datadisk\""
+time="2026-06-07T14:12:39+02:00" level=info msg="[hostagent] [VZ] - vm state change: running"
+time="2026-06-07T14:12:45+02:00" level=info msg="[hostagent] Started vsock forwarder: 127.0.0.1:<port> -> vsock:22 on VM"
+time="2026-06-07T14:12:45+02:00" level=info msg="[hostagent] Detected SSH server is listening on the vsock port; changed 127.0.0.1:<port> to proxy for the vsock port"
+time="2026-06-07T14:12:45+02:00" level=info msg="SSH Local Port: 59619"
+time="2026-06-07T14:12:45+02:00" level=info msg="[hostagent] Waiting for the essential requirement 1 of 3: \"ssh\""
+time="2026-06-07T14:12:45+02:00" level=info msg="[hostagent] The essential requirement 1 of 3 is satisfied"
+time="2026-06-07T14:12:45+02:00" level=info msg="[hostagent] Waiting for the essential requirement 2 of 3: \"user session is ready for ssh\""
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] The essential requirement 2 of 3 is satisfied"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Waiting for the essential requirement 3 of 3: \"Explicitly start ssh ControlMaster\""
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] The essential requirement 3 of 3 is satisfied"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Waiting for the optional requirement 1 of 2: \"systemd must be available\""
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] The optional requirement 1 of 2 is satisfied"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Guest agent is running"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Waiting for the optional requirement 2 of 2: \"containerd binaries to be installed\""
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Time sync: guest agent is alive, starting time synchronization"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding TCP 127.0.0.54:53"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding TCP 0.0.0.0:22"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding TCP 127.0.0.53:53"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Forwarding TCP from 0.0.0.0:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding TCP [::]:22"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Forwarding TCP from [::]:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.54:53"
+time="2026-06-07T14:12:46+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:12:46+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.53:53"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding UDP 192.168.104.x:68"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Forwarding UDP from 0.0.0.0:5353 to 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Forwarding UDP from 0.0.0.0:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Forwarding UDP from [::]:5353 to 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Forwarding UDP from [::]:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:12:46+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:12:51+02:00" level=info msg="[hostagent] Time sync: guest clock adjusted (was 224ms off)"
+time="2026-06-07T14:13:15+02:00" level=info msg="[hostagent] Forwarding UDP from 0.0.0.0:40695 to 127.0.0.1:<port>"
+time="2026-06-07T14:13:28+02:00" level=info msg="[hostagent] The optional requirement 2 of 2 is satisfied"
+time="2026-06-07T14:13:28+02:00" level=info msg="[hostagent] Waiting for the guest agent to be running"
+time="2026-06-07T14:13:28+02:00" level=info msg="[hostagent] Waiting for the final requirement 1 of 1: \"boot scripts must have finished\""
+time="2026-06-07T14:13:29+02:00" level=info msg="[hostagent] Forwarding TCP from 127.0.0.1:<port> to 127.0.0.1:<port>"
+time="2026-06-07T14:13:47+02:00" level=info msg="[hostagent] The final requirement 1 of 1 is satisfied"
+time="2026-06-07T14:13:47+02:00" level=info msg="READY. Run `limactl shell cp1` to open the shell."
+
+[1;36m[14:13:47] Création du disque Lima brut 'node1-hdd1' (10GiB)[0m
+time="2026-06-07T14:13:47+02:00" level=info msg="Creating qcow2 disk `node1-hdd1` with size 10GiB"
+
+[1;36m[14:13:47] Création du disque Lima brut 'node1-hdd2' (10GiB)[0m
+time="2026-06-07T14:13:47+02:00" level=info msg="Creating qcow2 disk `node1-hdd2` with size 10GiB"
+
+[1;36m[14:13:47] Création du disque Lima brut 'node1-hdd3' (10GiB)[0m
+time="2026-06-07T14:13:47+02:00" level=info msg="Creating qcow2 disk `node1-hdd3` with size 10GiB"
+
+[1;36m[14:13:47] Création du disque Lima brut 'node1-blockdb' (5GiB)[0m
+time="2026-06-07T14:13:47+02:00" level=info msg="Creating qcow2 disk `node1-blockdb` with size 5GiB"
+
+[1;36m[14:13:47] Création + démarrage de la VM Lima 'node1'[0m
+time="2026-06-07T14:13:47+02:00" level=info msg="Terminal is not available, proceeding without opening an editor"
+time="2026-06-07T14:13:47+02:00" level=warning msg="local username \"<user>\" is not a valid Linux username (must match \"^[a-z_][a-z0-9_-]*$\"); using \"lima\" instead"
+time="2026-06-07T14:13:47+02:00" level=info msg="Starting the instance \"node1\" with internal VM driver \"vz\""
+time="2026-06-07T14:13:47+02:00" level=info msg="Attempting to download the image" arch=aarch64 digest="sha512:b4f9240559da2c044953418d0632cee4d45e3d447a0ec6a9129ef7946e39ec4135ec9e085c176f8dc77af6536d7279c03487e9aa61fd6c628fb493886e23aef5" location="https://cloud.debian.org/images/cloud/trixie/20260525-2489/debian-13-genericcloud-arm64-20260525-2489.qcow2"
+time="2026-06-07T14:13:47+02:00" level=info msg="Using cache `~/Library/Caches/lima/download/by-url-sha256/44e8a685f9ff249718b06ac79193893d437846ce1b94661c525972d3157ebca6/data`"
+time="2026-06-07T14:13:47+02:00" level=info msg="Converting \"~/.lima/node1/image\" (qcow2) to a raw disk \"~/.lima/node1/disk\""
+time="2026-06-07T14:13:49+02:00" level=info msg="Expanding to 20GiB"
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] hostagent socket created at ~/.lima/node1/ha.sock"
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] Starting VZ (hint: to watch the boot progress, see `~/.lima/node1/serial*.log`)"
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] Mounting disk `node1-hdd1` on `/mnt/lima-node1-hdd1`"
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/node1-hdd1/datadisk\" (raw) to a raw disk \"~/.lima/_disks/node1-hdd1/datadisk\""
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] Mounting disk `node1-hdd2` on `/mnt/lima-node1-hdd2`"
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/node1-hdd2/datadisk\" (raw) to a raw disk \"~/.lima/_disks/node1-hdd2/datadisk\""
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] Mounting disk `node1-hdd3` on `/mnt/lima-node1-hdd3`"
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/node1-hdd3/datadisk\" (raw) to a raw disk \"~/.lima/_disks/node1-hdd3/datadisk\""
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] Mounting disk `node1-blockdb` on `/mnt/lima-node1-blockdb`"
+time="2026-06-07T14:13:50+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/node1-blockdb/datadisk\" (raw) to a raw disk \"~/.lima/_disks/node1-blockdb/datadisk\""
+time="2026-06-07T14:13:51+02:00" level=info msg="[hostagent] [VZ] - vm state change: running"
+time="2026-06-07T14:13:56+02:00" level=info msg="[hostagent] Started vsock forwarder: 127.0.0.1:<port> -> vsock:22 on VM"
+time="2026-06-07T14:13:56+02:00" level=info msg="[hostagent] Detected SSH server is listening on the vsock port; changed 127.0.0.1:<port> to proxy for the vsock port"
+time="2026-06-07T14:13:57+02:00" level=info msg="SSH Local Port: 59642"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Waiting for the essential requirement 1 of 3: \"ssh\""
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] The essential requirement 1 of 3 is satisfied"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Waiting for the essential requirement 2 of 3: \"user session is ready for ssh\""
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] The essential requirement 2 of 3 is satisfied"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Waiting for the essential requirement 3 of 3: \"Explicitly start ssh ControlMaster\""
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] The essential requirement 3 of 3 is satisfied"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Waiting for the optional requirement 1 of 2: \"systemd must be available\""
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Guest agent is running"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] The optional requirement 1 of 2 is satisfied"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Time sync: guest agent is alive, starting time synchronization"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Waiting for the optional requirement 2 of 2: \"containerd binaries to be installed\""
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding TCP 127.0.0.54:53"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding TCP 127.0.0.53:53"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Forwarding TCP from 0.0.0.0:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding TCP 0.0.0.0:22"
+time="2026-06-07T14:13:57+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Forwarding TCP from [::]:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding TCP [::]:22"
+time="2026-06-07T14:13:57+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.54:53"
+time="2026-06-07T14:13:57+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.53:53"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 192.168.104.x:68"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Forwarding UDP from 0.0.0.0:5353 to 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Forwarding UDP from 0.0.0.0:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Forwarding UDP from [::]:5353 to 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Forwarding UDP from [::]:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:13:57+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:14:02+02:00" level=info msg="[hostagent] Time sync: guest clock adjusted (was -298ms off)"
+time="2026-06-07T14:14:26+02:00" level=info msg="[hostagent] Forwarding UDP from 0.0.0.0:52152 to 127.0.0.1:<port>"
+time="2026-06-07T14:14:40+02:00" level=info msg="[hostagent] The optional requirement 2 of 2 is satisfied"
+time="2026-06-07T14:14:40+02:00" level=info msg="[hostagent] Waiting for the guest agent to be running"
+time="2026-06-07T14:14:40+02:00" level=info msg="[hostagent] Waiting for the final requirement 1 of 1: \"boot scripts must have finished\""
+time="2026-06-07T14:14:42+02:00" level=info msg="[hostagent] Forwarding TCP from 127.0.0.1:<port> to 127.0.0.1:<port>"
+time="2026-06-07T14:14:58+02:00" level=info msg="[hostagent] The final requirement 1 of 1 is satisfied"
+time="2026-06-07T14:14:58+02:00" level=info msg="READY. Run `limactl shell node1` to open the shell."
+
+[1;36m[14:14:58] Création du disque Lima brut 'node2-hdd1' (10GiB)[0m
+time="2026-06-07T14:14:58+02:00" level=info msg="Creating qcow2 disk `node2-hdd1` with size 10GiB"
+
+[1;36m[14:14:58] Création du disque Lima brut 'node2-hdd2' (10GiB)[0m
+time="2026-06-07T14:14:58+02:00" level=info msg="Creating qcow2 disk `node2-hdd2` with size 10GiB"
+
+[1;36m[14:14:58] Création du disque Lima brut 'node2-hdd3' (10GiB)[0m
+time="2026-06-07T14:14:58+02:00" level=info msg="Creating qcow2 disk `node2-hdd3` with size 10GiB"
+
+[1;36m[14:14:58] Création du disque Lima brut 'node2-blockdb' (5GiB)[0m
+time="2026-06-07T14:14:58+02:00" level=info msg="Creating qcow2 disk `node2-blockdb` with size 5GiB"
+
+[1;36m[14:14:58] Création + démarrage de la VM Lima 'node2'[0m
+time="2026-06-07T14:14:58+02:00" level=info msg="Terminal is not available, proceeding without opening an editor"
+time="2026-06-07T14:14:58+02:00" level=warning msg="local username \"<user>\" is not a valid Linux username (must match \"^[a-z_][a-z0-9_-]*$\"); using \"lima\" instead"
+time="2026-06-07T14:14:59+02:00" level=info msg="Starting the instance \"node2\" with internal VM driver \"vz\""
+time="2026-06-07T14:14:59+02:00" level=info msg="Attempting to download the image" arch=aarch64 digest="sha512:b4f9240559da2c044953418d0632cee4d45e3d447a0ec6a9129ef7946e39ec4135ec9e085c176f8dc77af6536d7279c03487e9aa61fd6c628fb493886e23aef5" location="https://cloud.debian.org/images/cloud/trixie/20260525-2489/debian-13-genericcloud-arm64-20260525-2489.qcow2"
+time="2026-06-07T14:14:59+02:00" level=info msg="Using cache `~/Library/Caches/lima/download/by-url-sha256/44e8a685f9ff249718b06ac79193893d437846ce1b94661c525972d3157ebca6/data`"
+time="2026-06-07T14:14:59+02:00" level=info msg="Converting \"~/.lima/node2/image\" (qcow2) to a raw disk \"~/.lima/node2/disk\""
+time="2026-06-07T14:15:00+02:00" level=info msg="Expanding to 20GiB"
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] hostagent socket created at ~/.lima/node2/ha.sock"
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] Starting VZ (hint: to watch the boot progress, see `~/.lima/node2/serial*.log`)"
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] Mounting disk `node2-hdd1` on `/mnt/lima-node2-hdd1`"
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/node2-hdd1/datadisk\" (raw) to a raw disk \"~/.lima/_disks/node2-hdd1/datadisk\""
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] Mounting disk `node2-hdd2` on `/mnt/lima-node2-hdd2`"
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/node2-hdd2/datadisk\" (raw) to a raw disk \"~/.lima/_disks/node2-hdd2/datadisk\""
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] Mounting disk `node2-hdd3` on `/mnt/lima-node2-hdd3`"
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/node2-hdd3/datadisk\" (raw) to a raw disk \"~/.lima/_disks/node2-hdd3/datadisk\""
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] Mounting disk `node2-blockdb` on `/mnt/lima-node2-blockdb`"
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] Converting \"~/.lima/_disks/node2-blockdb/datadisk\" (raw) to a raw disk \"~/.lima/_disks/node2-blockdb/datadisk\""
+time="2026-06-07T14:15:02+02:00" level=info msg="[hostagent] [VZ] - vm state change: running"
+time="2026-06-07T14:15:08+02:00" level=info msg="[hostagent] Started vsock forwarder: 127.0.0.1:<port> -> vsock:22 on VM"
+time="2026-06-07T14:15:08+02:00" level=info msg="[hostagent] Detected SSH server is listening on the vsock port; changed 127.0.0.1:<port> to proxy for the vsock port"
+time="2026-06-07T14:15:08+02:00" level=info msg="SSH Local Port: 59660"
+time="2026-06-07T14:15:08+02:00" level=info msg="[hostagent] Waiting for the essential requirement 1 of 3: \"ssh\""
+time="2026-06-07T14:15:08+02:00" level=info msg="[hostagent] The essential requirement 1 of 3 is satisfied"
+time="2026-06-07T14:15:08+02:00" level=info msg="[hostagent] Waiting for the essential requirement 2 of 3: \"user session is ready for ssh\""
+time="2026-06-07T14:15:08+02:00" level=info msg="[hostagent] The essential requirement 2 of 3 is satisfied"
+time="2026-06-07T14:15:08+02:00" level=info msg="[hostagent] Waiting for the essential requirement 3 of 3: \"Explicitly start ssh ControlMaster\""
+time="2026-06-07T14:15:08+02:00" level=info msg="[hostagent] The essential requirement 3 of 3 is satisfied"
+time="2026-06-07T14:15:08+02:00" level=info msg="[hostagent] Waiting for the optional requirement 1 of 2: \"systemd must be available\""
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Guest agent is running"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] The optional requirement 1 of 2 is satisfied"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Time sync: guest agent is alive, starting time synchronization"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Waiting for the optional requirement 2 of 2: \"containerd binaries to be installed\""
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding TCP 127.0.0.54:53"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Forwarding TCP from 0.0.0.0:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding TCP 127.0.0.53:53"
+time="2026-06-07T14:15:09+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:15:09+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding TCP 0.0.0.0:22"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Forwarding TCP from [::]:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding TCP [::]:22"
+time="2026-06-07T14:15:09+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:15:09+02:00" level=warning msg="[hostagent] failed to listen tcp: 127.0.0.1:<port>" error="listen tcp 127.0.0.1:<port>: bind: address already in use"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.54:53"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.53:53"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 192.168.104.x:68"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Forwarding UDP from 0.0.0.0:5353 to 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Forwarding UDP from 0.0.0.0:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Forwarding UDP from [::]:5353 to 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Forwarding UDP from [::]:5355 to 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:15:09+02:00" level=info msg="[hostagent] Not forwarding UDP 127.0.0.1:<port>"
+time="2026-06-07T14:15:14+02:00" level=info msg="[hostagent] Time sync: guest clock adjusted (was 253ms off)"
+time="2026-06-07T14:15:24+02:00" level=info msg="[hostagent] Forwarding TCP from 127.0.0.1:<port> to 127.0.0.1:<port>"
+time="2026-06-07T14:15:24+02:00" level=info msg="[hostagent] The optional requirement 2 of 2 is satisfied"
+time="2026-06-07T14:15:24+02:00" level=info msg="[hostagent] Waiting for the guest agent to be running"
+time="2026-06-07T14:15:24+02:00" level=info msg="[hostagent] Waiting for the final requirement 1 of 1: \"boot scripts must have finished\""
+time="2026-06-07T14:15:38+02:00" level=info msg="[hostagent] Forwarding UDP from 0.0.0.0:48902 to 127.0.0.1:<port>"
+time="2026-06-07T14:15:39+02:00" level=info msg="[hostagent] The final requirement 1 of 1 is satisfied"
+time="2026-06-07T14:15:39+02:00" level=info msg="READY. Run `limactl shell node2` to open the shell."
+
+[1;36m[14:15:39] Vérification des disques bruts (vdb..vde) sur chaque nœud[0m
+[1;32m  ✓ cp1 : disques bruts présents (vdb    10G vdc    10G vdd    10G vde     5G )[0m
+[1;32m  ✓ node1 : disques bruts présents (vdb    10G vdc    10G vdd    10G vde     5G )[0m
+[1;32m  ✓ node2 : disques bruts présents (vdb    10G vdc    10G vdd    10G vde     5G )[0m
+
+[1;36m[14:15:40] Phases 1-2 — bootstrap K8s + CNI[0m
+[1;32m  ✓ cp1 : IP user-v2 192.168.104.x[0m
+
+[1;36m[14:15:40]   ansible-playbook checks.yaml[0m
+
+PLAY [Install Kubernetes] ******************************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'node2' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'cp1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'node1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [audit-log : Append cluster-bootstrap audit-log entry] ********************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/audit-log/tasks/main.yaml:17:26
+
+15 - name: Append cluster-bootstrap audit-log entry
+16   become: true
+17   ansible.builtin.shell: |
+                            ^ column 26
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [node1]
+ok: [node2]
+ok: [cp1]
+
+TASK [k8s-pre-install : Machines run a supported, homogeneous operating system (Debian 13)] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:8:15
+
+6       - ansible_distribution == 'Debian'
+7       - ansible_distribution_major_version == '13'
+8     fail_msg: >-
+                ^ column 15
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:6:9
+
+4   ansible.builtin.assert:
+5     that:
+6       - ansible_distribution == 'Debian'
+          ^ column 9
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:7:9
+
+5     that:
+6       - ansible_distribution == 'Debian'
+7       - ansible_distribution_major_version == '13'
+          ^ column 9
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [k8s-pre-install : Each machine has enough RAM] ***************************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:18:19
+
+16       ansible.builtin.assert:
+17         that: ansible_memory_mb.real.total >= 4096
+18         fail_msg: >-
+                     ^ column 19
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:17:15
+
+15     - name: Each machine has enough RAM
+16       ansible.builtin.assert:
+17         that: ansible_memory_mb.real.total >= 4096
+                 ^ column 15
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [k8s-pre-install : Each machine has at least 2 CPUs] **********************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:26:19
+
+24       ansible.builtin.assert:
+25         that: ansible_processor_vcpus >= 2
+26         fail_msg: >-
+                     ^ column 19
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:25:15
+
+23     - name: Each machine has at least 2 CPUs
+24       ansible.builtin.assert:
+25         that: ansible_processor_vcpus >= 2
+                 ^ column 15
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [k8s-pre-install : Gather hostnames] **************************************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:34:24
+
+32     - name: Gather hostnames
+33       ansible.builtin.set_fact:
+34         all_hostnames: >-
+                          ^ column 24
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+ok: [node1]
+ok: [node2]
+
+TASK [k8s-pre-install : Hostnames are unique] **********************************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:42:19
+
+40       ansible.builtin.assert:
+41         that: all_hostnames | length == all_hostnames | unique | length
+42         fail_msg: >-
+                     ^ column 19
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:41:15
+
+39       run_once: true
+40       ansible.builtin.assert:
+41         that: all_hostnames | length == all_hostnames | unique | length
+                 ^ column 15
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [k8s-pre-install : Get product UUID from each machine] ********************
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [k8s-pre-install : Build the UUID list (ignoring hosts without a DMI UUID)] ***
+ok: [cp1]
+ok: [node1]
+ok: [node2]
+
+TASK [k8s-pre-install : UUIDs are unique] **************************************
+ok: [cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [k8s-pre-install : Warn when the filesystem backing /var is small] ********
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:73:16
+
+71 - name: Warn when the filesystem backing /var is small
+72   vars:
+73     var_mount: >-
+                  ^ column 16
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-pre-install/tasks/main.yaml:79:10
+
+77            | list) }}
+78   ansible.builtin.debug:
+79     msg: >-
+            ^ column 10
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => {
+    "msg": "WARNING: the filesystem backing /var on lima-cp1 is only 19.5 GB; >= 100 GB is recommended (containerd images, logs, etcd, /var/lib/rook)."
+}
+ok: [node1] => {
+    "msg": "WARNING: the filesystem backing /var on lima-node1 is only 19.5 GB; >= 100 GB is recommended (containerd images, logs, etcd, /var/lib/rook)."
+}
+ok: [node2] => {
+    "msg": "WARNING: the filesystem backing /var on lima-node2 is only 19.5 GB; >= 100 GB is recommended (containerd images, logs, etcd, /var/lib/rook)."
+}
+
+TASK [k8s-pre-install : Gather active swap devices] ****************************
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [k8s-pre-install : Disable all swap immediately] **************************
+skipping: [cp1]
+skipping: [node1]
+skipping: [node2]
+
+TASK [k8s-pre-install : Comment swap entries in /etc/fstab so swap stays off after reboot] ***
+ok: [cp1]
+ok: [node1]
+ok: [node2]
+
+PLAY RECAP *********************************************************************
+cp1                        : ok=13   changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+node1                      : ok=11   changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+node2                      : ok=11   changed=0    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+
+
+[1;36m[14:16:03]   ansible-playbook cri.yaml[0m
+
+PLAY [Install Kubernetes] ******************************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'node1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'node2' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'cp1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [node1]
+ok: [node2]
+ok: [cp1]
+
+TASK [audit-log : Append cluster-bootstrap audit-log entry] ********************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/audit-log/tasks/main.yaml:17:26
+
+15 - name: Append cluster-bootstrap audit-log entry
+16   become: true
+17   ansible.builtin.shell: |
+                            ^ column 26
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [k8s-CRI-install : Load required kernel modules at boot] ******************
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [k8s-CRI-install : Load required kernel modules now] **********************
+ok: [node2] => (item=overlay)
+ok: [cp1] => (item=overlay)
+ok: [node1] => (item=overlay)
+ok: [node2] => (item=br_netfilter)
+ok: [cp1] => (item=br_netfilter)
+ok: [node1] => (item=br_netfilter)
+
+TASK [k8s-CRI-install : Persist kernel parameters required by Kubernetes] ******
+changed: [cp1]
+changed: [node1]
+changed: [node2]
+
+TASK [k8s-CRI-install : Apply kernel parameters] *******************************
+ok: [node1]
+ok: [node2]
+ok: [cp1]
+
+TASK [k8s-CRI-install : Gather IPv4 forwarding value] **************************
+ok: [node1]
+ok: [node2]
+ok: [cp1]
+
+TASK [k8s-CRI-install : IPv4 forwarding is enabled] ****************************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-CRI-install/tasks/main.yaml:43:19
+
+41       ansible.builtin.assert:
+42         that: output_ipv4_forward.stdout == '1'
+43         fail_msg: IPv4 forwarding is not enabled on {{ ansible_hostname }}.
+                     ^ column 19
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [k8s-CRI-install : Install APT dependencies] ******************************
+changed: [node1]
+changed: [node2]
+changed: [cp1]
+
+TASK [k8s-CRI-install : Ensure the APT keyrings directory exists] **************
+ok: [node1]
+ok: [cp1]
+ok: [node2]
+
+TASK [k8s-CRI-install : Download the Docker GPG key] ***************************
+changed: [cp1]
+changed: [node1]
+changed: [node2]
+
+TASK [k8s-CRI-install : Add the Docker repository] *****************************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-CRI-install/tasks/main.yaml:72:15
+
+70     - name: Add the Docker repository
+71       ansible.builtin.apt_repository:
+72         repo: >-
+                 ^ column 15
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [node1]
+changed: [node2]
+changed: [cp1]
+
+TASK [k8s-CRI-install : Install the container runtime (containerd.io)] *********
+changed: [node2]
+changed: [cp1]
+changed: [node1]
+
+TASK [k8s-CRI-install : Generate the default containerd configuration] *********
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [k8s-CRI-install : Write containerd config with the systemd cgroup driver] ***
+changed: [cp1]
+changed: [node1]
+changed: [node2]
+
+TASK [k8s-CRI-install : Ensure containerd is enabled and running] **************
+ok: [cp1]
+ok: [node1]
+ok: [node2]
+
+RUNNING HANDLER [k8s-CRI-install : Restart containerd] *************************
+changed: [cp1]
+changed: [node1]
+changed: [node2]
+
+PLAY RECAP *********************************************************************
+cp1                        : ok=17   changed=7    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+node1                      : ok=17   changed=7    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+node2                      : ok=17   changed=7    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+[1;36m[14:18:11]   ansible-playbook kubeadm.yaml[0m
+
+PLAY [Install Kubernetes] ******************************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'cp1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'node1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'node2' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [cp1]
+ok: [node1]
+ok: [node2]
+
+TASK [audit-log : Append cluster-bootstrap audit-log entry] ********************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/audit-log/tasks/main.yaml:17:26
+
+15 - name: Append cluster-bootstrap audit-log entry
+16   become: true
+17   ansible.builtin.shell: |
+                            ^ column 26
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [k8s-install : Check apt dependencies] ************************************
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [k8s-install : Ensure the APT keyrings directory exists] ******************
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [k8s-install : Get kubernetes keyrings] ***********************************
+changed: [cp1]
+changed: [node2]
+changed: [node1]
+
+TASK [k8s-install : Add kubernetes repository] *********************************
+changed: [node2]
+changed: [cp1]
+changed: [node1]
+
+TASK [k8s-install : Install kubelet, kubeadm and cri-tools] ********************
+changed: [cp1]
+changed: [node1]
+changed: [node2]
+
+TASK [k8s-install : Hold kubelet, kubeadm and cri-tools at their installed version] ***
+changed: [node2] => (item=kubelet)
+changed: [cp1] => (item=kubelet)
+changed: [node1] => (item=kubelet)
+changed: [node2] => (item=kubeadm)
+changed: [cp1] => (item=kubeadm)
+changed: [node1] => (item=kubeadm)
+changed: [node2] => (item=cri-tools)
+changed: [cp1] => (item=cri-tools)
+changed: [node1] => (item=cri-tools)
+
+TASK [k8s-install : Configure KUBELET_EXTRA_ARGS for --node-ip when needed] ****
+skipping: [cp1]
+skipping: [node1]
+skipping: [node2]
+
+TASK [k8s-install : Enable and start kubernetes service] ***********************
+changed: [cp1]
+changed: [node2]
+changed: [node1]
+
+TASK [k8s-install : Map the control-plane endpoint to the primary control-plane node] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-install/tasks/main.yaml:91:15
+
+89         path: /etc/hosts
+90         regexp: '\s{{ control_plane_endpoint }}$'
+91         line: "{{ control_plane_ip | default(hostvars[groups['control'][0]].ansible_default_ipv4.address, true) }}...
+                 ^ column 15
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [node2]
+changed: [cp1]
+changed: [node1]
+
+PLAY RECAP *********************************************************************
+cp1                        : ok=10   changed=6    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+node1                      : ok=10   changed=6    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+node2                      : ok=10   changed=6    unreachable=0    failed=0    skipped=1    rescued=0    ignored=0   
+
+
+[1;36m[14:19:11]   ansible-playbook control-planes.yaml[0m
+
+PLAY [Install Kubernetes] ******************************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'cp1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [cp1]
+
+TASK [audit-log : Append cluster-bootstrap audit-log entry] ********************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/audit-log/tasks/main.yaml:17:26
+
+15 - name: Append cluster-bootstrap audit-log entry
+16   become: true
+17   ansible.builtin.shell: |
+                            ^ column 26
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [k8s-control-plane-nodes : Install kubectl] *******************************
+changed: [cp1]
+
+TASK [k8s-control-plane-nodes : Hold kubectl at its installed version] *********
+changed: [cp1]
+
+PLAY RECAP *********************************************************************
+cp1                        : ok=4    changed=2    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+[1;36m[14:19:30]   ansible-playbook initialisation.yaml[0m
+
+PLAY [Install Kubernetes] ******************************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'cp1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [cp1]
+
+TASK [audit-log : Append cluster-bootstrap audit-log entry] ********************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/audit-log/tasks/main.yaml:17:26
+
+15 - name: Append cluster-bootstrap audit-log entry
+16   become: true
+17   ansible.builtin.shell: |
+                            ^ column 26
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [k8s-initialization : Create hardening directories (encryption + audit)] ***
+changed: [cp1] => (item={'path': '/etc/kubernetes/enc', 'mode': '0700'})
+changed: [cp1] => (item={'path': '/etc/kubernetes/audit', 'mode': '0755'})
+changed: [cp1] => (item={'path': '/var/log/kubernetes/audit', 'mode': '0750'})
+
+TASK [k8s-initialization : Generate the etcd Secret encryption key (once)] *****
+changed: [cp1]
+
+TASK [k8s-initialization : Read the encryption key] ****************************
+ok: [cp1]
+
+TASK [k8s-initialization : Render EncryptionConfiguration] *********************
+changed: [cp1]
+
+TASK [k8s-initialization : Render audit policy] ********************************
+changed: [cp1]
+
+TASK [k8s-initialization : Render kubeadm init config] *************************
+changed: [cp1]
+
+TASK [k8s-initialization : Initialize the control plane] ***********************
+changed: [cp1]
+
+TASK [k8s-initialization : Create the .kube directory for the connecting user] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-initialization/tasks/main.yaml:87:15
+
+85     - name: Create the .kube directory for the connecting user
+86       ansible.builtin.file:
+87         path: '{{ ansible_env.HOME }}/.kube'
+                 ^ column 15
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [cp1]
+
+TASK [k8s-initialization : Copy kubernetes configuration] **********************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-initialization/tasks/main.yaml:97:15
+
+95         src: /etc/kubernetes/admin.conf
+96         remote_src: true
+97         dest: '{{ ansible_env.HOME }}/.kube/config'
+                 ^ column 15
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [cp1]
+
+TASK [k8s-initialization : Control plane accepts pods (remove the control-plane taint)] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-initialization/tasks/main.yaml:117:16
+
+115         - "'not found' not in taint_result.stderr"
+116       args:
+117         chdir: '{{ ansible_env.HOME }}'
+                   ^ column 16
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [cp1]
+
+TASK [k8s-initialization : Exclude the control plane from external load balancers] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-initialization/tasks/main.yaml:125:16
+
+123         >> lb-setup.log
+124       args:
+125         chdir: '{{ ansible_env.HOME }}'
+                   ^ column 16
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [cp1]
+
+PLAY RECAP *********************************************************************
+cp1                        : ok=13   changed=10   unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+[1;36m[14:21:00]   ansible-playbook join-workers.yaml[0m
+
+PLAY [Cluster initialization from one control-plane node] **********************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'cp1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [cp1]
+
+TASK [audit-log : Append cluster-bootstrap audit-log entry] ********************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/audit-log/tasks/main.yaml:17:26
+
+15 - name: Append cluster-bootstrap audit-log entry
+16   become: true
+17   ansible.builtin.shell: |
+                            ^ column 26
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [k8s-pre-join : Get join command] *****************************************
+ok: [cp1]
+
+TASK [k8s-pre-join : Set join command] *****************************************
+ok: [cp1]
+
+PLAY [Workers join the cluster] ************************************************
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'node1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'node2' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [node1]
+ok: [node2]
+
+TASK [audit-log : Append cluster-bootstrap audit-log entry] ********************
+ok: [node1]
+ok: [node2]
+
+TASK [k8s-join-cluster : Wait for the primary control plane API to be reachable] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-join-cluster/tasks/main.yaml:12:15
+
+10       # `ansible_default_ipv4.address` du control plane.
+11       ansible.builtin.wait_for:
+12         host: "{{ control_plane_ip | default(hostvars[groups['control'][0]].ansible_default_ipv4.address, true) }}"
+                 ^ column 15
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [node2]
+ok: [node1]
+
+TASK [k8s-join-cluster : Join the cluster] *************************************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/k8s-join-cluster/tasks/main.yaml:21:16
+
+19         # Home de l'utilisateur connecté (≠ /home/debian codé en dur) : existe sur
+20         # les nœuds réels / Vagrant (debian) ET sur le banc Lima (/home/lima.guest).
+21         chdir: '{{ ansible_env.HOME }}'
+                  ^ column 16
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [node2]
+changed: [node1]
+
+PLAY RECAP *********************************************************************
+cp1                        : ok=4    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+node1                      : ok=4    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+node2                      : ok=4    changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+
+[1;36m[14:21:33]   Cilium (cni.sh sur cp1)[0m
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+ 35 63.7M   35 22.4M    0     0  24.3M      0  0:00:02 --:--:--  0:00:02 24.3M100 63.7M  100 63.7M    0     0  49.0M      0  0:00:01  0:00:01 --:--:--  109M
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+100    92  100    92    0     0    243      0 --:--:-- --:--:-- --:--:--   243
+cilium-linux-arm64.tar.gz: OK
+cilium
+ℹ️  Using Cilium version 1.19.4
+🔮 Auto-detected cluster name: kubernetes
+🔮 Auto-detected kube-proxy has not been installed
+ℹ️  Cilium will fully replace all functionalities of kube-proxy
+Attente de la reconvergence Cilium (WireGuard + Hubble)…
+[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m1 errors[0m, [33m3 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [31m1 errors[0m, [33m2 warnings[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m, [33m3 warnings[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Unavailable: [31m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Pending: [32m3[0m
+                       cilium-envoy             Pending: [32m3[0m
+                       cilium-operator          Pending: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                              3 pods of DaemonSet cilium are not ready
+                       cilium-envoy       cilium-envoy                        3 pods of DaemonSet cilium-envoy are not ready
+                       cilium-operator    cilium-operator                     1 pods of Deployment cilium-operator are not ready
+                       hubble-relay       hubble-relay                        1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                        pod is pending
+                       cilium             cilium-f2sph                        pod is pending
+                       cilium             cilium-lg7xp                        pod is pending
+                       cilium-envoy       cilium-envoy-cv95w                  pod is pending
+                       cilium-envoy       cilium-envoy-h54wl                  pod is pending
+                       cilium-envoy       cilium-envoy-pvchh                  pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m1 errors[0m, [33m3 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [31m1 errors[0m, [33m2 warnings[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m, [33m3 warnings[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Unavailable: [31m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Pending: [32m3[0m
+                       cilium-envoy             Pending: [32m3[0m
+                       cilium-operator          Pending: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                              3 pods of DaemonSet cilium are not ready
+                       cilium-envoy       cilium-envoy                        3 pods of DaemonSet cilium-envoy are not ready
+                       cilium-operator    cilium-operator                     1 pods of Deployment cilium-operator are not ready
+                       hubble-relay       hubble-relay                        1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                        pod is pending
+                       cilium             cilium-f2sph                        pod is pending
+                       cilium             cilium-lg7xp                        pod is pending
+                       cilium-envoy       cilium-envoy-cv95w                  pod is pending
+                       cilium-envoy       cilium-envoy-h54wl                  pod is pending
+                       cilium-envoy       cilium-envoy-pvchh                  pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m1 errors[0m, [33m3 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [31m1 errors[0m, [33m2 warnings[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m, [33m3 warnings[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Unavailable: [31m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Pending: [32m3[0m
+                       cilium-envoy             Pending: [32m3[0m
+                       cilium-operator          Pending: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                              3 pods of DaemonSet cilium are not ready
+                       cilium-envoy       cilium-envoy                        3 pods of DaemonSet cilium-envoy are not ready
+                       cilium-operator    cilium-operator                     1 pods of Deployment cilium-operator are not ready
+                       hubble-relay       hubble-relay                        1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                        pod is pending
+                       cilium             cilium-f2sph                        pod is pending
+                       cilium             cilium-lg7xp                        pod is pending
+                       cilium-envoy       cilium-envoy-cv95w                  pod is pending
+                       cilium-envoy       cilium-envoy-h54wl                  pod is pending
+                       cilium-envoy       cilium-envoy-pvchh                  pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m1 errors[0m, [33m3 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [31m1 errors[0m, [33m2 warnings[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m, [33m3 warnings[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Unavailable: [31m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Pending: [32m3[0m
+                       cilium-envoy             Pending: [32m3[0m
+                       cilium-operator          Pending: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                              3 pods of DaemonSet cilium are not ready
+                       cilium-envoy       cilium-envoy                        3 pods of DaemonSet cilium-envoy are not ready
+                       cilium-operator    cilium-operator                     1 pods of Deployment cilium-operator are not ready
+                       hubble-relay       hubble-relay                        1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                        pod is pending
+                       cilium             cilium-f2sph                        pod is pending
+                       cilium             cilium-lg7xp                        pod is pending
+                       cilium-envoy       cilium-envoy-cv95w                  pod is pending
+                       cilium-envoy       cilium-envoy-h54wl                  pod is pending
+                       cilium-envoy       cilium-envoy-pvchh                  pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m1 errors[0m, [33m3 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [31m1 errors[0m, [33m2 warnings[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m, [33m3 warnings[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Unavailable: [31m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Pending: [32m3[0m
+                       cilium-envoy             Pending: [32m3[0m
+                       cilium-operator          Pending: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                              3 pods of DaemonSet cilium are not ready
+                       cilium-envoy       cilium-envoy                        3 pods of DaemonSet cilium-envoy are not ready
+                       cilium-operator    cilium-operator                     1 pods of Deployment cilium-operator are not ready
+                       hubble-relay       hubble-relay                        1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                        pod is pending
+                       cilium             cilium-f2sph                        pod is pending
+                       cilium             cilium-lg7xp                        pod is pending
+                       cilium-envoy       cilium-envoy-cv95w                  pod is pending
+                       cilium-envoy       cilium-envoy-h54wl                  pod is pending
+                       cilium-envoy       cilium-envoy-pvchh                  pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m1 errors[0m, [33m3 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [31m1 errors[0m, [33m2 warnings[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m, [33m3 warnings[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Unavailable: [31m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Pending: [32m3[0m
+                       cilium-envoy             Pending: [32m3[0m
+                       cilium-operator          Pending: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                              3 pods of DaemonSet cilium are not ready
+                       cilium-envoy       cilium-envoy                        3 pods of DaemonSet cilium-envoy are not ready
+                       cilium-operator    cilium-operator                     1 pods of Deployment cilium-operator are not ready
+                       hubble-relay       hubble-relay                        1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                        pod is pending
+                       cilium             cilium-f2sph                        pod is pending
+                       cilium             cilium-lg7xp                        pod is pending
+                       cilium-envoy       cilium-envoy-cv95w                  pod is pending
+                       cilium-envoy       cilium-envoy-h54wl                  pod is pending
+                       cilium-envoy       cilium-envoy-pvchh                  pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m1 errors[0m, [33m3 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [31m1 errors[0m, [33m2 warnings[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m, [33m2 warnings[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Unavailable: [31m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Pending: [32m3[0m
+                       cilium-envoy             Pending: [32m2[0m, Running: [32m1[0m
+                       cilium-operator          Pending: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                              3 pods of DaemonSet cilium are not ready
+                       cilium-envoy       cilium-envoy                        3 pods of DaemonSet cilium-envoy are not ready
+                       cilium-operator    cilium-operator                     1 pods of Deployment cilium-operator are not ready
+                       hubble-relay       hubble-relay                        1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                        pod is pending
+                       cilium             cilium-f2sph                        pod is pending
+                       cilium             cilium-lg7xp                        pod is pending
+                       cilium-envoy       cilium-envoy-cv95w                  pod is pending
+                       cilium-envoy       cilium-envoy-pvchh                  pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m1 errors[0m, [33m3 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [31m1 errors[0m, [33m2 warnings[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m, [33m2 warnings[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Unavailable: [31m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Pending: [32m3[0m
+                       cilium-envoy             Pending: [32m2[0m, Running: [32m1[0m
+                       cilium-operator          Pending: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                              3 pods of DaemonSet cilium are not ready
+                       cilium-envoy       cilium-envoy                        3 pods of DaemonSet cilium-envoy are not ready
+                       cilium-operator    cilium-operator                     1 pods of Deployment cilium-operator are not ready
+                       hubble-relay       hubble-relay                        1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                        pod is pending
+                       cilium             cilium-f2sph                        pod is pending
+                       cilium             cilium-lg7xp                        pod is pending
+                       cilium-envoy       cilium-envoy-cv95w                  pod is pending
+                       cilium-envoy       cilium-envoy-pvchh                  pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       cilium-operator    cilium-operator-5bfbb9d746-b99fx    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt       pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m3 errors[0m, [33m2 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m, [33m1 warnings[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m1[0m, Pending: [32m2[0m
+                       cilium-envoy             Pending: [32m1[0m, Running: [32m2[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                           3 pods of DaemonSet cilium are not ready
+                       cilium             cilium-f2sph                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium-envoy       cilium-envoy                     3 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                     pod is pending
+                       cilium             cilium-lg7xp                     pod is pending
+                       cilium-envoy       cilium-envoy-cv95w               pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m7 errors[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                           3 pods of DaemonSet cilium are not ready
+                       cilium             cilium-2s6fw                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-2s6fw                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium             cilium-lg7xp                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-lg7xp, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-lg7xp                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-lg7xp, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium-envoy       cilium-envoy                     3 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m7 errors[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                           3 pods of DaemonSet cilium are not ready
+                       cilium             cilium-2s6fw                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-2s6fw                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium             cilium-lg7xp                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-lg7xp, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-lg7xp                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-lg7xp, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium-envoy       cilium-envoy                     3 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m7 errors[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                           3 pods of DaemonSet cilium are not ready
+                       cilium             cilium-2s6fw                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-2s6fw                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium             cilium-lg7xp                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-lg7xp, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-lg7xp                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-lg7xp, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium-envoy       cilium-envoy                     3 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m7 errors[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                           3 pods of DaemonSet cilium are not ready
+                       cilium             cilium-2s6fw                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-2s6fw                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium             cilium-lg7xp                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-lg7xp, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-lg7xp                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-lg7xp, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium-envoy       cilium-envoy                     3 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m4 errors[0m, [33m2 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Unavailable: [31m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Unavailable: [31m3/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          0/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                           3 pods of DaemonSet cilium are not ready
+                       cilium             cilium-2s6fw                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium             cilium-2s6fw                     unable to retrieve cilium endpoint information: command failed (pod=kube-system/cilium-2s6fw, container=cilium-agent): command terminated with exit code 1: "Error: cannot get endpoint list: Get \"http://localhost/v1/endpoint\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n\n"
+                       cilium             cilium-f2sph                     unable to retrieve cilium status: command failed (pod=kube-system/cilium-f2sph, container=cilium-agent): command terminated with exit code 1: "Get \"http://localhost/v1/healthz\": dial unix /var/run/cilium/cilium.sock: connect: no such file or directory\nIs the agent running?\n"
+                       cilium-envoy       cilium-envoy                     3 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-lg7xp                     Hubble: Hubble starting
+                       cilium             cilium-lg7xp                     2 endpoints are not ready
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [31m1 errors[0m, [33m5 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Ready: [33m2/3[0m, Available: [33m2/3[0m, Unavailable: [31m1/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Ready: [33m2/3[0m, Available: [33m2/3[0m, Unavailable: [31m1/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          3/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium             cilium                           1 pods of DaemonSet cilium are not ready
+                       cilium-envoy       cilium-envoy                     1 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                     Hubble: Hubble starting
+                       cilium             cilium-2s6fw                     6 endpoints are not ready
+                       cilium             cilium-f2sph                     3 endpoints are not ready
+                       cilium             cilium-lg7xp                     Hubble: Hubble starting
+                       cilium             cilium-lg7xp                     3 endpoints are not ready
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [33m2 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Ready: [33m2/3[0m, Available: [33m2/3[0m, Unavailable: [31m1/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          3/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium-envoy       cilium-envoy                     1 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                     Hubble: Hubble starting
+                       cilium             cilium-lg7xp                     Hubble: Hubble starting
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [33m3 warnings[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Ready: [33m2/3[0m, Available: [33m2/3[0m, Unavailable: [31m1/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          3/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium-envoy       cilium-envoy                     1 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              cilium             cilium-2s6fw                     6 endpoints are not ready
+                       cilium             cilium-f2sph                     3 endpoints are not ready
+                       cilium             cilium-lg7xp                     2 endpoints are not ready
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [32mOK[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m, [33m2 warnings[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Ready: [33m2/3[0m, Available: [33m2/3[0m, Unavailable: [31m1/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Pending: [32m1[0m
+Cluster Pods:          3/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium-envoy       cilium-envoy                     1 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay                     1 pods of Deployment hubble-relay are not ready
+Warnings:              hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+                       hubble-relay       hubble-relay-7bf487775d-zj8pt    pod is pending
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [32mOK[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Ready: [33m2/3[0m, Available: [33m2/3[0m, Unavailable: [31m1/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Running: [32m1[0m
+Cluster Pods:          3/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium-envoy       cilium-envoy    1 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay    1 pods of Deployment hubble-relay are not ready
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [32mOK[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [31m1 errors[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Ready: [33m2/3[0m, Available: [33m2/3[0m, Unavailable: [31m1/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Running: [32m1[0m
+Cluster Pods:          3/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                cilium-envoy       cilium-envoy    1 pods of DaemonSet cilium-envoy are not ready
+                       hubble-relay       hubble-relay    1 pods of Deployment hubble-relay are not ready
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [32mOK[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [32mOK[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Running: [32m1[0m
+Cluster Pods:          3/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                hubble-relay       hubble-relay    1 pods of Deployment hubble-relay are not ready
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [32mOK[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [32mOK[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [31m1 errors[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Unavailable: [31m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Running: [32m1[0m
+Cluster Pods:          3/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Errors:                hubble-relay       hubble-relay    1 pods of Deployment hubble-relay are not ready
+[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[A[2K[33m    /¯¯\
+[36m /¯¯[33m\__/[32m¯¯\[0m    Cilium:             [32mOK[0m
+[36m \__[31m/¯¯\[32m__/[0m    Operator:           [32mOK[0m
+[32m /¯¯[31m\__/[35m¯¯\[0m    Envoy DaemonSet:    [32mOK[0m
+[32m \__[34m/¯¯\[35m__/[0m    Hubble Relay:       [32mOK[0m
+[34m[34m[34m    \__/[0m       ClusterMesh:        [36mdisabled[0m
+
+DaemonSet              cilium                   Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+DaemonSet              cilium-envoy             Desired: 3, Ready: [32m3/3[0m, Available: [32m3/3[0m
+Deployment             cilium-operator          Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Deployment             hubble-relay             Desired: 1, Ready: [32m1/1[0m, Available: [32m1/1[0m
+Containers:            cilium                   Running: [32m3[0m
+                       cilium-envoy             Running: [32m3[0m
+                       cilium-operator          Running: [32m1[0m
+                       clustermesh-apiserver    
+                       hubble-relay             Running: [32m1[0m
+Cluster Pods:          3/3 managed by Cilium
+Helm chart version:    1.19.4
+Image versions         cilium             quay.io/cilium/cilium:v1.19.4@sha256:2eb67991eaa9368ba199c2fac2c573cb0ffdeb79184533344f42fc9a7ff6af3c: 3
+                       cilium-envoy       quay.io/cilium/cilium-envoy:v1.36.6-1778235340-b87d1e32f522b33bd51701c6476d199326f01496@sha256:71d4fa0ec45e8d546dbd5604e169dc77fe92be63b799313bff031d00d89762e3: 3
+                       cilium-operator    quay.io/cilium/operator-generic:v1.19.4@sha256:1aa2b62735e7d8ab49ee840ae59c346932024c88901579121395c1271b435f71: 1
+                       hubble-relay       quay.io/cilium/hubble-relay:v1.19.4@sha256:59af8c0d561e560c2a042e7600a3496bc0367df8fbf868aa68d5834c8ec1a431: 1
+Vérification du chiffrement WireGuard…
+✓ WireGuard actif : Encryption: Wireguard (3/3 nodes)
+Attente de l'armement de KubeProxyReplacement par les agents…
+daemon set "cilium" successfully rolled out
+✓ KubeProxyReplacement actif — retrait de kube-proxy.
+✓ règles iptables KUBE-* purgées sur lima-cp1.
+ℹ️  Purge iptables à RÉPÉTER sur les autres nœuds (root) :
+    iptables-save | grep -v KUBE | iptables-restore
+ℹ️  Durabilité : kubeadm recrée kube-proxy à l'init/upgrade. Le rendu
+    permanent est posé via skipPhases: [addon/kube-proxy] dans la config
+    kubeadm (rôle k8s-initialization) — déjà appliqué aux nouveaux clusters.
+[1;32m  ✓ kubeconfig prêt : ~/cluster/test/lima/.work/kubeconfig (API via 127.0.0.1:<port>, tls-server-name=cluster-api)[0m
+
+[1;36m[14:22:30] Attente des 3 nœuds Ready (max 5 min)[0m
+[1;32m  ✓ 3 nœuds Ready[0m
+NAME         STATUS   ROLES           AGE    VERSION   INTERNAL-IP     EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION              CONTAINER-RUNTIME
+lima-cp1     Ready    control-plane   110s   v1.34.8   192.168.104.x   <none>        Debian GNU/Linux 13 (trixie)   6.12.90+deb13-cloud-arm64   containerd://2.2.1
+lima-node1   Ready    <none>          59s    v1.34.8   192.168.104.x   <none>        Debian GNU/Linux 13 (trixie)   6.12.90+deb13-cloud-arm64   containerd://2.2.1
+lima-node2   Ready    <none>          59s    v1.34.8   192.168.104.x   <none>        Debian GNU/Linux 13 (trixie)   6.12.90+deb13-cloud-arm64   containerd://2.2.1
+
+[1;36m[14:22:30] Phase 3 — Rook-Ceph (banc Lima : metadataDevice=vde)[0m
+
+[1;36m[14:22:31]   apply crds → common → operator (images dé-épinglées pour arm64)[0m
+customresourcedefinition.apiextensions.k8s.io/cephblockpoolradosnamespaces.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephblockpools.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephbucketnotifications.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephbuckettopics.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephclients.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephclusters.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephcosidrivers.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephfilesystemmirrors.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephfilesystems.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephfilesystemsubvolumegroups.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephnfses.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephnvmeofgateways.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephobjectrealms.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephobjectstores.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephobjectstoreusers.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephobjectzonegroups.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephobjectzones.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/cephrbdmirrors.ceph.rook.io created
+customresourcedefinition.apiextensions.k8s.io/objectbucketclaims.objectbucket.io created
+customresourcedefinition.apiextensions.k8s.io/objectbuckets.objectbucket.io created
+namespace/rook-ceph created
+clusterrole.rbac.authorization.k8s.io/cephfs-csi-nodeplugin created
+clusterrole.rbac.authorization.k8s.io/cephfs-external-provisioner-runner created
+clusterrole.rbac.authorization.k8s.io/objectstorage-provisioner-role created
+clusterrole.rbac.authorization.k8s.io/rbd-csi-nodeplugin created
+clusterrole.rbac.authorization.k8s.io/rbd-external-provisioner-runner created
+clusterrole.rbac.authorization.k8s.io/rook-ceph-cluster-mgmt created
+clusterrole.rbac.authorization.k8s.io/rook-ceph-global created
+clusterrole.rbac.authorization.k8s.io/rook-ceph-mgr-cluster created
+clusterrole.rbac.authorization.k8s.io/rook-ceph-mgr-system created
+clusterrole.rbac.authorization.k8s.io/rook-ceph-object-bucket created
+clusterrole.rbac.authorization.k8s.io/rook-ceph-osd created
+clusterrole.rbac.authorization.k8s.io/rook-ceph-system created
+clusterrolebinding.rbac.authorization.k8s.io/cephfs-csi-nodeplugin-role created
+clusterrolebinding.rbac.authorization.k8s.io/cephfs-csi-provisioner-role created
+clusterrolebinding.rbac.authorization.k8s.io/objectstorage-provisioner-role-binding created
+clusterrolebinding.rbac.authorization.k8s.io/rbd-csi-nodeplugin created
+clusterrolebinding.rbac.authorization.k8s.io/rbd-csi-provisioner-role created
+clusterrolebinding.rbac.authorization.k8s.io/rook-ceph-global created
+clusterrolebinding.rbac.authorization.k8s.io/rook-ceph-mgr-cluster created
+clusterrolebinding.rbac.authorization.k8s.io/rook-ceph-object-bucket created
+clusterrolebinding.rbac.authorization.k8s.io/rook-ceph-osd created
+clusterrolebinding.rbac.authorization.k8s.io/rook-ceph-system created
+role.rbac.authorization.k8s.io/cephfs-external-provisioner-cfg created
+role.rbac.authorization.k8s.io/rbd-csi-nodeplugin created
+role.rbac.authorization.k8s.io/rbd-external-provisioner-cfg created
+role.rbac.authorization.k8s.io/rook-ceph-cmd-reporter created
+role.rbac.authorization.k8s.io/rook-ceph-mgr created
+role.rbac.authorization.k8s.io/rook-ceph-osd created
+role.rbac.authorization.k8s.io/rook-ceph-purge-osd created
+role.rbac.authorization.k8s.io/rook-ceph-system created
+rolebinding.rbac.authorization.k8s.io/cephfs-csi-provisioner-role-cfg created
+rolebinding.rbac.authorization.k8s.io/rbd-csi-nodeplugin-role-cfg created
+rolebinding.rbac.authorization.k8s.io/rbd-csi-provisioner-role-cfg created
+rolebinding.rbac.authorization.k8s.io/rook-ceph-cluster-mgmt created
+rolebinding.rbac.authorization.k8s.io/rook-ceph-cmd-reporter created
+rolebinding.rbac.authorization.k8s.io/rook-ceph-mgr created
+rolebinding.rbac.authorization.k8s.io/rook-ceph-mgr-system created
+rolebinding.rbac.authorization.k8s.io/rook-ceph-osd created
+rolebinding.rbac.authorization.k8s.io/rook-ceph-purge-osd created
+rolebinding.rbac.authorization.k8s.io/rook-ceph-system created
+serviceaccount/objectstorage-provisioner created
+serviceaccount/rook-ceph-cmd-reporter created
+serviceaccount/rook-ceph-default created
+serviceaccount/rook-ceph-mgr created
+serviceaccount/rook-ceph-nvmeof created
+serviceaccount/rook-ceph-osd created
+serviceaccount/rook-ceph-purge-osd created
+serviceaccount/rook-ceph-rgw created
+serviceaccount/rook-ceph-system created
+serviceaccount/rook-csi-cephfs-plugin-sa created
+serviceaccount/rook-csi-cephfs-provisioner-sa created
+serviceaccount/rook-csi-rbd-plugin-sa created
+serviceaccount/rook-csi-rbd-provisioner-sa created
+configmap/rook-ceph-operator-config created
+deployment.apps/rook-ceph-operator created
+[1;32m  ✓ operator Ready[0m
+
+[1;36m[14:22:52]   apply cluster-bench.yaml + toolbox (images dé-épinglées pour arm64)[0m
+cephcluster.ceph.rook.io/rook-ceph created
+deployment.apps/rook-ceph-tools created
+
+[1;36m[14:22:52] Attente HEALTH_OK (max 20 min)[0m
+[1;32m  ✓ Ceph HEALTH_OK[0m
+  cluster:
+    id:     6569b67e-f017-44d0-8f57-493ce7c94bda
+    health: HEALTH_OK
+ 
+  services:
+    mon: 3 daemons, quorum a,b,c (age 59s) [leader: a]
+    mgr: a(active, since 8s), standbys: b
+    osd: 9 osds: 9 up (since 5s), 9 in (since 19s)
+ 
+  data:
+    pools:   1 pools, 1 pgs
+    objects: 2 objects, 449 KiB
+    usage:   15 GiB used, 90 GiB / 105 GiB avail
+    pgs:     1 active+clean
+ 
+[1;32m  ✓ pas d'erreur CSI[0m
+
+[1;36m[14:25:25] Phase 4 — StorageClasses[0m
+cephblockpool.ceph.rook.io/rook-ceph-block-replicated-pool created
+storageclass.storage.k8s.io/rook-ceph-block-replicated created
+cephblockpool.ceph.rook.io/rook-ceph-block-ec-metadata-pool created
+cephblockpool.ceph.rook.io/rook-ceph-block-ec-data-pool created
+storageclass.storage.k8s.io/rook-ceph-block-ec created
+cephblockpool.ceph.rook.io/rook-ceph-block-ec-delete-metadata-pool created
+cephblockpool.ceph.rook.io/rook-ceph-block-ec-delete-data-pool created
+storageclass.storage.k8s.io/rook-ceph-block-ec-delete created
+cephfilesystem.ceph.rook.io/myfs created
+storageclass.storage.k8s.io/rook-cephfs created
+[1;32m  ✓ StorageClass default = rook-ceph-block-replicated (1 seule)[0m
+
+[1;36m[14:25:26]   Attente de la config CSI (monitors peuplés)[0m
+
+[1;36m[14:25:26]   PVC test (Bound ?)[0m
+persistentvolumeclaim/run-phases-test-pvc created
+pod/run-phases-test-pod created
+[1;32m  ✓ PVC test Bound[0m
+
+[1;36m[14:25:37] 🎉 Banc Lima validé (mode Ceph) : up → bootstrap → ceph → storageClasses.[0m
+
+[1;36m[14:28:39] Phase datalake — CephObjectStore RGW + storageClass datalake[0m
+cephobjectstore.ceph.rook.io/datalake created
+storageclass.storage.k8s.io/rook-ceph-datalake created
+
+[1;36m[14:28:39]   Attente du RGW datalake Ready (max 5 min)[0m
+[1;32m  ✓ RGW datalake Ready (cible S3 des backups Barman)[0m
+
+[1;36m[15:59:06] Phase dataops — chaîne DataOps via Ansible (registry → CNPG → Dagster → Marquez)[0m
+
+PLAY [Plateforme DataOps — étape cluster (manifestes figés)] *******************
+
+TASK [Ensure the Python client libraries are present] **************************
+ok: [localhost]
+
+TASK [Resolve the certifi CA bundle path] **************************************
+ok: [localhost]
+
+TASK [Set the CA bundle for HTTPS requests] ************************************
+ok: [localhost]
+
+TASK [platform-registry : Ensure the Gateway API CRD download directory exists] ***
+ok: [localhost]
+
+TASK [platform-registry : Download Gateway API CRDs (1.4.1)] *******************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: Importing 'to_bytes' from 'ansible.module_utils._text' is deprecated. This feature will be removed from ansible-core version 2.24. Use ansible.module_utils.common.text.converters instead.
+[DEPRECATION WARNING]: Importing 'to_native' from 'ansible.module_utils._text' is deprecated. This feature will be removed from ansible-core version 2.24. Use ansible.module_utils.common.text.converters instead.
+[DEPRECATION WARNING]: Importing 'to_text' from 'ansible.module_utils._text' is deprecated. This feature will be removed from ansible-core version 2.24. Use ansible.module_utils.common.text.converters instead.
+ok: [localhost] => (item=gatewayclasses)
+ok: [localhost] => (item=gateways)
+ok: [localhost] => (item=httproutes)
+ok: [localhost] => (item=referencegrants)
+ok: [localhost] => (item=grpcroutes)
+
+TASK [platform-registry : Apply Gateway API CRDs (1.4.1)] **********************
+ok: [localhost] => (item=gatewayclasses)
+ok: [localhost] => (item=gateways)
+ok: [localhost] => (item=httproutes)
+ok: [localhost] => (item=referencegrants)
+ok: [localhost] => (item=grpcroutes)
+
+TASK [platform-registry : Apply registry namespace] ****************************
+ok: [localhost]
+
+TASK [platform-registry : Apply registry PVC (storageClass=rook-ceph-block-replicated)] ***
+[DEPRECATION WARNING]: Direct access to the `environment` attribute is deprecated. This feature will be removed from ansible-core version 2.23. Consider using `copy_with_new_env` or passing `overrides` to `template`.
+ok: [localhost]
+
+TASK [platform-registry : Apply registry deployment and service] ***************
+ok: [localhost] => (item=deployment.yaml)
+ok: [localhost] => (item=service.yaml)
+ok: [localhost] => (item=garbage-collect-cronjob.yaml)
+
+TASK [platform-registry : Apply registry network policies (ordered)] ***********
+ok: [localhost] => (item=00-default-deny.yaml)
+ok: [localhost] => (item=allow-dns.yaml)
+ok: [localhost] => (item=allow-registry.yaml)
+
+TASK [platform-registry : Wait for registry deployment to be Ready] ************
+ok: [localhost]
+
+TASK [platform-cert-manager : Apply cert-manager (server-side)] ****************
+ok: [localhost]
+
+TASK [platform-cert-manager : Wait for cert-manager webhook to be Ready] *******
+ok: [localhost]
+
+TASK [platform-cert-manager : Apply internal CA issuers] ***********************
+ok: [localhost]
+
+TASK [platform-cnpg : Ensure the postgres namespace exists] ********************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply CNPG operator (server-side)] ***********************
+ok: [localhost]
+
+TASK [platform-cnpg : Wait for CNPG controller manager to be Ready] ************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply Barman Cloud plugin (server-side)] *****************
+ok: [localhost]
+
+TASK [platform-cnpg : Claim the backup bucket from Ceph RGW (ObjectBucketClaim)] ***
+ok: [localhost]
+
+TASK [platform-cnpg : Wait for the OBC credentials Secret to be provisioned] ***
+ok: [localhost]
+
+TASK [platform-cnpg : Derive the Barman S3 credentials Secret] *****************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply managed role password Secrets] *********************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply CNPG ObjectStore (endpoint http://rook-ceph-rgw-datalake.rook-ceph:80)] ***
+ok: [localhost]
+
+TASK [platform-cnpg : Load the pinned Cluster manifest] ************************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply CNPG Cluster (storageClass=rook-ceph-block-replicated)] ***
+ok: [localhost] => (item=Namespace/postgres)
+ok: [localhost] => (item=Cluster/pg)
+
+TASK [platform-cnpg : Wait for the pg Cluster to be healthy] *******************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply logical databases] *********************************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply scheduled backup] **********************************
+ok: [localhost]
+
+PLAY [Plateforme DataOps — étape nœuds (containerd + build d'images)] **********
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'cp1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'node1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'node2' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [cp1]
+ok: [node1]
+ok: [node2]
+
+TASK [platform-registry : Get registry Service ClusterIP] **********************
+ok: [cp1 -> localhost]
+
+TASK [platform-registry : Assert registry ClusterIP is available] **************
+ok: [cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [platform-registry : Map registry hostname to its ClusterIP in /etc/hosts] ***
+ok: [node1]
+ok: [cp1]
+ok: [node2]
+
+TASK [platform-registry : Ensure containerd certs.d directory for the registry exists] ***
+ok: [node1]
+ok: [cp1]
+ok: [node2]
+
+TASK [platform-registry : Write containerd certs.d hosts.toml (HTTP registry)] ***
+ok: [cp1]
+ok: [node2]
+ok: [node1]
+
+TASK [platform-registry : Enable use_local_image_pull in containerd CRI config (drift L13)] ***
+ok: [cp1]
+ok: [node2]
+ok: [node1]
+
+TASK [platform-build-images : Install build prerequisites (git)] ***************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:25:13
+
+23         update_cache: true
+24         cache_valid_time: 3600
+25       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [platform-build-images : Enable and start buildkit] ***********************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:32:13
+
+30         enabled: true
+31         state: started
+32       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [platform-build-images : Ensure per-image build directories exist] ********
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:44:13
+
+42         - marquez
+43         - marquez-web
+44       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => (item=dagster)
+ok: [cp1] => (item=marquez)
+ok: [cp1] => (item=marquez-web)
+
+TASK [platform-build-images : Copy Dagster build context to the builder node] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:52:13
+
+50         dest: "{{ build_workdir }}/dagster/"
+51         mode: '0644'
+52       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [platform-build-images : Clone Marquez source at the pinned tag] **********
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:62:13
+
+60         depth: 1
+61         single_branch: true
+62       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [platform-build-images : Copy Marquez Dockerfiles to the builder node] ****
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:78:13
+
+76       loop_control:
+77         label: "{{ item.dest }}"
+78       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => (item=/tmp/dataops-build/marquez/Dockerfile)
+ok: [cp1] => (item=/tmp/dataops-build/marquez-web/Dockerfile)
+
+TASK [platform-build-images : Copy emitter build context to the builder node] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:88:11
+
+86         mode: '0644'
+87       when:
+88         - ansible_architecture == 'aarch64'
+             ^ column 11
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [cp1]
+
+TASK [platform-build-images : Provision each DataOps image] ********************
+included: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml for cp1 => (item=dagster-celery-k8s:1.13.7)
+included: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml for cp1 => (item=marquez:0.51.1)
+included: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml for cp1 => (item=marquez-web:0.51.1)
+included: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml for cp1 => (item=dagster-openlineage-emit:dev)
+
+TASK [platform-build-images : Check if image already present in the registry — dagster-celery-k8s] ***
+ok: [cp1]
+
+TASK [platform-build-images : Build arm64 image — dagster-celery-k8s] **********
+skipping: [cp1]
+
+TASK [platform-build-images : Pull official amd64 image on x86 — dagster-celery-k8s] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Retag official image to internal registry on x86 — dagster-celery-k8s] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Push to the internal registry — dagster-celery-k8s] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Check if image already present in the registry — marquez] ***
+ok: [cp1]
+
+TASK [platform-build-images : Build arm64 image — marquez] *********************
+skipping: [cp1]
+
+TASK [platform-build-images : Pull official amd64 image on x86 — marquez] ******
+skipping: [cp1]
+
+TASK [platform-build-images : Retag official image to internal registry on x86 — marquez] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Push to the internal registry — marquez] *********
+skipping: [cp1]
+
+TASK [platform-build-images : Check if image already present in the registry — marquez-web] ***
+ok: [cp1]
+
+TASK [platform-build-images : Build arm64 image — marquez-web] *****************
+skipping: [cp1]
+
+TASK [platform-build-images : Pull official amd64 image on x86 — marquez-web] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Retag official image to internal registry on x86 — marquez-web] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Push to the internal registry — marquez-web] *****
+skipping: [cp1]
+
+TASK [platform-build-images : Check if image already present in the registry — dagster-openlineage-emit] ***
+ok: [cp1]
+
+TASK [platform-build-images : Build arm64 image — dagster-openlineage-emit] ****
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml:31:13
+
+29           - "{{ img.build_context }}"
+30       changed_when: true
+31       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+changed: [cp1]
+
+TASK [platform-build-images : Pull official amd64 image on x86 — dagster-openlineage-emit] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml:38:13
+
+36       ansible.builtin.command: "nerdctl pull --platform linux/amd64 {{ img.official_image }}"
+37       changed_when: true
+38       when: ansible_architecture == 'x86_64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+skipping: [cp1]
+
+TASK [platform-build-images : Retag official image to internal registry on x86 — dagster-openlineage-emit] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml:44:13
+
+42         nerdctl tag {{ img.official_image }} {{ build_registry_host }}/{{ img.name }}:{{ img.tag }}
+43       changed_when: true
+44       when: ansible_architecture == 'x86_64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+skipping: [cp1]
+
+TASK [platform-build-images : Push to the internal registry — dagster-openlineage-emit] ***
+changed: [cp1]
+
+PLAY [Plateforme DataOps — étape applicative (Dagster + Marquez)] **************
+
+TASK [platform-dagster : Apply Dagster namespace] ******************************
+ok: [localhost]
+
+TASK [platform-dagster : Apply Dagster network policies (default-deny first)] ***
+ok: [localhost] => (item=00-default-deny.yaml)
+ok: [localhost] => (item=allow-dns.yaml)
+ok: [localhost] => (item=allow-intra-namespace.yaml)
+ok: [localhost] => (item=allow-apiserver-egress.yaml)
+ok: [localhost] => (item=allow-postgres-egress.yaml)
+ok: [localhost] => (item=allow-registry-egress.yaml)
+ok: [localhost] => (item=allow-marquez-egress.yaml)
+ok: [localhost] => (item=allow-webserver-ingress.yaml)
+
+TASK [platform-dagster : Read the CNPG dagster role password] ******************
+ok: [localhost]
+
+TASK [platform-dagster : Assert the CNPG dagster role password exists] *********
+ok: [localhost] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [platform-dagster : Derive the Dagster Postgres Secret] *******************
+ok: [localhost]
+
+TASK [platform-dagster : Apply Dagster manifest] *******************************
+changed: [localhost]
+
+TASK [platform-dagster : Wait for Dagster webserver and daemon to be Ready] ****
+ok: [localhost] => (item=dagster-dagster-webserver)
+ok: [localhost] => (item=dagster-daemon)
+
+TASK [platform-marquez : Apply Marquez namespace] ******************************
+ok: [localhost]
+
+TASK [platform-marquez : Apply Marquez network policies (default-deny first)] ***
+ok: [localhost] => (item=00-default-deny.yaml)
+ok: [localhost] => (item=allow-dns.yaml)
+ok: [localhost] => (item=allow-intra-namespace.yaml)
+ok: [localhost] => (item=allow-postgres-egress.yaml)
+ok: [localhost] => (item=allow-openlineage-ingress.yaml)
+ok: [localhost] => (item=allow-web-ingress.yaml)
+
+TASK [platform-marquez : Read the CNPG marquez role password] ******************
+ok: [localhost]
+
+TASK [platform-marquez : Assert the CNPG marquez role password exists] *********
+ok: [localhost] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [platform-marquez : Derive the Marquez Postgres Secret] *******************
+ok: [localhost]
+
+TASK [platform-marquez : Apply Marquez manifest] *******************************
+ok: [localhost]
+
+TASK [platform-marquez : Wait for Marquez API and web to be Ready] *************
+ok: [localhost] => (item=marquez)
+ok: [localhost] => (item=marquez-web)
+
+PLAY RECAP *********************************************************************
+cp1                        : ok=24   changed=3    unreachable=0    failed=0    skipped=14   rescued=0    ignored=0   
+localhost                  : ok=42   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+node1                      : ok=6    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+node2                      : ok=6    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+[1;32m  ✓ chaîne DataOps déployée (Ansible) — CNPG sain, Dagster + Marquez Ready[0m
+
+[1;36m[16:02:41]   Émetteur jetable — run Dagster + sensor OpenLineage → ingestion Marquez[0m
+
+[1;36m[16:02:46]     attente de la complétion du run émetteur (max 5 min)…[0m
+
+[1;36m[16:02:46]     vérification de l'ingestion côté Marquez…[0m
+[1;31mÉCHEC: Marquez : aucun job ingéré (1 → 1) — sensor OpenLineage → API Marquez à vérifier[0m
+
+[1;36m[16:07:57] Phase dataops — chaîne DataOps via Ansible (registry → CNPG → Dagster → Marquez)[0m
+
+PLAY [Plateforme DataOps — étape cluster (manifestes figés)] *******************
+
+TASK [Ensure the Python client libraries are present] **************************
+ok: [localhost]
+
+TASK [Resolve the certifi CA bundle path] **************************************
+ok: [localhost]
+
+TASK [Set the CA bundle for HTTPS requests] ************************************
+ok: [localhost]
+
+TASK [platform-registry : Ensure the Gateway API CRD download directory exists] ***
+ok: [localhost]
+
+TASK [platform-registry : Download Gateway API CRDs (1.4.1)] *******************
+[WARNING]: Deprecation warnings can be disabled by setting `deprecation_warnings=False` in ansible.cfg.
+[DEPRECATION WARNING]: Importing 'to_bytes' from 'ansible.module_utils._text' is deprecated. This feature will be removed from ansible-core version 2.24. Use ansible.module_utils.common.text.converters instead.
+[DEPRECATION WARNING]: Importing 'to_native' from 'ansible.module_utils._text' is deprecated. This feature will be removed from ansible-core version 2.24. Use ansible.module_utils.common.text.converters instead.
+[DEPRECATION WARNING]: Importing 'to_text' from 'ansible.module_utils._text' is deprecated. This feature will be removed from ansible-core version 2.24. Use ansible.module_utils.common.text.converters instead.
+ok: [localhost] => (item=gatewayclasses)
+ok: [localhost] => (item=gateways)
+ok: [localhost] => (item=httproutes)
+ok: [localhost] => (item=referencegrants)
+ok: [localhost] => (item=grpcroutes)
+
+TASK [platform-registry : Apply Gateway API CRDs (1.4.1)] **********************
+ok: [localhost] => (item=gatewayclasses)
+ok: [localhost] => (item=gateways)
+ok: [localhost] => (item=httproutes)
+ok: [localhost] => (item=referencegrants)
+ok: [localhost] => (item=grpcroutes)
+
+TASK [platform-registry : Apply registry namespace] ****************************
+ok: [localhost]
+
+TASK [platform-registry : Apply registry PVC (storageClass=rook-ceph-block-replicated)] ***
+[DEPRECATION WARNING]: Direct access to the `environment` attribute is deprecated. This feature will be removed from ansible-core version 2.23. Consider using `copy_with_new_env` or passing `overrides` to `template`.
+ok: [localhost]
+
+TASK [platform-registry : Apply registry deployment and service] ***************
+ok: [localhost] => (item=deployment.yaml)
+ok: [localhost] => (item=service.yaml)
+ok: [localhost] => (item=garbage-collect-cronjob.yaml)
+
+TASK [platform-registry : Apply registry network policies (ordered)] ***********
+ok: [localhost] => (item=00-default-deny.yaml)
+ok: [localhost] => (item=allow-dns.yaml)
+ok: [localhost] => (item=allow-registry.yaml)
+
+TASK [platform-registry : Wait for registry deployment to be Ready] ************
+ok: [localhost]
+
+TASK [platform-cert-manager : Apply cert-manager (server-side)] ****************
+ok: [localhost]
+
+TASK [platform-cert-manager : Wait for cert-manager webhook to be Ready] *******
+ok: [localhost]
+
+TASK [platform-cert-manager : Apply internal CA issuers] ***********************
+ok: [localhost]
+
+TASK [platform-cnpg : Ensure the postgres namespace exists] ********************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply CNPG operator (server-side)] ***********************
+ok: [localhost]
+
+TASK [platform-cnpg : Wait for CNPG controller manager to be Ready] ************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply Barman Cloud plugin (server-side)] *****************
+ok: [localhost]
+
+TASK [platform-cnpg : Claim the backup bucket from Ceph RGW (ObjectBucketClaim)] ***
+ok: [localhost]
+
+TASK [platform-cnpg : Wait for the OBC credentials Secret to be provisioned] ***
+ok: [localhost]
+
+TASK [platform-cnpg : Derive the Barman S3 credentials Secret] *****************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply managed role password Secrets] *********************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply CNPG ObjectStore (endpoint http://rook-ceph-rgw-datalake.rook-ceph:80)] ***
+ok: [localhost]
+
+TASK [platform-cnpg : Load the pinned Cluster manifest] ************************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply CNPG Cluster (storageClass=rook-ceph-block-replicated)] ***
+ok: [localhost] => (item=Namespace/postgres)
+ok: [localhost] => (item=Cluster/pg)
+
+TASK [platform-cnpg : Wait for the pg Cluster to be healthy] *******************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply logical databases] *********************************
+ok: [localhost]
+
+TASK [platform-cnpg : Apply scheduled backup] **********************************
+ok: [localhost]
+
+PLAY [Plateforme DataOps — étape nœuds (containerd + build d'images)] **********
+
+TASK [Gathering Facts] *********************************************************
+[WARNING]: Host 'cp1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'node1' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+[WARNING]: Host 'node2' is using the discovered Python interpreter at '/usr/bin/python3.13', but future installation of another Python interpreter could cause a different interpreter to be discovered. See https://docs.ansible.com/ansible-core/2.20/reference_appendices/interpreter_discovery.html for more information.
+ok: [cp1]
+ok: [node1]
+ok: [node2]
+
+TASK [platform-registry : Get registry Service ClusterIP] **********************
+ok: [cp1 -> localhost]
+
+TASK [platform-registry : Assert registry ClusterIP is available] **************
+ok: [cp1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node1] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+ok: [node2] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [platform-registry : Map registry hostname to its ClusterIP in /etc/hosts] ***
+ok: [node2]
+ok: [node1]
+ok: [cp1]
+
+TASK [platform-registry : Ensure containerd certs.d directory for the registry exists] ***
+ok: [node2]
+ok: [cp1]
+ok: [node1]
+
+TASK [platform-registry : Write containerd certs.d hosts.toml (HTTP registry)] ***
+ok: [node1]
+ok: [cp1]
+ok: [node2]
+
+TASK [platform-registry : Enable use_local_image_pull in containerd CRI config (drift L13)] ***
+ok: [node1]
+ok: [cp1]
+ok: [node2]
+
+TASK [platform-build-images : Install build prerequisites (git)] ***************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:25:13
+
+23         update_cache: true
+24         cache_valid_time: 3600
+25       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [platform-build-images : Enable and start buildkit] ***********************
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:32:13
+
+30         enabled: true
+31         state: started
+32       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [platform-build-images : Ensure per-image build directories exist] ********
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:44:13
+
+42         - marquez
+43         - marquez-web
+44       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => (item=dagster)
+ok: [cp1] => (item=marquez)
+ok: [cp1] => (item=marquez-web)
+
+TASK [platform-build-images : Copy Dagster build context to the builder node] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:52:13
+
+50         dest: "{{ build_workdir }}/dagster/"
+51         mode: '0644'
+52       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [platform-build-images : Clone Marquez source at the pinned tag] **********
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:62:13
+
+60         depth: 1
+61         single_branch: true
+62       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [platform-build-images : Copy Marquez Dockerfiles to the builder node] ****
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:78:13
+
+76       loop_control:
+77         label: "{{ item.dest }}"
+78       when: ansible_architecture == 'aarch64'
+               ^ column 13
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1] => (item=/tmp/dataops-build/marquez/Dockerfile)
+ok: [cp1] => (item=/tmp/dataops-build/marquez-web/Dockerfile)
+
+TASK [platform-build-images : Copy emitter build context to the builder node] ***
+[DEPRECATION WARNING]: INJECT_FACTS_AS_VARS default to `True` is deprecated, top-level facts will not be auto injected after the change. This feature will be removed from ansible-core version 2.24.
+Origin: ~/cluster/bootstrap/roles/platform-build-images/tasks/main.yaml:88:11
+
+86         mode: '0644'
+87       when:
+88         - ansible_architecture == 'aarch64'
+             ^ column 11
+
+Use `ansible_facts["fact_name"]` (no `ansible_` prefix) instead.
+
+ok: [cp1]
+
+TASK [platform-build-images : Provision each DataOps image] ********************
+included: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml for cp1 => (item=dagster-celery-k8s:1.13.7)
+included: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml for cp1 => (item=marquez:0.51.1)
+included: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml for cp1 => (item=marquez-web:0.51.1)
+included: ~/cluster/bootstrap/roles/platform-build-images/tasks/image.yaml for cp1 => (item=dagster-openlineage-emit:dev)
+
+TASK [platform-build-images : Check if image already present in the registry — dagster-celery-k8s] ***
+ok: [cp1]
+
+TASK [platform-build-images : Build arm64 image — dagster-celery-k8s] **********
+skipping: [cp1]
+
+TASK [platform-build-images : Pull official amd64 image on x86 — dagster-celery-k8s] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Retag official image to internal registry on x86 — dagster-celery-k8s] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Push to the internal registry — dagster-celery-k8s] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Check if image already present in the registry — marquez] ***
+ok: [cp1]
+
+TASK [platform-build-images : Build arm64 image — marquez] *********************
+skipping: [cp1]
+
+TASK [platform-build-images : Pull official amd64 image on x86 — marquez] ******
+skipping: [cp1]
+
+TASK [platform-build-images : Retag official image to internal registry on x86 — marquez] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Push to the internal registry — marquez] *********
+skipping: [cp1]
+
+TASK [platform-build-images : Check if image already present in the registry — marquez-web] ***
+ok: [cp1]
+
+TASK [platform-build-images : Build arm64 image — marquez-web] *****************
+skipping: [cp1]
+
+TASK [platform-build-images : Pull official amd64 image on x86 — marquez-web] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Retag official image to internal registry on x86 — marquez-web] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Push to the internal registry — marquez-web] *****
+skipping: [cp1]
+
+TASK [platform-build-images : Check if image already present in the registry — dagster-openlineage-emit] ***
+ok: [cp1]
+
+TASK [platform-build-images : Build arm64 image — dagster-openlineage-emit] ****
+skipping: [cp1]
+
+TASK [platform-build-images : Pull official amd64 image on x86 — dagster-openlineage-emit] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Retag official image to internal registry on x86 — dagster-openlineage-emit] ***
+skipping: [cp1]
+
+TASK [platform-build-images : Push to the internal registry — dagster-openlineage-emit] ***
+skipping: [cp1]
+
+PLAY [Plateforme DataOps — étape applicative (Dagster + Marquez)] **************
+
+TASK [platform-dagster : Apply Dagster namespace] ******************************
+ok: [localhost]
+
+TASK [platform-dagster : Apply Dagster network policies (default-deny first)] ***
+ok: [localhost] => (item=00-default-deny.yaml)
+ok: [localhost] => (item=allow-dns.yaml)
+ok: [localhost] => (item=allow-intra-namespace.yaml)
+ok: [localhost] => (item=allow-apiserver-egress.yaml)
+ok: [localhost] => (item=allow-postgres-egress.yaml)
+ok: [localhost] => (item=allow-registry-egress.yaml)
+ok: [localhost] => (item=allow-marquez-egress.yaml)
+ok: [localhost] => (item=allow-webserver-ingress.yaml)
+
+TASK [platform-dagster : Read the CNPG dagster role password] ******************
+ok: [localhost]
+
+TASK [platform-dagster : Assert the CNPG dagster role password exists] *********
+ok: [localhost] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [platform-dagster : Derive the Dagster Postgres Secret] *******************
+ok: [localhost]
+
+TASK [platform-dagster : Apply Dagster manifest] *******************************
+changed: [localhost]
+
+TASK [platform-dagster : Wait for Dagster webserver and daemon to be Ready] ****
+ok: [localhost] => (item=dagster-dagster-webserver)
+ok: [localhost] => (item=dagster-daemon)
+
+TASK [platform-marquez : Apply Marquez namespace] ******************************
+ok: [localhost]
+
+TASK [platform-marquez : Apply Marquez network policies (default-deny first)] ***
+ok: [localhost] => (item=00-default-deny.yaml)
+ok: [localhost] => (item=allow-dns.yaml)
+ok: [localhost] => (item=allow-intra-namespace.yaml)
+ok: [localhost] => (item=allow-postgres-egress.yaml)
+ok: [localhost] => (item=allow-openlineage-ingress.yaml)
+ok: [localhost] => (item=allow-web-ingress.yaml)
+
+TASK [platform-marquez : Read the CNPG marquez role password] ******************
+ok: [localhost]
+
+TASK [platform-marquez : Assert the CNPG marquez role password exists] *********
+ok: [localhost] => {
+    "changed": false,
+    "msg": "All assertions passed"
+}
+
+TASK [platform-marquez : Derive the Marquez Postgres Secret] *******************
+ok: [localhost]
+
+TASK [platform-marquez : Apply Marquez manifest] *******************************
+ok: [localhost]
+
+TASK [platform-marquez : Wait for Marquez API and web to be Ready] *************
+ok: [localhost] => (item=marquez)
+ok: [localhost] => (item=marquez-web)
+
+PLAY RECAP *********************************************************************
+cp1                        : ok=22   changed=0    unreachable=0    failed=0    skipped=16   rescued=0    ignored=0   
+localhost                  : ok=42   changed=1    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+node1                      : ok=6    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+node2                      : ok=6    changed=0    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0   
+
+[1;32m  ✓ chaîne DataOps déployée (Ansible) — CNPG sain, Dagster + Marquez Ready[0m
+
+[1;36m[16:10:49]   Émetteur jetable — run Dagster + sensor OpenLineage → ingestion Marquez[0m
+
+[1;36m[16:10:51]     attente de la complétion du run émetteur (max 5 min)…[0m
+
+[1;36m[16:10:51]     vérification de l'ingestion côté Marquez…[0m
+[1;32m  ✓ Marquez : lineage présent (1 → 1 jobs)[0m
+[1;32m  ✓ 🎉 chaîne DataOps validée — lineage d'un run Dagster réel visible dans Marquez[0m
+
+[1;36m[16:10:58] Consigner ce run dans test/lima/RESULTS.md (honnêteté des Runs, ADR 0023).[0m
