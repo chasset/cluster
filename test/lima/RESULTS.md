@@ -159,7 +159,7 @@ tâches idempotentes plutôt que les redécouvrir à chaque run.
 > [ADR 0033](../../docs/decisions/0033-orchestration-ansible-platform-dataops.md))
 > a été monté de bout en bout **par le playbook** (plus de shell impératif) et
 > le **lineage d'un run Dagster réel est ingéré dans Marquez**.
-
+>
 > ⚠️ **Honnêteté du Run (ADR 0023).** Ce résultat vert a été atteint **après 12
 > correctifs intermédiaires** (drifts L21–L32) : la phase `dataops` a échoué et
 > été relancée 9 fois avant de passer. Le socle (`all`) et `datalake` sont, eux,
