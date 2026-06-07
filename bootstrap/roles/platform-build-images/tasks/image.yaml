@@ -1,6 +1,8 @@
 # code: language=ansible
 # Provisionne UNE image (var `img`) dans le registry interne. Idempotent :
 # saute si le tag existe déjà ; sinon build (arm64) ou re-tag officiel (x86).
+# Contexte et Dockerfile sont des chemins SUR LE NŒUD (copiés/clonés par
+# main.yaml — drift L27).
 
 - name: 'Check if image already present in the registry — {{ img.name }}'
   ansible.builtin.command: >-
@@ -12,8 +14,7 @@
 - name: 'Build (arm64) or retag (x86) image — {{ img.name }}'
   when: img_present.rc != 0
   block:
-    # arm64 : build interne via nerdctl/buildkit. Contexte selon la source
-    # (local pour Dagster ; clone Marquez + sous-dossier éventuel pour Marquez).
+    # arm64 : build interne via nerdctl/buildkit, depuis les sources sur le nœud.
     - name: 'Build arm64 image — {{ img.name }}'
       ansible.builtin.command:
         argv:
@@ -25,7 +26,7 @@
           - '{{ build_registry_host }}/{{ img.name }}:{{ img.tag }}'
           - -f
           - '{{ img.dockerfile }}'
-          - "{{ (img.source == 'local') | ternary(img.context, '/tmp/marquez-src/' ~ img.clone_subdir) }}"
+          - '{{ img.build_context }}'
       changed_when: true
       when: ansible_architecture == 'aarch64'
 

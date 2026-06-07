@@ -51,11 +51,14 @@ classify_dagster_run() {
 }
 
 # classify_marquez_ingest BEFORE AFTER
-#   Verdict sur l'ingestion d'un événement OpenLineage : compare le nombre de jobs
+#   Verdict sur l'ingestion d'un événement OpenLineage : examine le nombre de jobs
 #   Marquez avant/après le run émetteur.
 #   - BEFORE ou AFTER illisible (vide/"?")   → skip
-#   - AFTER > BEFORE                         → ok (au moins un job ingéré)
-#   - AFTER <= BEFORE                        → fail (rien ingéré)
+#   - AFTER >= 1                             → ok (au moins un job présent)
+#   - AFTER == 0                             → fail (rien ingéré)
+#   NB : on teste la PRÉSENCE (after >= 1), pas le delta : le run est idempotent
+#   (Marquez ne vide pas le namespace), donc un 2ᵉ passage laisse after == before
+#   alors que l'ingestion a bien eu lieu (drift L32). before sert d'info au message.
 classify_marquez_ingest() {
     local before=${1:-} after=${2:-}
     case "$before$after" in
@@ -68,8 +71,8 @@ classify_marquez_ingest() {
         printf 'skip|Marquez : compteur de jobs non numérique (before=%s after=%s)\n' "$before" "$after"
         return
     fi
-    if [ "$after" -gt "$before" ]; then
-        printf 'ok|Marquez : lineage ingéré (%s → %s jobs)\n' "$before" "$after"
+    if [ "$after" -ge 1 ]; then
+        printf 'ok|Marquez : lineage présent (%s → %s jobs)\n' "$before" "$after"
     else
         printf 'fail|Marquez : aucun job ingéré (%s → %s)\n' "$before" "$after"
     fi

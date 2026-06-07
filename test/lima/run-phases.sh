@@ -44,9 +44,11 @@ CP=cp1 # nœud control-plane (kubeconfig + cni.sh)
 # Port hôte du forward de l'API du control-plane (127.0.0.1:API_PORT → guest 6443).
 API_PORT=6443
 
-# Ressources par VM (5 GiB : cf. check k8s-pre-install real.total >= 4096 MB).
+# Ressources par VM. 8 GiB (drift L28) : 5 GiB suffit au socle+Ceph, mais le
+# build arm64 de marquez-web (webpack/npm) sature et se fait OOM-killer (rc=137)
+# quand le nœud porte déjà k8s+Ceph+CNPG. 8 GiB laisse la marge du pic de build.
 VM_CPUS=2
-VM_MEMORY=5GiB
+VM_MEMORY=8GiB
 VM_DISK=20GiB
 
 # CRDs Gateway API (alignées sur Cilium 1.19.x — ADR 0006 ; cf. platform/cilium-expo).
@@ -448,9 +450,15 @@ phase_dataops() {
 
     # Le playbook tourne depuis l'hôte : kubernetes.core lit ce KUBECONFIG ;
     # storageClass banc = rook-ceph-block-replicated (défaut prod, mode Ceph).
+    # Le CA TLS (SSL_CERT_FILE, drift L23) est résolu et posé PAR le playbook
+    # lui-même (pré-tâche certifi) — avec le bon interpréteur Python.
+    # build_emitter_image=true : le banc build aussi l'émetteur OpenLineage jetable
+    # (harnais e2e, ADR 0022) requis par la preuve lineage ci-dessous — JAMAIS en
+    # prod (défaut false). Drift L31.
     KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
         "${REPO}/bootstrap/dataops.yaml" \
         -e dataops_k8s_host=localhost \
+        -e build_emitter_image=true \
         || die "dataops.yaml : échec du déploiement de la chaîne"
     ok "chaîne DataOps déployée (Ansible) — CNPG sain, Dagster + Marquez Ready"
 

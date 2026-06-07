@@ -8,6 +8,18 @@
 - name: Deploy CloudNativePG with Barman backups
   run_once: true
   block:
+    # Namespace `postgres` créé EN PREMIER : les Secrets (rôles, pg-backup-s3) y
+    # sont posés avant le Cluster qui, lui, le redéclare (drift L25 : sans ça, le
+    # Secret dérivé échoue « namespaces postgres not found »).
+    - name: Ensure the postgres namespace exists
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: '{{ cnpg_namespace }}'
+
     # ── 1. operator (CRDs volumineuses → server-side) + plugin Barman ────────
     - name: Apply CNPG operator (server-side)
       kubernetes.core.k8s:
