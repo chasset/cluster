@@ -38,7 +38,10 @@ Détail des temps par phase du run #173 (M3 Max, mode Ceph, 8 GiB/VM) :
 
 > Le `dataops` (≈14 min) est dominé par le **build d'images arm64** (gradle Java
 > Marquez + npm React). C'est l'argument premier pour des **bancs plus rapides
-> et ciblés** quand on n'itère que sur une brique.
+> et ciblés** quand on n'itère que sur une brique — d'où la stratégie
+> fidélité/vitesse de
+> [ADR 0035](../decisions/0035-strategie-bancs-fidelite-vitesse.md) (profil
+> `local-path` ~11 min vs Ceph ~30 min).
 
 ## Les drifts par catégorie
 
