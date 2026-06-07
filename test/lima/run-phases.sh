@@ -464,7 +464,11 @@ phase_datalake() {
     log "  Attente du RGW datalake Ready (max 5 min)"
     # shellcheck disable=SC2329  # invoquée indirectement par `retry`
     rgw_ready() {
-        [ "$("${KUBECTL[@]}" -n rook-ceph get deploy rook-ceph-rgw-datalake-a -o jsonpath='{.status.readyReplicas}' 2> /dev/null)" = "1" ]
+        # Le CephObjectStore a `instances: 3` → Deployment à 3 replicas (drift
+        # L33 : tester == 1 échouait alors que le RGW est sain). On exige >= 1.
+        local rr
+        rr=$("${KUBECTL[@]}" -n rook-ceph get deploy rook-ceph-rgw-datalake-a -o jsonpath='{.status.readyReplicas}' 2> /dev/null)
+        [ -n "${rr}" ] && [ "${rr}" -ge 1 ]
     }
     retry 300 10 rgw_ready \
         || die "RGW datalake pas Ready : $("${KUBECTL[@]}" -n rook-ceph get pods -l app=rook-ceph-rgw 2>&1 | tail -5)"
