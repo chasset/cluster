@@ -61,3 +61,4 @@ Format léger inspiré de Michael Nygard :
 | 0039 | [Nomenclature des axes du catalogue (codes par valeur)](0039-nomenclature-axes-catalogue.md)                   | Accepted |
 | 0040 | [Stratégie terrains × topologies (quel terrain monte quoi)](0040-terrains-x-topologies.md)                     | Accepted |
 | 0041 | [Gouvernance & complétude DataOps (dbt, Airflow, catalogue) — cadrage](0041-gouvernance-completude-dataops.md) | Accepted |
+| 0042 | [Fraîcheur des preuves de banc (garde-fou CI)](0042-fraicheur-preuves-banc.md)                                 | Accepted |
