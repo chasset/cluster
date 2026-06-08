@@ -57,3 +57,4 @@ Format léger inspiré de Michael Nygard :
 | 0035 | [Stratégie de bancs : fidélité vs vitesse](0035-strategie-bancs-fidelite-vitesse.md)                       | Accepted |
 | 0036 | [Backing S3 par topologie : SeaweedFS (léger) / RGW (prod)](0036-backing-s3-unique-rgw.md)                 | Accepted |
 | 0037 | [Stratégie de merge : merge commit (préserver les références)](0037-strategie-merge-commit.md)             | Accepted |
+| 0038 | [Lima seul banc local ; provisioning n'est plus un axe](0038-lima-seul-banc-local.md)                      | Accepted |

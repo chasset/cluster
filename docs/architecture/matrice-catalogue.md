@@ -13,40 +13,106 @@ combinaisons ont réellement été montées sur banc).
 > Cette page est une **carte de lecture**, pas une source de vérité : en cas
 > d'écart, les RESULTS.md font foi.
 
-## 1. Les cinq axes de construction
+## 1. Les quatre axes de construction
 
 Une configuration de banc = un point du produit **matériel × topologie × terrain
-× provisioning × briques**.
+× briques**.
+
+> **Pourquoi quatre et non cinq.** Le « provisioning » n'est plus un axe : en
+> local il se réduit à **Lima** (Vagrant/VirtualBox dépréciés, kind abandonné,
+> k3d jamais retenu — [ADR 0038](../decisions/0038-lima-seul-banc-local.md)). Un
+> axe à une seule valeur n'en est pas un. Le provisioner devient un **attribut
+> dérivé du terrain** (§1.3), pas une dimension à croiser.
 
 ### 1.1 Matériel
 
-- Architectures : x86_64, arm64
-- Stockage : NVMe, HDD
+Le matériel n'est pas qu'« arch + type de disque » : plusieurs sous-dimensions
+**portent des décisions du dépôt** (et certaines ont déjà cassé un run).
+
+- **Architecture CPU** : **arm64** (tout l'existant) · x86_64.
+- **CPU (cœurs)** : pèse sur le **build** (`dataops` est dominé par le build
+  d'images arm64). Banc actuel = **2 vCPU/nœud**.
+- **RAM par nœud** : dimension **éprouvée** — le drift L28 (OOM de `marquez-web`
+  à 5 GiB) a imposé **8 GiB/nœud** sur le banc. Cité dans nombre d'ADR.
+- **Réseau (NIC / débit)** : 1 GbE · 2.5 GbE · **10 GbE** (cible prod, cf.
+  stockage). Ceph y est très sensible (réplication, recovery) ; la **séparation
+  réseau public ↔ cluster Ceph** est une sous-dimension à part entière. Sur le
+  banc local, c'est le réseau virtuel de l'hyperviseur (non représentatif).
+- **Topologie de disques** (type **et** rôle, pas seulement le média) :
+  - **HDD** : données d'objets OSD (capacité) ;
+  - **NVMe/SSD** : **métadonnées Ceph** de l'OSD (`metadataDevice`) — la couche
+    BlueStore rapide : `block.db` RocksDB (index des objets, omaps) **et** WAL.
+    Les HDD portent les données, le NVMe porte les métadonnées
+    ([ADR 0008](../decisions/0008-metadatadevice-nvme-spof-par-noeud.md) ;
+    hyperconvergence
+    [ADR 0007](../decisions/0007-hyperconvergence-control-plane-osd.md)). Un
+    `metadataDevice` NVMe par nœud = **SPOF par nœud assumé** (sa perte invalide
+    tous les OSD du nœud).
+  - Banc = 3× HDD data + 1× NVMe métadonnées par nœud (disques bruts `vd[b-e]`).
+
+> **Trous matériels connus** : **x86_64**, médias **NVMe réels** (le banc émule
+> des disques), **réseau ≥ 2.5 GbE** et séparation public/cluster Ceph,
+> **sécurité firmware** (UEFI/Secure Boot/TPM) — cette dernière non traitée par
+> le dépôt à ce jour (à cadrer si le durcissement
+> [ADR 0014](../decisions/0014-durcissement-kubeadm-init.md) /
+> [ADR 0025](../decisions/0025-securite-active-chaos-attaques-controlees.md)
+> descend au niveau matériel).
+>
+> **x86_64 n'est pas testé localement, par choix.** Lima pourrait l'émuler (QEMU
+> `arch: x86_64` = vraie VM x86 mais ~5–10× plus lente → gates en timeout ;
+> Rosetta = binaires x86 sur **kernel arm**, donc non fidèle). La validation
+> x86_64 fidèle passe par un **vrai terrain** (cloud / bare-metal,
+> [ADR 0031](../decisions/0031-terrain-cloud-arm.md) /
+> [ADR 0032](../decisions/0032-opentofu-provisioning-cloud.md)), pas par
+> l'émulation locale.
 
 ### 1.2 Topologie — le _quoi_ : forme du cluster
 
-- k8s HA multi-sites
-- k8s HA
-- k8s mono-nœud
+Deux sous-dimensions **indépendantes** — les confondre masque la combinaison
+réellement buildée (multi-nœuds **sans** HA du control plane) :
+
+- **HA du control plane** : **1 CP** (SPOF assumé,
+  [ADR 0002](../decisions/0002-control-plane-unique-avec-endpoint.md)) · **≥3
+  CP** (quorum etcd, haute disponibilité). C'est la dimension qui dit si le plan
+  de contrôle survit à la perte d'un nœud (scénario 04).
+- **Répartition des nœuds** : mono-nœud · multi-nœuds · multi-sites.
+
+Topologies nommées
+([ADR 0030](../decisions/0030-nomenclature-bancs-topologies.md)) qui croisent
+ces deux sous-dimensions :
+
+| Nom            | Control plane  | Nœuds                           | État              |
+| -------------- | -------------- | ------------------------------- | ----------------- |
+| `single-node`  | 1 CP           | 1 nœud (CP seul)                | **buildé**        |
+| `multi-node-3` | **1 CP**       | 3 nœuds (1 CP + 2 workers)      | **buildé**        |
+| `ha-3cp`       | **≥3 CP (HA)** | 3 control planes                | cible, non buildé |
+| `multisite`    | ≥3 CP (HA)     | plusieurs sites, 1 cluster/site | cible, non buildé |
+
+> **Le banc actuel (`multi-node-3`) est multi-nœuds mais _pas_ HA control
+> plane** : un seul CP, SPOF assumé (ADR 0002). La HA réelle du plan de contrôle
+> (`ha-3cp`) reste un **trou de la matrice** — d'où le scénario 04 (perte du CP)
+> qui éprouve précisément ce SPOF.
 
 ### 1.3 Terrain d'exécution — où tourne le cluster
 
-- Bare-metal : 4 serveurs lames
-- Cloud / IaaS : 1 VM cloud
-- Local : machine de dev
+Le terrain détermine le **provisioner** (attribut, pas axe —
+[ADR 0038](../decisions/0038-lima-seul-banc-local.md)) :
 
-### 1.4 Provisioning local — outil qui monte le cluster local
+| Terrain    | Provisioner                                                                 | État        |
+| ---------- | --------------------------------------------------------------------------- | ----------- |
+| local      | **Lima** (kubeadm 1.34, même chemin que la prod)                            | **utilisé** |
+| cloud      | **OpenTofu** ([ADR 0032](../decisions/0032-opentofu-provisioning-cloud.md)) | cible       |
+| bare-metal | manuel / PXE (non outillé)                                                  | trou        |
 
-- VM : Lima, Vagrant, VirtualBox
-- Conteneurs : kind, k3d
-
-> kind/k3d figent la version de Kubernetes hors du chemin `kubeadm` de prod : le
-> banc retenu est **Lima** (vrai kubeadm 1.34), cf.
-> [ADR 0006](../decisions/0006-matrice-de-versions-et-politique-de-bump.md). Le
+> **Provisioning local = Lima uniquement.** Vagrant/VirtualBox **dépréciés**
+> (conservés pour l'historique des Runs, plus maintenus), kind **abandonné**
+> (figeait k8s en 1.31,
+> [ADR 0006](../decisions/0006-matrice-de-versions-et-politique-de-bump.md)),
+> k3d jamais retenu — [ADR 0038](../decisions/0038-lima-seul-banc-local.md). Le
 > choix d'un banc selon **fidélité vs vitesse** (profils Ceph / local-path) est
 > cadré par [ADR 0035](../decisions/0035-strategie-bancs-fidelite-vitesse.md).
 
-### 1.5 Briques déployées — le _comment_ : ce qu'on installe dessus
+### 1.4 Briques déployées — le _comment_ : ce qu'on installe dessus
 
 - Socle : k8s, Cilium
 - Stockage : Rook-Ceph / Longhorn / local-path
@@ -57,10 +123,10 @@ Une configuration de banc = un point du produit **matériel × topologie × terr
 - IaaS : OpenStack
 - Interfaces : CLI, API, WebApp
 
-### 1.6 Dimensions fines paramétrables (à briques fixées)
+### 1.5 Dimensions fines paramétrables (à briques fixées)
 
-Au-delà des cinq axes, plusieurs **briques sont paramétrables par topologie** :
-une même brique tourne avec un réglage différent selon le banc. Ce sont ces
+Au-delà des quatre axes, plusieurs **briques sont paramétrables par topologie**
+: une même brique tourne avec un réglage différent selon le banc. Ce sont ces
 réglages qui démultiplient les combinaisons à valider — et c'est là que vivent
 les drifts spécifiques à un profil (cf. [Leçons des Runs](lecons-des-runs.md),
 cat. 7).
@@ -86,42 +152,41 @@ banc déjà monté. La table dit, pour chacun, la catégorie, la topologie requi
 les briques validées et le terrain particulier exigé. Source :
 [`test/scenarios/`](../../test/scenarios/).
 
-| #   | Scénario                           | Catégorie     | Topologie req. | Briques testées          | Terrain particulier  |
-| --- | ---------------------------------- | ------------- | -------------- | ------------------------ | -------------------- |
-| 01  | RBD block write-read               | stockage      | agnostique     | Rook-Ceph, k8s           | —                    |
-| 02  | Pod rescheduling (persistance)     | stockage      | agnostique     | Rook-Ceph, k8s           | —                    |
-| 03  | Perte worker + Ceph HEALTH         | résilience    | multi-nœuds    | Rook-Ceph, k8s           | SSH hôte + halt/up   |
-| 04  | Perte control plane + snapshot     | résilience    | mono-nœud      | etcd, k8s                | SSH hôte + halt/up   |
-| 05  | Bump réplication pool              | stockage      | multi-nœuds    | Rook-Ceph                | —                    |
-| 06  | Object store (RGW) smoke           | stockage      | agnostique     | Rook-Ceph, k8s           | —                    |
-| 07  | Connectivité Cilium                | réseau        | agnostique     | Cilium, k8s              | —                    |
-| 08  | Audit requests/limits              | observabilité | agnostique     | Rook-Ceph, k8s           | —                    |
-| 09  | Restore snapshot etcd              | résilience    | mono-nœud      | etcd                     | SSH hôte + etcdctl   |
-| 10  | Pod Security Admission             | sécurité      | agnostique     | PSA, k8s                 | —                    |
-| 11  | NetworkPolicy default-deny         | sécurité      | agnostique     | Cilium, NetworkPolicy    | —                    |
-| 12  | securityContext runtime            | sécurité      | agnostique     | k8s, securityContext     | —                    |
-| 13  | Durcissement host/node             | sécurité      | agnostique     | host-hardening           | SSH hôte + state.sh  |
-| 14  | Chiffrement Cilium + Hubble        | sécurité      | multi-nœuds    | Cilium, WireGuard        | —                    |
-| 15  | Chiffrement at-rest etcd + audit   | sécurité      | mono-nœud      | etcd, PSA                | SSH hôte + etcdctl   |
-| 16  | Brute-force SSH → fail2ban         | sécurité      | agnostique     | host-hardening, fail2ban | SSH hôte             |
-| 17  | Évasion pod → PSA rejette          | sécurité      | agnostique     | PSA, k8s                 | offensif (BANC=1)    |
-| 18  | Exfiltration → NetworkPolicy       | sécurité      | agnostique     | Cilium, NetworkPolicy    | offensif (BANC=1)    |
-| 19  | Chaos perte paquets/partition      | chaos         | multi-nœuds    | Cilium, Rook-Ceph, k8s   | tc netem (VM réelle) |
-| 20  | Chaos kill pods                    | chaos         | agnostique     | k8s, Rook-Ceph           | offensif (BANC=1)    |
-| 21  | Chaos saturation CPU/mém           | chaos         | agnostique     | k8s, resource limits     | offensif (BANC=1)    |
-| 22  | Alerte détecteurs → Mailpit        | observabilité | agnostique     | host-hardening, Mailpit  | SSH hôte             |
-| 23  | Marquez OpenLineage                | dataops       | agnostique     | DataOps, CNPG, Dagster   | API Marquez          |
-| 24  | Prometheus scrape + Grafana up     | observabilité | agnostique     | kube-prometheus-stack    | _à écrire_ (#158)    |
-| 25  | PrometheusRule → alerte tirée      | observabilité | agnostique     | Prometheus, Alertmanager | _à écrire_ (#158)    |
-| 26  | Loki : ingest logs + requête LogQL | observabilité | agnostique     | Loki, S3 (SeaweedFS/RGW) | _à écrire_ (#186)    |
+| #   | Scénario                           | Catégorie     | Topologie req. | Briques testées          | Terrain particulier    |
+| --- | ---------------------------------- | ------------- | -------------- | ------------------------ | ---------------------- |
+| 01  | RBD block write-read               | stockage      | agnostique     | Rook-Ceph, k8s           | —                      |
+| 02  | Pod rescheduling (persistance)     | stockage      | agnostique     | Rook-Ceph, k8s           | —                      |
+| 03  | Perte worker + Ceph HEALTH         | résilience    | multi-nœuds    | Rook-Ceph, k8s           | SSH hôte + halt/up     |
+| 04  | Perte control plane + snapshot     | résilience    | mono-nœud      | etcd, k8s                | SSH hôte + halt/up     |
+| 05  | Bump réplication pool              | stockage      | multi-nœuds    | Rook-Ceph                | —                      |
+| 06  | Object store (RGW) smoke           | stockage      | agnostique     | Rook-Ceph, k8s           | —                      |
+| 07  | Connectivité Cilium                | réseau        | agnostique     | Cilium, k8s              | —                      |
+| 08  | Audit requests/limits              | observabilité | agnostique     | Rook-Ceph, k8s           | —                      |
+| 09  | Restore snapshot etcd              | résilience    | mono-nœud      | etcd                     | SSH hôte + etcdctl     |
+| 10  | Pod Security Admission             | sécurité      | agnostique     | PSA, k8s                 | —                      |
+| 11  | NetworkPolicy default-deny         | sécurité      | agnostique     | Cilium, NetworkPolicy    | —                      |
+| 12  | securityContext runtime            | sécurité      | agnostique     | k8s, securityContext     | —                      |
+| 13  | Durcissement host/node             | sécurité      | agnostique     | host-hardening           | SSH hôte + state.sh    |
+| 14  | Chiffrement Cilium + Hubble        | sécurité      | multi-nœuds    | Cilium, WireGuard        | —                      |
+| 15  | Chiffrement at-rest etcd + audit   | sécurité      | mono-nœud      | etcd, PSA                | SSH hôte + etcdctl     |
+| 16  | Brute-force SSH → fail2ban         | sécurité      | agnostique     | host-hardening, fail2ban | SSH hôte               |
+| 17  | Évasion pod → PSA rejette          | sécurité      | agnostique     | PSA, k8s                 | offensif (BANC=1)      |
+| 18  | Exfiltration → NetworkPolicy       | sécurité      | agnostique     | Cilium, NetworkPolicy    | offensif (BANC=1)      |
+| 19  | Chaos perte paquets/partition      | chaos         | multi-nœuds    | Cilium, Rook-Ceph, k8s   | tc netem (VM réelle)   |
+| 20  | Chaos kill pods                    | chaos         | agnostique     | k8s, Rook-Ceph           | offensif (BANC=1)      |
+| 21  | Chaos saturation CPU/mém           | chaos         | agnostique     | k8s, resource limits     | offensif (BANC=1)      |
+| 22  | Alerte détecteurs → Mailpit        | observabilité | agnostique     | host-hardening, Mailpit  | SSH hôte               |
+| 23  | Marquez OpenLineage                | dataops       | agnostique     | DataOps, CNPG, Dagster   | API Marquez            |
+| 24  | Prometheus scrape + Grafana up     | observabilité | agnostique     | kube-prometheus-stack    | API Prometheus/Grafana |
+| 25  | PrometheusRule → alerte tirée      | observabilité | agnostique     | Prometheus, Alertmanager | API Prometheus         |
+| 26  | Loki : ingest logs + requête LogQL | observabilité | agnostique     | Loki, S3 (SeaweedFS/RGW) | API Loki               |
 
-> **Scénarios 24–26 (observabilité) : à écrire.** La stack monitoring/Loki est
-> **montée et validée e2e** (§3, #158/#186), mais les _épreuves_ qui la
-> sollicitent (Prometheus scrape ses targets, une `PrometheusRule` déclenche
-> bien une alerte, Loki ingère des logs et répond à une requête LogQL) ne sont
-> **pas encore** scriptées dans [`test/scenarios/`](../../test/scenarios/).
-> Monté ≠ éprouvé : tant que le script n'existe pas, la ligne reste _à écrire_
-> (honnêteté des Runs).
+> **Scénarios 24–26 (observabilité) : écrits et éprouvés (2026-06-08).** La
+> stack monitoring/Loki (#158/#186) est désormais **sollicitée par des
+> épreuves** réelles, scriptées dans [`test/scenarios/`](../../test/scenarios/)
+> : Prometheus scrape ses targets (22 UP), l'alerte témoin `Watchdog` est bien
+> _firing_, et un log poussé est relu en LogQL (round-trip via le backing S3).
+> Passés au vert sur le banc Ceph (profil RGW) — _monté **et** éprouvé_.
 
 ## 3. Couverture build (combinaisons réellement montées sur banc)
 
@@ -161,8 +226,6 @@ dimensions fines :
 
 ## Suite
 
-- **Écrire les scénarios 24–26** (observabilité : Prometheus/alerte/Loki) pour
-  passer la stack monitoring de _montée_ à _éprouvée_.
 - **Combler les trous d'axes** : matériel `x86_64`, topologie HA réelle
   (`ha-3cp`) et multi-sites (`multisite`), terrain cloud — cadrés par
   [ADR 0031](../decisions/0031-terrain-cloud-arm.md) /
