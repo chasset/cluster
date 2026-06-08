@@ -34,8 +34,10 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 . "${HERE}/lib.sh"
 
 # ── Table des nœuds (noms génériques — ADR 0023) ─────────────────────────────
-# "nom:rôle". 1 control-plane + 2 workers = quorum mon Ceph (3 nœuds) + ×3
-# réplication. Tous nœuds de stockage (disques bruts attachés à chacun).
+# "nom:rôle". Topologie `multi-node-3` : 1 control-plane + 2 workers = quorum mon
+# Ceph (3 nœuds) + ×3 réplication. Tous nœuds de stockage (disques bruts attachés
+# à chacun). C'est la SEULE topologie du banc local (ADR 0040 : single-node
+# abandonné ; ha-3cp/multisite = cibles à outillage dédié, pas via ce harnais).
 NODES=(
     "cp1:control"
     "node1:worker"
@@ -124,7 +126,8 @@ node_disks() {
 }
 
 # ── Prédicats pour retry (repris de multi-node) ──────────────────────────────
-nodes_ready_3() { [ "$("${KUBECTL[@]}" get nodes --no-headers 2> /dev/null | grep -cw Ready)" -eq 3 ]; }
+# Gate générique : tous les nœuds attendus (${#NODES[@]}) sont Ready.
+nodes_ready_all() { [ "$("${KUBECTL[@]}" get nodes --no-headers 2> /dev/null | grep -cw Ready)" -eq "${#NODES[@]}" ]; }
 operator_ready() { [ "$("${KUBECTL[@]}" -n rook-ceph get deploy rook-ceph-operator -o jsonpath='{.status.readyReplicas}' 2> /dev/null)" = "1" ]; }
 # Nombre d'OSD attendus = nœuds × disques data (3 × 3 = 9).
 OSD_EXPECTED=$(( ${#NODES[@]} * HDD_COUNT ))
@@ -286,11 +289,11 @@ phase_bootstrap() {
     run_cni "${CP}"
     fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}"
 
-    # GATE : 3 nœuds Ready.
-    log "Attente des 3 nœuds Ready (max 5 min)"
-    retry 300 10 nodes_ready_3 \
-        || die "moins de 3 nœuds Ready : $("${KUBECTL[@]}" get nodes 2>&1)"
-    ok "3 nœuds Ready"
+    # GATE : tous les nœuds attendus (${#NODES[@]}) Ready.
+    log "Attente des ${#NODES[@]} nœud(s) Ready (max 5 min)"
+    retry 300 10 nodes_ready_all \
+        || die "moins de ${#NODES[@]} nœud(s) Ready : $("${KUBECTL[@]}" get nodes 2>&1)"
+    ok "${#NODES[@]} nœud(s) Ready"
     "${KUBECTL[@]}" get nodes -o wide
 }
 
@@ -503,10 +506,31 @@ phase_dataops() {
     # build_emitter_image=true : le banc build aussi l'émetteur OpenLineage jetable
     # (harnais e2e, ADR 0022) requis par la preuve lineage ci-dessous — JAMAIS en
     # prod (défaut false). Drift L31.
+    # Profil de stockage/backing par topologie (ADR 0035/0036), comme monitoring :
+    #   - mode Ceph (WITH_CEPH=1) : storageClass rook-ceph ; backups CNPG → RGW.
+    #   - mode léger (défaut)      : storageClass local-path ; backups CNPG →
+    #     SeaweedFS (déployé par la phase monitoring). Permet la chaîne DataOps
+    #     SANS Ceph (banc léger, ADR 0036).
+    local sc backing endpoint
+    if [ "${WITH_CEPH:-0}" = 1 ]; then
+        sc=rook-ceph-block-replicated
+        backing=rgw
+        endpoint=http://rook-ceph-rgw-datalake.rook-ceph:80
+    else
+        sc=local-path
+        backing=seaweedfs
+        endpoint=http://seaweedfs.s3.svc.cluster.local:8333
+    fi
+    log "  storageClass=${sc}, backing S3 CNPG=${backing} (${endpoint})"
+
     KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
         "${REPO}/bootstrap/dataops.yaml" \
         -e dataops_k8s_host=localhost \
         -e build_emitter_image=true \
+        -e "registry_storage_class=${sc}" \
+        -e "cnpg_storage_class=${sc}" \
+        -e "cnpg_s3_backing=${backing}" \
+        -e "cnpg_s3_endpoint=${endpoint}" \
         || die "dataops.yaml : échec du déploiement de la chaîne"
     ok "chaîne DataOps déployée (Ansible) — CNPG sain, Dagster + Marquez Ready"
 
@@ -523,8 +547,8 @@ phase_dataops() {
 # Déploie kube-prometheus-stack + Loki via bootstrap/monitoring.yaml (ADR
 # 0016/0036). Profil de stockage choisi selon le mode du banc :
 #   - mode Ceph (WITH_CEPH=1) : storageClass rook-ceph, Loki en profil s3 → RGW.
-#   - mode léger (défaut)      : storageClass local-path, Loki en profil filesystem.
-# Le profil léger NE requiert PAS Ceph (testable en banc rapide, ADR 0035).
+#   - mode léger (défaut)      : storageClass local-path, Loki en s3 → SeaweedFS.
+# Le profil léger NE requiert PAS Ceph (testable en banc rapide, ADR 0035/0036).
 phase_monitoring() {
     preflight
     [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
