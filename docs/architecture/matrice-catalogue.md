@@ -50,13 +50,14 @@ Une configuration de banc = un point du produit **matériel × topologie × terr
 
 - Socle : k8s, Cilium
 - Stockage : Rook-Ceph / Longhorn / local-path
-- Observabilité : Prometheus
-- DataOps (dont Airflow)
+- Stockage objet S3 : RGW Ceph (prod) / SeaweedFS (banc léger) — ADR 0036
+- Observabilité : Prometheus + Alertmanager + Grafana (métriques) · Loki (logs)
+- DataOps : CNPG, Dagster, Marquez (dont Airflow envisagé)
 - GitOps · MLOps · AIOps
 - IaaS : OpenStack
 - Interfaces : CLI, API, WebApp
 
-## 1.6 Dimensions fines paramétrables (à briques fixées)
+### 1.6 Dimensions fines paramétrables (à briques fixées)
 
 Au-delà des cinq axes, plusieurs **briques sont paramétrables par topologie** :
 une même brique tourne avec un réglage différent selon le banc. Ce sont ces
@@ -85,31 +86,42 @@ banc déjà monté. La table dit, pour chacun, la catégorie, la topologie requi
 les briques validées et le terrain particulier exigé. Source :
 [`test/scenarios/`](../../test/scenarios/).
 
-| #   | Scénario                         | Catégorie     | Topologie req. | Briques testées          | Terrain particulier  |
-| --- | -------------------------------- | ------------- | -------------- | ------------------------ | -------------------- |
-| 01  | RBD block write-read             | stockage      | agnostique     | Rook-Ceph, k8s           | —                    |
-| 02  | Pod rescheduling (persistance)   | stockage      | agnostique     | Rook-Ceph, k8s           | —                    |
-| 03  | Perte worker + Ceph HEALTH       | résilience    | multi-nœuds    | Rook-Ceph, k8s           | SSH hôte + halt/up   |
-| 04  | Perte control plane + snapshot   | résilience    | mono-nœud      | etcd, k8s                | SSH hôte + halt/up   |
-| 05  | Bump réplication pool            | stockage      | multi-nœuds    | Rook-Ceph                | —                    |
-| 06  | Object store (RGW) smoke         | stockage      | agnostique     | Rook-Ceph, k8s           | —                    |
-| 07  | Connectivité Cilium              | réseau        | agnostique     | Cilium, k8s              | —                    |
-| 08  | Audit requests/limits            | observabilité | agnostique     | Rook-Ceph, k8s           | —                    |
-| 09  | Restore snapshot etcd            | résilience    | mono-nœud      | etcd                     | SSH hôte + etcdctl   |
-| 10  | Pod Security Admission           | sécurité      | agnostique     | PSA, k8s                 | —                    |
-| 11  | NetworkPolicy default-deny       | sécurité      | agnostique     | Cilium, NetworkPolicy    | —                    |
-| 12  | securityContext runtime          | sécurité      | agnostique     | k8s, securityContext     | —                    |
-| 13  | Durcissement host/node           | sécurité      | agnostique     | host-hardening           | SSH hôte + state.sh  |
-| 14  | Chiffrement Cilium + Hubble      | sécurité      | multi-nœuds    | Cilium, WireGuard        | —                    |
-| 15  | Chiffrement at-rest etcd + audit | sécurité      | mono-nœud      | etcd, PSA                | SSH hôte + etcdctl   |
-| 16  | Brute-force SSH → fail2ban       | sécurité      | agnostique     | host-hardening, fail2ban | SSH hôte             |
-| 17  | Évasion pod → PSA rejette        | sécurité      | agnostique     | PSA, k8s                 | offensif (BANC=1)    |
-| 18  | Exfiltration → NetworkPolicy     | sécurité      | agnostique     | Cilium, NetworkPolicy    | offensif (BANC=1)    |
-| 19  | Chaos perte paquets/partition    | chaos         | multi-nœuds    | Cilium, Rook-Ceph, k8s   | tc netem (VM réelle) |
-| 20  | Chaos kill pods                  | chaos         | agnostique     | k8s, Rook-Ceph           | offensif (BANC=1)    |
-| 21  | Chaos saturation CPU/mém         | chaos         | agnostique     | k8s, resource limits     | offensif (BANC=1)    |
-| 22  | Alerte détecteurs → Mailpit      | observabilité | agnostique     | host-hardening, Mailpit  | SSH hôte             |
-| 23  | Marquez OpenLineage              | dataops       | agnostique     | DataOps, CNPG, Dagster   | API Marquez          |
+| #   | Scénario                           | Catégorie     | Topologie req. | Briques testées          | Terrain particulier  |
+| --- | ---------------------------------- | ------------- | -------------- | ------------------------ | -------------------- |
+| 01  | RBD block write-read               | stockage      | agnostique     | Rook-Ceph, k8s           | —                    |
+| 02  | Pod rescheduling (persistance)     | stockage      | agnostique     | Rook-Ceph, k8s           | —                    |
+| 03  | Perte worker + Ceph HEALTH         | résilience    | multi-nœuds    | Rook-Ceph, k8s           | SSH hôte + halt/up   |
+| 04  | Perte control plane + snapshot     | résilience    | mono-nœud      | etcd, k8s                | SSH hôte + halt/up   |
+| 05  | Bump réplication pool              | stockage      | multi-nœuds    | Rook-Ceph                | —                    |
+| 06  | Object store (RGW) smoke           | stockage      | agnostique     | Rook-Ceph, k8s           | —                    |
+| 07  | Connectivité Cilium                | réseau        | agnostique     | Cilium, k8s              | —                    |
+| 08  | Audit requests/limits              | observabilité | agnostique     | Rook-Ceph, k8s           | —                    |
+| 09  | Restore snapshot etcd              | résilience    | mono-nœud      | etcd                     | SSH hôte + etcdctl   |
+| 10  | Pod Security Admission             | sécurité      | agnostique     | PSA, k8s                 | —                    |
+| 11  | NetworkPolicy default-deny         | sécurité      | agnostique     | Cilium, NetworkPolicy    | —                    |
+| 12  | securityContext runtime            | sécurité      | agnostique     | k8s, securityContext     | —                    |
+| 13  | Durcissement host/node             | sécurité      | agnostique     | host-hardening           | SSH hôte + state.sh  |
+| 14  | Chiffrement Cilium + Hubble        | sécurité      | multi-nœuds    | Cilium, WireGuard        | —                    |
+| 15  | Chiffrement at-rest etcd + audit   | sécurité      | mono-nœud      | etcd, PSA                | SSH hôte + etcdctl   |
+| 16  | Brute-force SSH → fail2ban         | sécurité      | agnostique     | host-hardening, fail2ban | SSH hôte             |
+| 17  | Évasion pod → PSA rejette          | sécurité      | agnostique     | PSA, k8s                 | offensif (BANC=1)    |
+| 18  | Exfiltration → NetworkPolicy       | sécurité      | agnostique     | Cilium, NetworkPolicy    | offensif (BANC=1)    |
+| 19  | Chaos perte paquets/partition      | chaos         | multi-nœuds    | Cilium, Rook-Ceph, k8s   | tc netem (VM réelle) |
+| 20  | Chaos kill pods                    | chaos         | agnostique     | k8s, Rook-Ceph           | offensif (BANC=1)    |
+| 21  | Chaos saturation CPU/mém           | chaos         | agnostique     | k8s, resource limits     | offensif (BANC=1)    |
+| 22  | Alerte détecteurs → Mailpit        | observabilité | agnostique     | host-hardening, Mailpit  | SSH hôte             |
+| 23  | Marquez OpenLineage                | dataops       | agnostique     | DataOps, CNPG, Dagster   | API Marquez          |
+| 24  | Prometheus scrape + Grafana up     | observabilité | agnostique     | kube-prometheus-stack    | _à écrire_ (#158)    |
+| 25  | PrometheusRule → alerte tirée      | observabilité | agnostique     | Prometheus, Alertmanager | _à écrire_ (#158)    |
+| 26  | Loki : ingest logs + requête LogQL | observabilité | agnostique     | Loki, S3 (SeaweedFS/RGW) | _à écrire_ (#186)    |
+
+> **Scénarios 24–26 (observabilité) : à écrire.** La stack monitoring/Loki est
+> **montée et validée e2e** (§3, #158/#186), mais les _épreuves_ qui la
+> sollicitent (Prometheus scrape ses targets, une `PrometheusRule` déclenche
+> bien une alerte, Loki ingère des logs et répond à une requête LogQL) ne sont
+> **pas encore** scriptées dans [`test/scenarios/`](../../test/scenarios/).
+> Monté ≠ éprouvé : tant que le script n'existe pas, la ligne reste _à écrire_
+> (honnêteté des Runs).
 
 ## 3. Couverture build (combinaisons réellement montées sur banc)
 
@@ -118,14 +130,18 @@ l'[ADR 0030](../decisions/0030-nomenclature-bancs-topologies.md). Source de
 vérité : [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md) et
 [`test/RESULTS.md`](../../test/RESULTS.md).
 
-| Topologie      | Mat.  | Provis. | storageClass | backing S3 | Briques validées                                                        | Run      |
-| -------------- | ----- | ------- | ------------ | ---------- | ----------------------------------------------------------------------- | -------- |
-| `multi-node-3` | arm64 | Lima    | local-path   | —          | k8s 1.34, Cilium+WireGuard, local-path                                  | 04/06    |
-| `multi-node-3` | arm64 | Lima    | local-path   | SeaweedFS  | + Prometheus/Grafana/**Loki S3 réel** (#158/#186)                       | 07/06    |
-| `multi-node-3` | arm64 | Lima    | rook-ceph    | RGW (OBC)  | + Rook-Ceph (HEALTH_OK), SC, RGW datalake                               | 04→07/06 |
-| `multi-node-3` | arm64 | Lima    | rook-ceph    | RGW (OBC)  | + **DataOps** : CNPG/PG18 + Barman→RGW, Dagster, Marquez lineage (#173) | 07/06    |
-| `multi-node-3` | arm64 | Lima    | rook-ceph    | RGW (OBC)  | + Prometheus/Grafana/**Loki S3 RGW** (#158/#186)                        | 07/06    |
-| `multi-node-3` | arm64 | Vagrant | rook-ceph    | RGW        | k8s 1.34, Cilium ; Rook-Ceph + SC + datalake                            | 28→31/05 |
+Topologie `multi-node-3` (1 CP + 2 workers), matériel arm64, terrain local pour
+toutes les lignes. La vraie variable est le **profil** (léger vs Ceph) et ses
+dimensions fines :
+
+| Profil | Provis. | storageClass | backing S3 | Briques validées                                                        | Run      |
+| ------ | ------- | ------------ | ---------- | ----------------------------------------------------------------------- | -------- |
+| léger  | Lima    | local-path   | —          | k8s 1.34, Cilium+WireGuard, local-path                                  | 04/06    |
+| léger  | Lima    | local-path   | SeaweedFS  | + Prometheus/Grafana/**Loki S3 réel** (#158/#186)                       | 07/06    |
+| Ceph   | Lima    | rook-ceph    | RGW (OBC)  | + Rook-Ceph (HEALTH_OK), SC, RGW datalake                               | 04→07/06 |
+| Ceph   | Lima    | rook-ceph    | RGW (OBC)  | + **DataOps** : CNPG/PG18 + Barman→RGW, Dagster, Marquez lineage (#173) | 07/06    |
+| Ceph   | Lima    | rook-ceph    | RGW (OBC)  | + Prometheus/Grafana/**Loki S3 RGW** (#158/#186)                        | 07/06    |
+| Ceph   | Vagrant | rook-ceph    | RGW        | k8s 1.34, Cilium ; Rook-Ceph + SC + datalake                            | 28→31/05 |
 
 > Terrain = **local** pour toutes ces lignes (seul terrain monté à ce jour). Les
 > dimensions fines **storageClass** et **backing S3** sont validées sur **leurs
@@ -145,6 +161,11 @@ vérité : [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md) et
 
 ## Suite
 
-- Croiser ces axes en une table normalisée (matrice catalogue) et nommer
-  bancs/topologies.
-- Cadrer le terrain cloud.
+- **Écrire les scénarios 24–26** (observabilité : Prometheus/alerte/Loki) pour
+  passer la stack monitoring de _montée_ à _éprouvée_.
+- **Combler les trous d'axes** : matériel `x86_64`, topologie HA réelle
+  (`ha-3cp`) et multi-sites (`multisite`), terrain cloud — cadrés par
+  [ADR 0031](../decisions/0031-terrain-cloud-arm.md) /
+  [ADR 0032](../decisions/0032-opentofu-provisioning-cloud.md).
+- **Tenir cette page à jour** à chaque nouveau coin de matrice monté (réflexe de
+  fin de run, au même titre que `RESULTS.md`).
