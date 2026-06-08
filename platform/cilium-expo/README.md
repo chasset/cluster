@@ -64,7 +64,7 @@ kubectl delete -f platform/cilium-expo/gateway-test.yaml   # nettoyage
 ## Décisions assumées
 
 - **Pool prod en TODO** : seul le banc (`192.168.67.240-250`) est défini. La
-  plage prod (`10.67.2.0/22`) sera ajoutée **après arbitrage admin réseau** —
+  plage prod (`10.0.0.0/22`) sera ajoutée **après arbitrage admin réseau** —
   aucune IP prod réservée à l'aveugle (ADR 0020).
 - **`externalTrafficPolicy: Cluster`** (jamais `Local`) : en L2, `Local` droppe
   le trafic si le nœud annonceur n'a pas d'endpoint local.
