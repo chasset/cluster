@@ -332,3 +332,26 @@ Verdicts (M3 Max, 8 GiB/VM, `multi-node-3` arm64, local) :
 Les **scénarios d'observabilité 24–26** (Prometheus scrape, alerte `Watchdog`
 firing, Loki round-trip LogQL) ont été **écrits puis passés au vert** sur le
 banc Ceph (profil RGW) — la stack monitoring passe de _montée_ à _éprouvée_.
+
+## DataOps sans Ceph — backing S3 factorisé (2026-06-08)
+
+> **But** : rendre la chaîne DataOps (CNPG/Barman) **montable sans Ceph**, en la
+> découplant du RGW via un rôle S3 factorisé `platform-s3-bucket` (backing `rgw`
+> | `seaweedfs`,
+> [ADR 0036](../../docs/decisions/0036-backing-s3-unique-rgw.md)). Loki et CNPG
+> partagent désormais cette brique (fin de la duplication OBC/creds).
+
+Validé e2e **sur les deux profils** (M3 Max, `multi-node-3` arm64, local) — le
+refactor S3 ne casse pas le chemin prod (RGW) **et** débloque le banc léger :
+
+| Profil | Backing S3 (CNPG + Loki)  | Chaîne DataOps                                | Temps notables                                              |
+| ------ | ------------------------- | --------------------------------------------- | ----------------------------------------------------------- |
+| léger  | **SeaweedFS** (sans Ceph) | ✅ CNPG sain + Dagster + Marquez, lineage 0→1 | bootstrap 6m31s · monitoring 3m05s · dataops **11m01s**     |
+| Ceph   | **RGW** (OBC)             | ✅ idem (non-régression rgw), lineage 0→1     | ceph 3m09s · datalake 1m31s · dataops ~14m · monitoring ~3m |
+
+Drifts de cette campagne (détail :
+[`registre-drifts.yaml`](../../docs/architecture/registre-drifts.yaml)) :
+**L41** (storageClass registry/CNPG non aligné au profil → paramétré),
+**L42/L43** (single-node : gate Dagster lent, éviction CNPG disque — _caducs_,
+topologie abandonnée ADR 0040), **L44** (dépendance à `WITH_CEPH` en variable
+d'env — _ouvert_ : dataops/monitoring devraient détecter le profil).
