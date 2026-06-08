@@ -1,0 +1,71 @@
+name: Bench freshness
+
+# Garde-fou de fraîcheur des preuves de banc (ADR 0042). Le banc Lima NE PEUT
+# PAS tourner en CI (nested virt, arm64, ~30 min) : ce workflow n'EXÉCUTE pas
+# l'e2e — il OBSERVE la date du dernier run consigné (test/lima/runs-history.yaml)
+# et ALERTE quand elle dépasse le seuil. NON BLOQUANT : cron seulement, jamais
+# sur `push`/`pull_request`, donc aucune PR n'est verrouillée par la fraîcheur.
+#
+# Cron quotidien (08:00 UTC). Au-delà du seuil (7 j, ADR 0042 §2), le job échoue
+# de façon VISIBLE et ouvre/met à jour une issue de rappel.
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    inputs:
+      seuil_jours:
+        description: 'Seuil de fraîcheur en jours (défaut 7)'
+        required: false
+        default: '7'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vérifier la fraîcheur du dernier run de banc
+        id: check
+        env:
+          SEUIL_JOURS: ${{ github.event.inputs.seuil_jours || '7' }}
+        # On capture le code de sortie (0 frais / 1 périmé / 2 aucune preuve)
+        # sans faire échouer l'étape ici : le verdict est posté en sortie pour
+        # piloter l'ouverture d'issue, puis l'étape finale matérialise l'échec.
+        run: |
+          set +e
+          out=$(bash test/lima/check-freshness.sh 2>&1); rc=$?
+          echo "$out"
+          {
+            echo "rc=$rc"
+            echo "summary<<EOF"
+            echo "$out"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+
+      # Ouvre (ou met à jour) une issue de rappel quand la preuve est périmée
+      # ou absente (rc != 0). ADR 0042 §1 : signaler, ne pas bloquer.
+      - name: Ouvrir/mettre à jour l'issue de rappel
+        if: ${{ steps.check.outputs.rc != '0' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SUMMARY: ${{ steps.check.outputs.summary }}
+        run: |
+          TITLE="⏰ Preuve de banc périmée — relancer test/lima/run-phases.sh all"
+          BODY=$(printf '%s\n\n— Détecté par .github/workflows/bench-freshness.yml (ADR 0042). Refermer après un run consigné.' "$SUMMARY")
+          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number' --repo "$GITHUB_REPOSITORY")
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY" --repo "$GITHUB_REPOSITORY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY" --repo "$GITHUB_REPOSITORY"
+          fi
+
+      - name: Matérialiser le verdict (visible, non bloquant pour les PR)
+        if: ${{ steps.check.outputs.rc != '0' }}
+        run: |
+          echo "Preuve de banc non fraîche (voir l'issue de rappel)."
+          exit 1
