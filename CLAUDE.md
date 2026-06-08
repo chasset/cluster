@@ -48,6 +48,12 @@ Détail et justification :
 - **Commits** : Conventional Commits, sujet **en minuscules** (commitlint
   `subject-case`), **sans email / sans `Co-Authored-By`**. Hooks lefthook
   **jamais** bypassés (`--no-verify`, `LEFTHOOK=0` interdits).
+- **Merge** : **merge commit** (PAS squash) — l'historique fin de chaque PR est
+  préservé dans `main`
+  ([ADR 0037](docs/decisions/0037-strategie-merge-commit.md)). Donc **chaque
+  commit** d'une PR doit être propre (la CI valide commitlint sur toute la
+  plage, pas seulement le titre de PR) : soigner/regrouper ses commits avant le
+  merge.
 - **Validation** : `pnpm lint` (format, yamllint, shellcheck, kubeconform,
   ansible-lint, jscpd, bats) ; `pnpm docs:build` (VitePress, échoue sur lien
   mort) ; jobs CI séparés non couverts par `pnpm lint` : **markdownlint** et
