@@ -145,7 +145,7 @@ le détail des claims et l'extraction des credentials.
 Aucun chiffrement Ceph n'est activé : `network.connections.encryption.enabled`
 reste à `false` dans `cluster.yaml`, et le datalake RGW expose `port: 80` sans
 TLS. La décision tient parce que les flux internes au cluster restent confinés
-au réseau privé `10.67.2.0/22`, et que **l'accès externe est limité par le
+au réseau privé `10.0.0.0/22`, et que **l'accès externe est limité par le
 contrôle d'accès au Service** (réseau cluster, port-forward sur API K8s, ou
 tunnel Tailscale si l'operator est déployé — voir ci-dessous). À revisiter le
 jour où ces hypothèses changent (exposition publique, données classifiées,
