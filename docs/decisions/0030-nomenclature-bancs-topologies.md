@@ -23,13 +23,13 @@ table de référence), **pas** une partie du nom.
 Schéma : `topologie[-taille]`, en kebab-case, taille = nombre de nœuds ou de
 control planes quand c'est discriminant.
 
-| Nom technique    | Topologie                                  | Statut            |
-| ---------------- | ------------------------------------------ | ----------------- |
-| `single-node`    | 1 nœud (control plane unique, sans worker) | buildé            |
-| `multi-node-3`   | 3 nœuds : 1 control plane + 2 workers      | buildé            |
-| `mesh-2clusters` | 2 clusters fédérés par Cilium Cluster Mesh | spike (jetable)   |
-| `ha-3cp`         | 3 control planes (haute disponibilité)     | cible, non buildé |
-| `multisite`      | plusieurs sites, 1 cluster autonome/site   | cible, non buildé |
+| Nom technique    | Topologie                                                         | Statut            |
+| ---------------- | ----------------------------------------------------------------- | ----------------- |
+| `multi-node-3`   | 3 nœuds : 1 control plane + 2 workers                             | buildé            |
+| `multi-node-4`   | 4 nœuds : 1 control plane + 3 workers (prod bare-metal, ADR 0009) | cible (prod)      |
+| `mesh-2clusters` | 2 clusters fédérés par Cilium Cluster Mesh                        | spike (jetable)   |
+| `ha-3cp`         | 3 control planes (haute disponibilité)                            | cible, non buildé |
+| `multisite`      | plusieurs sites, 1 cluster autonome/site                          | cible, non buildé |
 
 Règles :
 

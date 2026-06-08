@@ -3,7 +3,7 @@
 ## Contexte
 
 L'[ADR 0030](0030-nomenclature-bancs-topologies.md) a doté **un** axe — la
-topologie — de noms de code stables (`single-node`, `multi-node-3`, `ha-3cp`,
+topologie — de noms de code stables (`multi-node-3`, `multi-node-4`, `ha-3cp`,
 `multisite`). Le succès de cette convention (clé de jointure entre la
 [matrice](../architecture/matrice-catalogue.md) et les `RESULTS.md`, écart
 `cible`/`buildé` lisible) appelle la même chose pour les **autres axes**.

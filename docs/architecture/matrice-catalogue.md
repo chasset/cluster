@@ -67,13 +67,14 @@ Le matériel n'est pas qu'« arch + type de disque » : plusieurs sous-dimension
 > [ADR 0025](../decisions/0025-securite-active-chaos-attaques-controlees.md)
 > descend au niveau matériel).
 >
-> **x86_64 n'est pas testé localement, par choix.** Lima pourrait l'émuler (QEMU
-> `arch: x86_64` = vraie VM x86 mais ~5–10× plus lente → gates en timeout ;
-> Rosetta = binaires x86 sur **kernel arm**, donc non fidèle). La validation
-> x86_64 fidèle passe par un **vrai terrain** (cloud / bare-metal,
-> [ADR 0031](../decisions/0031-terrain-cloud-arm.md) /
-> [ADR 0032](../decisions/0032-opentofu-provisioning-cloud.md)), pas par
-> l'émulation locale.
+> **x86_64 n'est testé QUE sur bare-metal (prod).** Tous les terrains
+> d'itération sont arm64 : le local (Mac, Lima) **et** le cloud (Oracle Ampere —
+> le Free Tier x86 est inexploitable). Émuler x86 en local est exclu (QEMU
+> ~5–10× plus lent → gates en timeout ; Rosetta = binaires x86 sur **kernel
+> arm**, non fidèle). x86 n'est donc validé qu'en
+> **`x86/baremetal/multi-node-4`** (cible prod, ADR 0009) — un **angle mort**
+> des bancs d'itération, mitigé par un chemin strictement identique arm64/x86
+> ([ADR 0040](../decisions/0040-terrains-x-topologies.md)).
 
 ### 1.2 Topologie — le _quoi_ : forme du cluster
 
@@ -90,28 +91,40 @@ Topologies nommées
 ([ADR 0030](../decisions/0030-nomenclature-bancs-topologies.md)) qui croisent
 ces deux sous-dimensions :
 
-| Nom            | Control plane  | Nœuds                           | État              |
-| -------------- | -------------- | ------------------------------- | ----------------- |
-| `single-node`  | 1 CP           | 1 nœud (CP seul)                | **buildé**        |
-| `multi-node-3` | **1 CP**       | 3 nœuds (1 CP + 2 workers)      | **buildé**        |
-| `ha-3cp`       | **≥3 CP (HA)** | 3 control planes                | cible, non buildé |
-| `multisite`    | ≥3 CP (HA)     | plusieurs sites, 1 cluster/site | cible, non buildé |
+| Nom            | Control plane  | Nœuds                           | Rôle / terrain ([ADR 0040](../decisions/0040-terrains-x-topologies.md))   | État         |
+| -------------- | -------------- | ------------------------------- | ------------------------------------------------------------------------- | ------------ |
+| `multi-node-3` | **1 CP**       | 3 nœuds (1 CP + 2 workers)      | **référence** — `local` (Lima) **+** cible `cloud` (Oracle, 3 VMs), arm64 | **buildé**   |
+| `multi-node-4` | 1 CP           | 4 nœuds (1 CP + 3 workers)      | **prod** — `baremetal` (x86, ADR 0009) ; banc = modèle réduit             | cible (prod) |
+| `ha-3cp`       | **≥3 CP (HA)** | 3 control planes                | cible HA — `local` (VIP) ou `cloud` (Load Balancer) ; complexité adaptée  | cible        |
+| `multisite`    | ≥3 CP (HA)     | plusieurs sites, 1 cluster/site | cible **étirée** — si ressources suffisantes                              | cible        |
 
-> **Le banc actuel (`multi-node-3`) est multi-nœuds mais _pas_ HA control
-> plane** : un seul CP, SPOF assumé (ADR 0002). La HA réelle du plan de contrôle
-> (`ha-3cp`) reste un **trou de la matrice** — d'où le scénario 04 (perte du CP)
-> qui éprouve précisément ce SPOF.
+> **Le banc de référence (`multi-node-3`) est multi-nœuds mais _pas_ HA control
+> plane** : un seul CP, SPOF assumé (ADR 0002). La HA réelle (`ha-3cp`) est une
+> **cible** : le prérequis manquant est un **endpoint flottant** (VIP en local /
+> Load Balancer Free Tier en cloud) devant les 3 CP — d'où le scénario 04 (perte
+> du CP) qui éprouvera vraiment la HA une fois `ha-3cp` monté.
+>
+> **Stratégie terrains × topologies**
+> ([ADR 0040](../decisions/0040-terrains-x-topologies.md)) : `multi-node-3` est
+> la topologie d'**itération arm64**, sur `local` (Lima, référence) **et**
+> `cloud` (Oracle, 3 VMs du pool Free Tier). `ha-3cp`/`multisite` sont des
+> cibles à **complexité adaptée aux ressources** (paliers de RAM allouée, ADR
+> 0040). Seul `baremetal` porte `multi-node-4` **en x86** (cible **prod**,
+> ADR 0009) : **x86 n'est validé qu'en prod** — angle mort des bancs d'itération
+> (tous arm64). Le banc `multi-node-3` est le **modèle réduit fidèle** de la
+> prod `multi-node-4`. _(`single-node` retiré du catalogue : trop dégradé — ADR
+> 0040.)_
 
 ### 1.3 Terrain d'exécution — où tourne le cluster
 
 Le terrain détermine le **provisioner** (attribut, pas axe —
 [ADR 0038](../decisions/0038-lima-seul-banc-local.md)) :
 
-| Code        | Terrain                                                                            | Provisioner | État        |
-| ----------- | ---------------------------------------------------------------------------------- | ----------- | ----------- |
-| `local`     | machine de dev — **Lima** (kubeadm 1.34, même chemin que la prod)                  | Lima        | **utilisé** |
-| `cloud`     | IaaS — **OpenTofu** ([ADR 0032](../decisions/0032-opentofu-provisioning-cloud.md)) | OpenTofu    | cible       |
-| `baremetal` | serveurs physiques — manuel / PXE (non outillé)                                    | manuel/PXE  | trou        |
+| Code        | Terrain                                                                            | Provisioner | État                                                |
+| ----------- | ---------------------------------------------------------------------------------- | ----------- | --------------------------------------------------- |
+| `local`     | machine de dev — **Lima** (kubeadm 1.34, même chemin que la prod)                  | Lima        | **utilisé**                                         |
+| `cloud`     | IaaS — **OpenTofu** ([ADR 0032](../decisions/0032-opentofu-provisioning-cloud.md)) | OpenTofu    | cible (**arm64**, `multi-node-3` ; 3 VMs Free Tier) |
+| `baremetal` | serveurs physiques — manuel / PXE                                                  | manuel/PXE  | cible **prod** (x86, `multi-node-4`)                |
 
 > **Provisioning local = Lima uniquement.** Vagrant/VirtualBox **dépréciés**
 > (conservés pour l'historique des Runs, plus maintenus), kind **abandonné**
