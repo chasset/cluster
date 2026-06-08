@@ -23,13 +23,22 @@ Une configuration de banc = un point du produit **matériel × topologie × terr
 > k3d jamais retenu — [ADR 0038](../decisions/0038-lima-seul-banc-local.md)). Un
 > axe à une seule valeur n'en est pas un. Le provisioner devient un **attribut
 > dérivé du terrain** (§1.3), pas une dimension à croiser.
+>
+> **Codes des axes**
+> ([ADR 0039](../decisions/0039-nomenclature-axes-catalogue.md)). Chaque valeur
+> d'axe a un code stable, ce qui permet de désigner une combinaison par un tuple
+> **`arch/terrain/topologie/profil`** — ex. le banc Ceph =
+> `arm64/local/multi-node-3/dataops`. Les codes sont donnés dans chaque
+> sous-section ci-dessous.
 
 ### 1.1 Matériel
 
 Le matériel n'est pas qu'« arch + type de disque » : plusieurs sous-dimensions
 **portent des décisions du dépôt** (et certaines ont déjà cassé un run).
 
-- **Architecture CPU** : **arm64** (tout l'existant) · x86_64.
+- **Architecture CPU** (codes
+  [ADR 0039](../decisions/0039-nomenclature-axes-catalogue.md)) : **`arm64`**
+  (tout l'existant) · `x86` (x86_64, cible).
 - **CPU (cœurs)** : pèse sur le **build** (`dataops` est dominé par le build
   d'images arm64). Banc actuel = **2 vCPU/nœud**.
 - **RAM par nœud** : dimension **éprouvée** — le drift L28 (OOM de `marquez-web`
@@ -98,11 +107,11 @@ ces deux sous-dimensions :
 Le terrain détermine le **provisioner** (attribut, pas axe —
 [ADR 0038](../decisions/0038-lima-seul-banc-local.md)) :
 
-| Terrain    | Provisioner                                                                 | État        |
-| ---------- | --------------------------------------------------------------------------- | ----------- |
-| local      | **Lima** (kubeadm 1.34, même chemin que la prod)                            | **utilisé** |
-| cloud      | **OpenTofu** ([ADR 0032](../decisions/0032-opentofu-provisioning-cloud.md)) | cible       |
-| bare-metal | manuel / PXE (non outillé)                                                  | trou        |
+| Code        | Terrain                                                                            | Provisioner | État        |
+| ----------- | ---------------------------------------------------------------------------------- | ----------- | ----------- |
+| `local`     | machine de dev — **Lima** (kubeadm 1.34, même chemin que la prod)                  | Lima        | **utilisé** |
+| `cloud`     | IaaS — **OpenTofu** ([ADR 0032](../decisions/0032-opentofu-provisioning-cloud.md)) | OpenTofu    | cible       |
+| `baremetal` | serveurs physiques — manuel / PXE (non outillé)                                    | manuel/PXE  | trou        |
 
 > **Provisioning local = Lima uniquement.** Vagrant/VirtualBox **dépréciés**
 > (conservés pour l'historique des Runs, plus maintenus), kind **abandonné**
@@ -122,6 +131,18 @@ Le terrain détermine le **provisioner** (attribut, pas axe —
 - GitOps · MLOps · AIOps
 - IaaS : OpenStack
 - Interfaces : CLI, API, WebApp
+
+**Profils de briques** (codes
+[ADR 0039](../decisions/0039-nomenclature-axes-catalogue.md)) — combinaisons
+**cumulatives** (chaque profil inclut les précédents), alignées sur les paliers
+du banc :
+
+| Code      | Contenu (cumulatif)                             | Phase `run-phases.sh`                     |
+| --------- | ----------------------------------------------- | ----------------------------------------- |
+| `base`    | socle : k8s + Cilium (+WireGuard)               | `bootstrap`                               |
+| `store`   | + stockage : local-path **ou** Ceph (+SC, +RGW) | `storage-simple` / `ceph`+`sc`+`datalake` |
+| `obs`     | + observabilité : Prometheus + Grafana + Loki   | `monitoring`                              |
+| `dataops` | + DataOps : CNPG, Dagster, Marquez              | `dataops`                                 |
 
 ### 1.5 Dimensions fines paramétrables (à briques fixées)
 
@@ -195,18 +216,20 @@ l'[ADR 0030](../decisions/0030-nomenclature-bancs-topologies.md). Source de
 vérité : [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md) et
 [`test/RESULTS.md`](../../test/RESULTS.md).
 
-Topologie `multi-node-3` (1 CP + 2 workers), matériel arm64, terrain local pour
-toutes les lignes. La vraie variable est le **profil** (léger vs Ceph) et ses
-dimensions fines :
+Toutes les lignes : topologie `multi-node-3` (1 CP + 2 workers), arch `arm64`,
+terrain `local`. La vraie variable est le **profil de briques** et ses
+dimensions fines. Colonne **Tuple** = notation
+[ADR 0039](../decisions/0039-nomenclature-axes-catalogue.md)
+(`arch/terrain/topologie/profil`) :
 
-| Profil | Provis. | storageClass | backing S3 | Briques validées                                                        | Run      |
-| ------ | ------- | ------------ | ---------- | ----------------------------------------------------------------------- | -------- |
-| léger  | Lima    | local-path   | —          | k8s 1.34, Cilium+WireGuard, local-path                                  | 04/06    |
-| léger  | Lima    | local-path   | SeaweedFS  | + Prometheus/Grafana/**Loki S3 réel** (#158/#186)                       | 07/06    |
-| Ceph   | Lima    | rook-ceph    | RGW (OBC)  | + Rook-Ceph (HEALTH_OK), SC, RGW datalake                               | 04→07/06 |
-| Ceph   | Lima    | rook-ceph    | RGW (OBC)  | + **DataOps** : CNPG/PG18 + Barman→RGW, Dagster, Marquez lineage (#173) | 07/06    |
-| Ceph   | Lima    | rook-ceph    | RGW (OBC)  | + Prometheus/Grafana/**Loki S3 RGW** (#158/#186)                        | 07/06    |
-| Ceph   | Vagrant | rook-ceph    | RGW        | k8s 1.34, Cilium ; Rook-Ceph + SC + datalake                            | 28→31/05 |
+| Tuple                              | Provis. | storageClass | backing S3 | Briques validées                                                        | Run      |
+| ---------------------------------- | ------- | ------------ | ---------- | ----------------------------------------------------------------------- | -------- |
+| `arm64/local/multi-node-3/base`    | Lima    | local-path   | —          | k8s 1.34, Cilium+WireGuard, local-path                                  | 04/06    |
+| `arm64/local/multi-node-3/obs`     | Lima    | local-path   | SeaweedFS  | + Prometheus/Grafana/**Loki S3 réel** (#158/#186)                       | 07/06    |
+| `arm64/local/multi-node-3/store`   | Lima    | rook-ceph    | RGW (OBC)  | + Rook-Ceph (HEALTH_OK), SC, RGW datalake                               | 04→07/06 |
+| `arm64/local/multi-node-3/dataops` | Lima    | rook-ceph    | RGW (OBC)  | + **DataOps** : CNPG/PG18 + Barman→RGW, Dagster, Marquez lineage (#173) | 07/06    |
+| `arm64/local/multi-node-3/obs`     | Lima    | rook-ceph    | RGW (OBC)  | + Prometheus/Grafana/**Loki S3 RGW** (#158/#186)                        | 07/06    |
+| `arm64/local/multi-node-3/store`   | Vagrant | rook-ceph    | RGW        | k8s 1.34, Cilium ; Rook-Ceph + SC + datalake (déprécié, ADR 0038)       | 28→31/05 |
 
 > Terrain = **local** pour toutes ces lignes (seul terrain monté à ce jour). Les
 > dimensions fines **storageClass** et **backing S3** sont validées sur **leurs
