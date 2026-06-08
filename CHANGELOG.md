@@ -14,6 +14,21 @@ pnpm release:dry   # aperçu
 pnpm release       # bump + tag + commit
 ```
 
+## [2.30.0](https://github.com/univ-lehavre/cluster/compare/v2.29.3...v2.30.0) (2026-06-08)
+
+
+### Features
+
+* **banc:** phase_dataops paramètre storageClass/backing par profil (drift L41) ([0651917](https://github.com/univ-lehavre/cluster/commit/065191742f4303ca410cefd35013948bb27b25b4))
+* **platform:** DataOps sans Ceph — rôle s3-bucket + stratégie terrains×topologies ([e07dfe8](https://github.com/univ-lehavre/cluster/commit/e07dfe8298f68a05d552c88490e9eae7db89fb90))
+* **platform:** rôle s3-bucket factorisé, CNPG/Loki backing rgw|seaweedfs ([#186](https://github.com/univ-lehavre/cluster/issues/186)) ([b85f7ac](https://github.com/univ-lehavre/cluster/commit/b85f7ac7eec2277e263cb287a1c7a2c33b1fb9b7))
+
+
+### Documentation
+
+* **adr:** 0040 terrains×topologies (single-node/TOPO abandonnés, cloud arm64, paliers HA) ([c09f811](https://github.com/univ-lehavre/cluster/commit/c09f811796085f30da568f73b568fd2ab026015b))
+* **drifts:** registre indexé des drifts (L41-L44) + lien synthèse ([39fe904](https://github.com/univ-lehavre/cluster/commit/39fe904ed38083f36b2f761e91a5ef64e05a05e7))
+
 ## [2.29.3](https://github.com/univ-lehavre/cluster/compare/v2.29.2...v2.29.3) (2026-06-08)
 
 
