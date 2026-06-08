@@ -169,9 +169,11 @@ cat. 7).
 ## 2. Couverture des scénarios (épreuves × axes)
 
 Un scénario n'est pas un axe de construction : c'est une **épreuve** passée à un
-banc déjà monté. La table dit, pour chacun, la catégorie, la topologie requise,
-les briques validées et le terrain particulier exigé. Source :
-[`test/scenarios/`](../../test/scenarios/).
+banc déjà monté. La table ci-dessous dit ce qu'un scénario **requiert** (sa
+catégorie, la topologie et les briques nécessaires, le terrain particulier
+exigé) — **pas** s'il a tourné. Le statut d'exécution réel (quoi a été passé,
+sur quelle combinaison, quand) est dans le **bloc « Scénarios exécutés »** juste
+après la table. Source : [`test/scenarios/`](../../test/scenarios/).
 
 | #   | Scénario                           | Catégorie     | Topologie req. | Briques testées          | Terrain particulier    |
 | --- | ---------------------------------- | ------------- | -------------- | ------------------------ | ---------------------- |
@@ -208,6 +210,28 @@ les briques validées et le terrain particulier exigé. Source :
 > : Prometheus scrape ses targets (22 UP), l'alerte témoin `Watchdog` est bien
 > _firing_, et un log poussé est relu en LogQL (round-trip via le backing S3).
 > Passés au vert sur le banc Ceph (profil RGW) — _monté **et** éprouvé_.
+
+### Scénarios exécutés (statut réel)
+
+Quels scénarios ont **effectivement tourné**, sur quelle **combinaison**
+([tuple ADR 0039](../decisions/0039-nomenclature-axes-catalogue.md)) et avec
+quel verdict. Une épreuve **agnostique** vaut pour toute combinaison qui
+satisfait ses prérequis ; on consigne ici la combinaison **réellement** utilisée
+au dernier passage. `?` = jamais consigné explicitement (script présent, dernier
+run non tracé — honnêteté des Runs).
+
+| Scénarios                  | Combinaison (tuple)                                        | Date       | Verdict                                                         |
+| -------------------------- | ---------------------------------------------------------- | ---------- | --------------------------------------------------------------- |
+| 24, 25, 26 (observabilité) | `arm64/local/multi-node-3/dataops` (banc Ceph, profil RGW) | 2026-06-08 | ✅ vert (22 targets UP ; `Watchdog` firing ; round-trip LogQL)  |
+| 23 (lineage Marquez)       | `arm64/local/multi-node-3/dataops`                         | 2026-06-07 | ✅ vert (lineage ingéré, #173)                                  |
+| 01–22                      | `?`                                                        | `?`        | scripts présents ; dernier passage non consigné par combinaison |
+
+> **À retenir** : seuls **23–26** ont un statut d'exécution **tracé à une
+> combinaison**. Les scénarios 01–22 existent et ont tourné par le passé (cf.
+> [`RESULTS.md`](../../test/lima/RESULTS.md)), mais leur dernier passage n'est
+> pas consigné par tuple — les y rattacher est un chantier de traçabilité à
+> part. Ne pas lire l'absence de tuple comme « échoué » : c'est « non tracé ici
+> ».
 
 ## 3. Couverture build (combinaisons réellement montées sur banc)
 
