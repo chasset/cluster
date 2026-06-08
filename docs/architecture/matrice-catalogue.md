@@ -56,6 +56,28 @@ Une configuration de banc = un point du produit **matériel × topologie × terr
 - IaaS : OpenStack
 - Interfaces : CLI, API, WebApp
 
+## 1.6 Dimensions fines paramétrables (à briques fixées)
+
+Au-delà des cinq axes, plusieurs **briques sont paramétrables par topologie** :
+une même brique tourne avec un réglage différent selon le banc. Ce sont ces
+réglages qui démultiplient les combinaisons à valider — et c'est là que vivent
+les drifts spécifiques à un profil (cf. [Leçons des Runs](lecons-des-runs.md),
+cat. 7).
+
+| Dimension              | Brique(s)                        | Valeurs testées                                                | Pilotage                       | Réf.                                                              |
+| ---------------------- | -------------------------------- | -------------------------------------------------------------- | ------------------------------ | ----------------------------------------------------------------- |
+| **storageClass PVC**   | registry, CNPG, monitoring, Loki | **local-path** (léger) · **rook-ceph-block-replicated** (Ceph) | variable de rôle / `WITH_CEPH` | #158                                                              |
+| **backing S3**         | Loki, CNPG/Barman                | **SeaweedFS** (léger) · **RGW Ceph** via OBC (prod)            | `loki_s3_backing`, `WITH_CEPH` | #186, [ADR 0036](../decisions/0036-backing-s3-unique-rgw.md)      |
+| **profil stockage**    | socle                            | **local-path** (rapide) · **Rook-Ceph** (fidèle)               | `WITH_CEPH`                    | [ADR 0035](../decisions/0035-strategie-bancs-fidelite-vitesse.md) |
+| **chiffrement réseau** | Cilium                           | **WireGuard actif**                                            | bootstrap                      | [ADR 0019](../decisions/0019-durcissement-reseau-cilium.md)       |
+
+> **Invariant clé** ([ADR 0036](../decisions/0036-backing-s3-unique-rgw.md)) :
+> pour une dimension à deux valeurs dont l'une élargit les droits (ex. creds
+> admin SeaweedFS vs creds OBC restreints), la valeur permissive **masque** les
+> contraintes de l'autre. Un chemin de code partagé doit donc être validé **sur
+> chaque valeur réellement employée** — sinon le banc rapide valide une version
+> plus laxiste que la prod.
+
 ## 2. Couverture des scénarios (épreuves × axes)
 
 Un scénario n'est pas un axe de construction : c'est une **épreuve** passée à un
@@ -96,11 +118,19 @@ l'[ADR 0030](../decisions/0030-nomenclature-bancs-topologies.md). Source de
 vérité : [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md) et
 [`test/RESULTS.md`](../../test/RESULTS.md).
 
-| Topologie      | Mat.  | Terrain | Provisioning | Briques validées                                                  | Run      |
-| -------------- | ----- | ------- | ------------ | ----------------------------------------------------------------- | -------- |
-| `multi-node-3` | arm64 | local   | Lima         | k8s 1.34, Cilium+WireGuard, local-path, Rook-Ceph (HEALTH_OK), SC | 04/06    |
-| `multi-node-3` | arm64 | local   | Lima         | + DataOps : CNPG/PG18, Dagster (SUCCESS), Marquez (mode rapide)   | 04→07/06 |
-| `multi-node-3` | arm64 | local   | Vagrant      | k8s 1.34, Cilium ; Rook-Ceph + SC + datalake                      | 28→31/05 |
+| Topologie      | Mat.  | Provis. | storageClass | backing S3 | Briques validées                                                        | Run      |
+| -------------- | ----- | ------- | ------------ | ---------- | ----------------------------------------------------------------------- | -------- |
+| `multi-node-3` | arm64 | Lima    | local-path   | —          | k8s 1.34, Cilium+WireGuard, local-path                                  | 04/06    |
+| `multi-node-3` | arm64 | Lima    | local-path   | SeaweedFS  | + Prometheus/Grafana/**Loki S3 réel** (#158/#186)                       | 07/06    |
+| `multi-node-3` | arm64 | Lima    | rook-ceph    | RGW (OBC)  | + Rook-Ceph (HEALTH_OK), SC, RGW datalake                               | 04→07/06 |
+| `multi-node-3` | arm64 | Lima    | rook-ceph    | RGW (OBC)  | + **DataOps** : CNPG/PG18 + Barman→RGW, Dagster, Marquez lineage (#173) | 07/06    |
+| `multi-node-3` | arm64 | Lima    | rook-ceph    | RGW (OBC)  | + Prometheus/Grafana/**Loki S3 RGW** (#158/#186)                        | 07/06    |
+| `multi-node-3` | arm64 | Vagrant | rook-ceph    | RGW        | k8s 1.34, Cilium ; Rook-Ceph + SC + datalake                            | 28→31/05 |
+
+> Terrain = **local** pour toutes ces lignes (seul terrain monté à ce jour). Les
+> dimensions fines **storageClass** et **backing S3** sont validées sur **leurs
+> deux valeurs** (léger local-path/SeaweedFS **et** Ceph rook-ceph/RGW) — c'est
+> l'apport de #158/#186.
 
 ### Trous de la matrice (jamais buildés)
 
