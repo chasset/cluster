@@ -22,11 +22,15 @@ doit pas sacrifier la **fidélité au chemin de prod**.
 d'intégration comme seule preuve ; on ajoute des bancs ciblés pour itérer — tous
 sur le _vrai_ `kubeadm`, jamais une distribution alternative.**
 
-| Banc / profil               | Monte                                    | Temps   | Fidélité | Pour quoi                                         |
-| --------------------------- | ---------------------------------------- | ------- | -------- | ------------------------------------------------- |
-| `single-node`               | 1 nœud kubeadm + Cilium                  | ~5 min  | ★★       | itérer un **rôle bootstrap**, une version         |
-| `multi-node-3` (local-path) | 3 nœuds kubeadm + Cilium, PVC local-path | ~11 min | ★★       | itérer un **manifeste/brique sans stockage réel** |
-| `multi-node-3` (ceph)       | + Rook-Ceph + RGW + chaîne DataOps       | ~30 min | ★★★      | **intégration** — la seule preuve complète        |
+| Banc / profil               | Monte                                                     | Temps   | Fidélité | Pour quoi                                                        |
+| --------------------------- | --------------------------------------------------------- | ------- | -------- | ---------------------------------------------------------------- |
+| `multi-node-3` (local-path) | 3 nœuds kubeadm + Cilium, PVC local-path + SeaweedFS (S3) | ~11 min | ★★       | itérer un **manifeste/brique**, DataOps **sans Ceph** (ADR 0036) |
+| `multi-node-3` (ceph)       | + Rook-Ceph + RGW + chaîne DataOps                        | ~30 min | ★★★      | **intégration** — la preuve complète (stockage résilient)        |
+
+> `single-node` a été **retiré** ([ADR 0040](0040-terrains-x-topologies.md)) :
+> trop dégradé pour être représentatif. Pour itérer vite, le profil
+> `multi-node-3 local-path` (DataOps sans Ceph) joue ce rôle, en restant fidèle
+> au multi-nœuds.
 
 Principes :
 

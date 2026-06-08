@@ -38,12 +38,15 @@ terrain » de la matrice), selon ces partis pris :
    ([ADR 0027](0027-bootstrap-parametre-multi-cluster.md) : CIDR, `cluster.id`/
    `name`). Aucun rôle nouveau n'est requis pour un premier run.
 
-3. **Topologies visées** : **`ha-3cp`** (3 control planes — la HA jamais montée
-   en local faute de ressources) et **`multisite`** (un cluster autonome par
-   région, fédéré par Cilium Cluster Mesh, avec **vraie** latence inter-région
-   au lieu du `tc netem` du spike). `single-node` / `multi-node-3` y sont
-   rejouables pour comparaison, mais l'intérêt du terrain est la HA et le mesh
-   réels.
+3. **Topologies visées** : **`ha-3cp`** (3 control planes — la HA, via le **Load
+   Balancer** Free Tier comme endpoint flottant) et **`multisite`** (un cluster
+   autonome par région, fédéré par Cilium Cluster Mesh, avec **vraie** latence
+   inter-région au lieu du `tc netem` du spike). `multi-node-3` y est aussi
+   rejouable (terrain d'itération cloud,
+   [ADR 0040](0040-terrains-x-topologies.md)), mais l'intérêt propre du cloud
+   est la HA et le mesh réels. (`ha-3cp` est aussi tentée **en local** par
+   paliers de ressources — ADR 0040 ; le cloud apporte le LB natif et la vraie
+   latence.)
 
 4. **Généricité stricte ([ADR 0023](0023-plateforme-exemple-generique.md)).** La
    documentation versionnée parle de **« terrain cloud ARM (free tier) »** —
