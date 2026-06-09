@@ -95,10 +95,16 @@ spec:
           port: 5557 # dex (grpc)
 ---
 # repo-server -> Gitea intra-banc (drift L53). repo-server clone le dépôt de
-# workflows atlas hébergé par Gitea (ADR 0044). L'egress générique ci-dessus
+# workflows atlas hébergé par Gitea (ADR 0044). L'egress générique
 # (`allow-reposerver-egress`, ipBlock 0.0.0.0/0) NE couvre PAS Gitea : sous
 # Cilium, un `ipBlock` EXCLUT les IPs des pods du cluster (même piège que L48).
-# On autorise donc explicitement le namespace gitea (port 80 du Service → 3000).
+# On autorise donc explicitement le namespace gitea.
+#
+# PORT 3000, PAS 80 : sous Cilium, la NetworkPolicy egress filtre le port du POD
+# de destination APRÈS traduction du Service (le Service gitea-http:80 est DNATé
+# vers le pod:3000). Ouvrir 80 laissait le trafic bloqué (clone → context
+# deadline exceeded) car le paquet vise 3000. On ouvre les deux pour robustesse
+# (80 si un jour le client vise le Service avant DNAT, 3000 = cible réelle pod).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -117,4 +123,6 @@ spec:
               kubernetes.io/metadata.name: gitea
       ports:
         - protocol: TCP
-          port: 80 # Service gitea-http (mappe 80 → pod 3000)
+          port: 3000 # port du POD gitea (cible réelle après DNAT du Service)
+        - protocol: TCP
+          port: 80 # Service gitea-http (robustesse selon le datapath)
