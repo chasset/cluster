@@ -799,9 +799,9 @@ drifts:
     correctif: >-
       VM_DISK DÉRIVE du profil (ADR 0046) : 40 GiB en mode Ceph (WITH_CEPH=1),
       20 GiB en léger. Le qcow2 Lima est thin-provisionné → n'occupe le disque
-      hôte qu'à l'usage réel. À re-prouver au prochain run from-scratch
-      atlas-ceph (ADR 0034). Tombstones du run courant nettoyés (kubectl delete
-      pod --field-selector status.phase=Failed).
+      hôte qu'à l'usage réel. Re-preuve from-scratch atlas-ceph différée → issue
+      #251 (ADR 0034). Tombstones du run courant nettoyés (kubectl delete pod
+      --field-selector status.phase=Failed).
     statut: corrige
 
   - id: L56
@@ -827,6 +827,7 @@ drifts:
       (1) cni.sh applique les CRs inline (heredoc), plage LB-IPAM + interface L2
       paramétrées par env (LB_IPAM_RANGE_START/STOP, L2_INTERFACE) dérivées du
       réseau réel par run-phases.sh (ADR 0023) ; (2) poser les CRDs Gateway API
-      AVANT cni.sh (dépendance réelle Gateway-API → Cilium-gateway). À re-prouver
-      par un run from-scratch (scénario 28 PASS, ADR 0034).
+      AVANT cni.sh (dépendance réelle Gateway-API → Cilium-gateway). Validé À
+      CHAUD (HTTP 200 via Gateway, scénario 28 PASS). Re-preuve from-scratch
+      différée → issue #251 (ADR 0034/0046).
     statut: en-cours
