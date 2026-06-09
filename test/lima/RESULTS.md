@@ -483,3 +483,39 @@ Drift de cette campagne :
   (`localhost:8080 refused`) — le runner fait `cd` dans son dossier, invalidant
   le chemin relatif. Correctif : résoudre `KUBECONFIG` en **absolu avant le
   `cd`**. Validé (ONLY=24 avec KUBECONFIG relatif passe).
+
+## Chaîne GitOps → workflows atlas — scénario 27 prouvé (#231, 2026-06-09)
+
+> **✅ Cœur du banc atlas prouvé sur banc (2026-06-09), branche
+> `feat/231-scenario27-gitops-dataops`.** Un **push sur Gitea déclenche, via
+> webhook, le déploiement par Argo CD du workflow atlas**, qui lance un run
+> Dagster réel dont le **lineage est ingéré par Marquez**. Objectif ADR
+> 0044/0045 atteint : atlas lance sa GitOps qui pilote toute la chaîne DataOps.
+
+`run-phases.sh gitops-seed` (init dépôt Gitea + webhook + Application) puis
+`STRICT_GITOPS=1 ONLY='27' run-all.sh` — **scénario 27 PASS** :
+
+| Étape (gate)                           | Résultat                                                       |
+| -------------------------------------- | -------------------------------------------------------------- |
+| Gitea + Argo CD + Application présents | ✅                                                             |
+| push commit de déclenchement (Gitea)   | ✅ nouveau commit                                              |
+| Argo CD réconcilie via webhook         | ✅ **nouvelle révision** (fc6d860 → 57ff5f4), `Synced/Healthy` |
+| run Dagster + lineage Marquez          | ✅ Job `Complete`, lineage ingéré                              |
+
+Drifts de cette campagne (détail : registre-drifts.yaml) — **4 bugs du livrable
+révélés par le run réel**, corrigés dans les manifestes versionnés (appliqués
+par le rôle Ansible `platform-argocd`, plus de `kubectl patch`) :
+
+- **L51** : `sourceRepos` `/*` → `/**` (le glob Argo ne traverse pas les `/`).
+- **L52** : egress interne argocd (controller → repo-server:8081 / redis) — le
+  default-deny coupait le trafic intra-Argo.
+- **L53** : egress repo-server → Gitea (namespaceSelector) — `ipBlock 0.0.0.0/0`
+  exclut les pods cluster sous Cilium (même piège que L48).
+- **L54** : workflow jouet sans securityContext durci (Dagster écrit son
+  DAGSTER_HOME ; aligné sur l'émetteur de référence ; durcissement = #234).
+
+> **Bug résiduel (contourné, à corriger à froid)** : `gitea-init.sh` ne **met
+> pas à jour** un fichier existant via l'API Contents (PUT) — l'update est
+> silencieusement ignoré. Contournement : supprimer le dépôt avant re-seed
+> (POST/create), et le scénario 27 pousse un **fichier de déclenchement neuf**
+> plutôt qu'un update. À corriger (issue dédiée).
