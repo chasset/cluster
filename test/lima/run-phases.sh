@@ -862,6 +862,7 @@ case "${1:-}" in
         # Cache du socle (#219) : on saute up+bootstrap(+ceph+sc) SI le socle en
         # cache est encore valable (VMs up, cluster Ready, contenu inchangé).
         # NO_CACHE=1 force le rebuild from-scratch (la PREUVE, ADR 0034).
+        socle_built=0 # 1 seulement si up/bootstrap/storage ont RÉELLEMENT tourné
         if metro_cache_valid "${profil}"; then
             ok "socle réutilisé depuis le cache (clé inchangée) — up/bootstrap sautés (#219)"
             log "ℹ️  Forcer un rebuild from-scratch (preuve ADR 0034) : NO_CACHE=1 $0 all"
@@ -878,6 +879,7 @@ case "${1:-}" in
                 log "ℹ️  Pour le stockage réel : WITH_CEPH=1 $0 all  (ou : $0 ceph && $0 sc)"
             fi
             metro_cache_save "${profil}" # socle bâti → réutilisable au prochain run
+            socle_built=1
         fi
         # Socle GitOps (Gitea + Argo CD) PAR-DESSUS le socle, hors cache (c'est de
         # l'applicatif, pas le socle cluster). Profil banc atlas = local-path, donc
@@ -886,8 +888,18 @@ case "${1:-}" in
             time_phase gitops phase_gitops
             log "🎉 Socle GitOps déployé : Gitea (forge) + Argo CD (moteur)."
         fi
-        # Consigne le run complété (date/tuple/durées + métriques) — ADR 0034/0042.
-        record_full_run "$(( $(date +%s) - run_start ))"
+        # Consigne le run dans runs-history.yaml UNIQUEMENT s'il est from-scratch
+        # (socle réellement bâti). Un run sur CACHE (#219) ne rejoue pas up/
+        # bootstrap/storage : ses PHASE_DURATIONS sont partiels (p. ex. `gitops`
+        # seul) — le consigner produirait une fausse preuve (total_s tronqué,
+        # phases manquantes) qui tromperait le garde-fou de fraîcheur (ADR 0042).
+        # Seul un run from-scratch est LA preuve (ADR 0034 ; cf. NO_CACHE=1).
+        if [ "${socle_built}" = 1 ]; then
+            record_full_run "$(( $(date +%s) - run_start ))"
+        else
+            log "ℹ️  Run sur cache (socle réutilisé) — NON consigné dans runs-history.yaml"
+            log "    (seul un run from-scratch est une preuve ADR 0034/0042 ; NO_CACHE=1 pour consigner)"
+        fi
         ;;
     status) phase_status ;;
     down) phase_down ;;
