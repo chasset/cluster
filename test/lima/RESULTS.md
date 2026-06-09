@@ -514,8 +514,13 @@ par le rôle Ansible `platform-argocd`, plus de `kubectl patch`) :
 - **L54** : workflow jouet sans securityContext durci (Dagster écrit son
   DAGSTER_HOME ; aligné sur l'émetteur de référence ; durcissement = #234).
 
-> **Bug résiduel (contourné, à corriger à froid)** : `gitea-init.sh` ne **met
-> pas à jour** un fichier existant via l'API Contents (PUT) — l'update est
-> silencieusement ignoré. Contournement : supprimer le dépôt avant re-seed
-> (POST/create), et le scénario 27 pousse un **fichier de déclenchement neuf**
-> plutôt qu'un update. À corriger (issue dédiée).
+> **Note** : l'update Contents API de `gitea-init.sh` (PUT avec sha) a été
+> soupçonné défaillant en cours de run, mais **vérification faite, il
+> fonctionne** (un changement local du workflow produit bien un commit
+> `update workflow` dans Gitea, contenu mis à jour). La fausse piste venait d'un
+> comptage erroné (`grep readOnlyRootFilesystem` matchait les **commentaires**
+> du fichier, pas le YAML effectif) et de l'idempotence (relancer sans
+> changement ne crée pas de commit — comportement attendu). Pas de bug d'update.
+> Le correctif « push vérifié » (commit de la campagne) échoue désormais
+> explicitement si un PUT/POST ne renvoie pas de commit, ce qui aurait rendu un
+> vrai défaut visible.
