@@ -5,12 +5,12 @@ Réconcilie en continu, depuis git, les manifestes **applicatifs** (apps
 Marquez). Décision et frontière :
 [ADR 0022](../../docs/decisions/0022-argocd-gitops-applicatif.md).
 
-| Fichier                                                                | Rôle                                                                               |
-| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| [`argocd.yaml`](argocd.yaml)                                           | Bundle officiel v3.4.3 (3 CRDs+RBAC+Deploys), images par digest, `server.insecure` |
-| [`appproject-atlas.yaml`](appproject-atlas.yaml)                       | `AppProject atlas` cadrant citation-\*/dagster/marquez                             |
-| [`gateway.yaml`](gateway.yaml)                                         | `Gateway` + `HTTPRoute` d'exposition UI (TLS bordure cert-manager)                 |
-| [`_test/application-guestbook.yaml`](_test/application-guestbook.yaml) | `Application` guestbook de **test** (validation banc — jetable)                    |
+| Fichier                                                                | Rôle                                                                                            |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| [`argocd.yaml`](argocd.yaml)                                           | Bundle officiel v3.4.3 (3 CRDs+RBAC+Deploys), images par digest, `server.insecure`              |
+| [`appproject-atlas.yaml`](appproject-atlas.yaml)                       | `AppProject atlas` cadrant citation-\*/dagster/marquez ; `sourceRepos` surchargeable (ADR 0044) |
+| [`gateway.yaml`](gateway.yaml)                                         | `Gateway` + `HTTPRoute` d'exposition UI (TLS bordure cert-manager)                              |
+| [`_test/application-guestbook.yaml`](_test/application-guestbook.yaml) | `Application` guestbook de **test** (validation banc — jetable)                                 |
 
 NetworkPolicies sous `platform/network-policies/argocd/`
 ([`00-default-deny.yaml`](../network-policies/argocd/00-default-deny.yaml) +
