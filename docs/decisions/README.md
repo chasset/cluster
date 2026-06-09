@@ -64,4 +64,4 @@ Format léger inspiré de Michael Nygard :
 | 0042 | [Fraîcheur des preuves de banc (garde-fou CI)](0042-fraicheur-preuves-banc.md)                                     | Accepted |
 | 0043 | [Contrat d'interface cluster → atlas (endpoints, SC, secrets)](0043-contrat-interface-cluster-atlas.md)            | Accepted |
 | 0044 | [Topologie du banc atlas (socle consommé, Gitea intra-banc)](0044-topologie-deploiement-banc-atlas.md)             | Accepted |
-| 0045 | [Chemins d'installation du banc : couches, dépendances, tests associés](0045-chemins-installation-banc-couches.md) | Proposed |
+| 0045 | [Chemins d'installation du banc : couches, dépendances, tests associés](0045-chemins-installation-banc-couches.md) | Accepted |

@@ -153,7 +153,7 @@ profil) est un invariant à ne pas régresser.
 
 ## Statut
 
-Proposed.
+Accepted (2026-06-09).
 
 ## Conséquences
 
