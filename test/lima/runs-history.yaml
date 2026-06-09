@@ -45,3 +45,23 @@ runs:
       bootstrap: 406
       storage-simple: 13
       gitops: 75
+  - id: 2026-06-09T08-local-path-ceeec24
+    date: 2026-06-09T08:59:54Z
+    branche: feat/237-chemins-installation-adr0045
+    commit: ceeec24
+    profil: local-path
+    topologie: multi-node-3
+    arch: arm64
+    hote: 'Mac15,9'
+    total_s: 1564
+    phases:
+      up: 194
+      bootstrap: 402
+      storage-simple: 11
+      monitoring: 188
+      gitops: 75
+      dataops: 694
+    metriques:
+      cpu_core_s: 655
+      ram_peak_mib: 9191
+      ram_mean_mib: 5891
