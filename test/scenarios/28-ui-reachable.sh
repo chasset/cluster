@@ -8,10 +8,12 @@
 # TLS bordure cert-manager). C'est le chemin exact qu'un lien du portail emprunte.
 #
 # Les hostnames `*.cluster.lan` sont des PLACEHOLDERS non résolus en DNS cluster
-# (l'admin réseau pose les vrais) : on sonde donc l'IP du Gateway (LB Cilium) en
-# passant le hostname dans l'en-tête `Host:` (et SNI), TLS auto-signé toléré (CA
-# interne). « Atteignable » = code < 400, ou 401/403 (protégé mais vivant) — cf.
-# classify_ui_http. Échec = timeout, 404 (route morte), 5xx (backend cassé).
+# (l'admin réseau pose les vrais) : on sonde donc l'IP du Gateway (LB Cilium) via
+# `curl --resolve host:443:IP` qui pose à la fois le SNI TLS ET l'en-tête Host
+# (le Gateway Envoy choisit le certificat par SNI — sans SNI il RESET). TLS
+# auto-signé toléré (CA interne). « Atteignable » = code < 400, ou 401/403
+# (protégé mais vivant) — cf. classify_ui_http. Échec = timeout, 404 (route
+# morte), 5xx (backend cassé).
 #
 # INDÉPENDANT du déploiement. SKIP NEUTRE si aucun HTTPRoute — sauf STRICT_UI=1.
 #
@@ -61,13 +63,18 @@ while read -r nsroute host; do
         log "$(classify_ui_http "${host}" "" | sed 's/^[^|]*|//') (pas d'IP LB dans ${ns})"
         fails=$((fails + 1)); continue
     fi
-    # Sonde HTTPS via l'IP du Gateway + Host/SNI = hostname. wget busybox :
-    # --header Host, TLS auto-signé toléré. Code HTTP extrait des en-têtes.
+    # Sonde HTTPS via l'IP du Gateway. INDISPENSABLE : envoyer le SNI TLS =
+    # hostname (curl --resolve host:443:IP), pas seulement l'en-tête Host HTTP.
+    # Le Gateway Envoy sélectionne le certificat par SNI ; sans SNI, il RESET le
+    # handshake (faux négatif). busybox wget ne pose pas le SNI → on utilise curl
+    # (--resolve = SNI + Host + cert matching). TLS auto-signé toléré (-k, CA
+    # interne). Code HTTP via -w. (Bug historique : wget --header Host = pas de
+    # SNI → « Connection reset » alors que curl --resolve donne 200.)
     code=$(kubectl -n "${ns}" run ui-probe-$$-"${RANDOM}" --rm -i --restart=Never \
-        --image=busybox:1.36 --quiet --command -- \
-        wget -S -T 10 -qO /dev/null --no-check-certificate \
-        --header "Host: ${host}" "https://${ip}/" 2>&1 \
-        | grep -oE 'HTTP/[0-9.]+ [0-9]+' | grep -oE '[0-9]+$' | head -1)
+        --image=alpine/curl --quiet --command -- \
+        curl -sk -o /dev/null -w '%{http_code}' --max-time 12 \
+        --resolve "${host}:443:${ip}" "https://${host}/" 2>/dev/null \
+        | grep -oE '[0-9]+' | head -1)
     verdict=$(classify_ui_http "${host}" "${code}")
     if [ "${verdict%%|*}" = ok ]; then
         log "✓ ${verdict#*|}"

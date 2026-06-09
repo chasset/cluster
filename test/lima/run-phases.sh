@@ -61,18 +61,25 @@ CP=cp1 # nœud control-plane (kubeconfig + cni.sh)
 # Port hôte du forward de l'API du control-plane (127.0.0.1:API_PORT → guest 6443).
 API_PORT=6443
 
-# Ressources par VM. La RAM DÉRIVE du profil (ADR 0046 : pas de valeur de profil
-# codée en dur) :
-#   - mode Ceph (WITH_CEPH=1) : 12 GiB — un nœud porte OSD/mon Ceph + k8s + CNPG +
-#     Dagster/Marquez + monitoring (chemin atlas-ceph). Pic mesuré ~9 GiB/cluster ;
+# Ressources par VM. RAM et DISQUE DÉRIVENT du profil (ADR 0046 : pas de valeur
+# de profil codée en dur) :
+#   - mode Ceph (WITH_CEPH=1) : 12 GiB RAM — un nœud porte OSD/mon Ceph + k8s +
+#     CNPG + Dagster/Marquez + monitoring (chemin atlas-ceph). Pic mesuré ~9 GiB ;
 #     Ceph sensible à la pression mémoire (OSD lents → boot/HEALTH qui traînent).
-#   - mode léger (local-path) : 8 GiB — suffit (drift L28 : pic de build
+#   - mode léger (local-path) : 8 GiB RAM — suffit (drift L28 : pic de build
 #     marquez-web arm64) sans gaspiller (banc atlas léger).
 # 3×12 = 36 GiB sur un hôte 48 GiB : marge OK pour macOS. Surchargeable via VM_MEMORY.
+#
+# DISQUE : 20 GiB suffit en léger, mais le profil Ceph+dataops SATURE l'ephemeral-
+# storage à 20 GiB (évictions postgres/rgw/exporter sous le seuil ~2 GiB — drift
+# consigné). Ceph+dataops empile OSD + images applicatives + logs sur le rootfs.
+# → 40 GiB en mode Ceph (qcow2 thin-provisionné : n'occupe le disque hôte qu'à
+# l'usage réel). Surchargeable via VM_DISK.
 VM_CPUS=2
 VM_MEMORY_DEFAULT=$([ "${WITH_CEPH:-0}" = 1 ] && echo 12GiB || echo 8GiB)
 VM_MEMORY=${VM_MEMORY:-${VM_MEMORY_DEFAULT}}
-VM_DISK=20GiB
+VM_DISK_DEFAULT=$([ "${WITH_CEPH:-0}" = 1 ] && echo 40GiB || echo 20GiB)
+VM_DISK=${VM_DISK:-${VM_DISK_DEFAULT}}
 
 # CRDs Gateway API (alignées sur Cilium 1.19.x — ADR 0006 ; cf. platform/cilium-expo).
 GWAPI_VERSION=1.4.1
@@ -323,7 +330,22 @@ phase_bootstrap() {
     ok "${CP} : IP user-v2 ${cp_ip}"
 
     bootstrap_node_sequence "${INVENTORY}" -e "control_plane_ip=${cp_ip}"
-    run_cni "${CP}"
+
+    # Exposition tout-Cilium (ADR 0020) : DÉRIVER la plage LB-IPAM et l'interface
+    # L2 du réseau user-v2 réel du banc (pas de valeur codée en dur — ADR 0023).
+    # Plage = .240-.250 du /24 des nœuds (hors DHCP) ; interface = NIC user-v2
+    # détecté côté invité (Lima ne garantit pas le nom selon les versions).
+    local lb_prefix l2_if
+    lb_prefix=${cp_ip%.*}                       # ex. 192.168.104.1 → 192.168.104
+    l2_if=$(vm_uservv2_iface "${CP}")
+    [ -n "${l2_if}" ] || die "${CP} : interface user-v2 introuvable"
+    ok "expo : LB-IPAM ${lb_prefix}.240-.250, L2 sur ${l2_if}"
+    # CRDs Gateway API AVANT Cilium (drift L56) : l'operator les vérifie au boot.
+    apply_gwapi_crds_in_vm "${CP}" "${GWAPI_VERSION}"
+    run_cni "${CP}" \
+        "LB_IPAM_RANGE_START=${lb_prefix}.240" \
+        "LB_IPAM_RANGE_STOP=${lb_prefix}.250" \
+        "L2_INTERFACE=${l2_if}"
     fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}"
 
     # GATE : tous les nœuds attendus (${#NODES[@]}) Ready.
@@ -349,16 +371,18 @@ phase_storage_simple() {
 
 # ── Phase platform-prereqs — pré-requis transverses de la couche plateforme ──
 # Pose ce dont les addons plateforme ont besoin et que le bootstrap nu n'installe
-# pas : (1) les CRDs Gateway API (cert-manager les exige car cni.sh active
-# gatewayAPI ; Cilium ne les embarque pas — ADR 0006/0020) ; (2) la config
-# containerd « insecure registry » sur chaque nœud pour le registry interne HTTP
-# (registry:80, ADR 0011) — sinon ImagePullBackOff « HTTP response to HTTPS
-# client » au pull des images applicatives.
+# pas : (1) les CRDs Gateway API — RÉAPPLIQUÉES ici par IDEMPOTENCE (la pose
+# PRIMAIRE est désormais au bootstrap, AVANT cni.sh : l'operator Cilium les exige
+# à son démarrage pour armer le contrôleur Gateway — drift L56, ADR 0006/0020) ;
+# (2) la config containerd « insecure registry » sur chaque nœud pour le registry
+# interne HTTP (registry:80, ADR 0011) — sinon ImagePullBackOff « HTTP response
+# to HTTPS client » au pull des images applicatives.
 phase_platform_prereqs() {
     preflight
     [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
 
-    log "Phase platform-prereqs — CRDs Gateway API (v${GWAPI_VERSION})"
+    # Réapplication idempotente (posées au bootstrap avant Cilium — drift L56).
+    log "Phase platform-prereqs — CRDs Gateway API (v${GWAPI_VERSION}, idempotent)"
     local base="https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v${GWAPI_VERSION}/config/crd/standard"
     local crd
     for crd in gatewayclasses gateways httproutes referencegrants grpcroutes; do
