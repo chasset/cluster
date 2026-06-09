@@ -39,16 +39,27 @@ d'installation nommés.**
 ```text
 socle           : up → bootstrap → platform-prereqs
   └─ stockage    : [léger] storage-simple        | [ceph] ceph → sc → datalake
-       └─ applicatif (briques SŒURS, dépendent du stockage, pas l'une de l'autre) :
-            monitoring   (cluster + SC ; déploie son backing S3)
-            gitops       (cluster + SC ; PVC Gitea)
-            dataops      (cluster + SC + backing S3 Barman)
+       └─ backing S3 : [léger] SeaweedFS (rôle conditionnel)  | [ceph] RGW (déjà via datalake)
+            └─ applicatif (briques SŒURS, dépendent du stockage/backing, pas l'une de l'autre) :
+                 monitoring   (cluster + SC + backing S3 pour Loki)
+                 gitops       (cluster + SC ; PVC Gitea)
+                 dataops      (cluster + SC + backing S3 pour Barman)
 ```
 
-`monitoring`, `gitops`, `dataops` ne dépendent que de la **couche stockage** (un
-cluster Ready + une StorageClass `default` + un backing S3 pour celles qui font
-du S3) — **jamais l'une de l'autre**. L'ordre entre elles est donc libre, et se
-décide par un critère : **l'observabilité d'abord**.
+`monitoring`, `gitops`, `dataops` ne dépendent que des couches **stockage** et
+**backing S3** (cluster Ready + StorageClass `default` + un endpoint S3 pour
+celles qui font du S3) — **jamais l'une de l'autre**. L'ordre entre elles est
+donc libre, et se décide par un critère : **l'observabilité d'abord**.
+
+**SeaweedFS est découplé du monitoring.** Le backing S3 du profil léger est une
+**dépendance partagée** (Loki _et_ Barman/CNPG l'utilisent), pas un sous-produit
+de l'observabilité. Il est fourni par le rôle conditionnel `platform-seaweedfs`,
+appelé par les couches qui en ont besoin **`when` le backing vaut `seaweedfs`**
+(profil léger) — et **jamais en mode Ceph**, où le **RGW** (posé par `datalake`)
+joue ce rôle. Conséquence : sur le profil Ceph, SeaweedFS n'est pas installé du
+tout ; sur le profil léger, il l'est une fois, en amont des consommateurs. (Pas
+de phase dédiée : c'est un rôle invoqué sous condition, pour ne pas dupliquer le
+backing.)
 
 ### 2. Observabilité précoce
 
@@ -72,16 +83,21 @@ premier instant, pas après coup.
 `all` est conservé pour compatibilité mais documenté comme **alias du chemin
 selon `WITH_CEPH`** ; les noms ci-dessus sont la référence.
 
-### 4. Chaque couche porte ses tests (gate + assertion)
+### 4. Chaque couche porte ses tests (gate + assertion + scénario)
 
 Un chemin n'est pas qu'une séquence de phases : **chaque couche déclare ce qui
-prouve qu'elle a réussi**. Deux niveaux, déjà présents dans le harnais :
+prouve qu'elle a réussi**. Trois niveaux complémentaires, recensés ensemble dans
+le [plan de tests](../architecture/plan-de-tests.md) (couverture par couche +
+lacunes à combler) :
 
-- **Gate de phase** (dans `run-phases.sh`) : vérification bloquante en fin de
-  phase (exit ≠ 0 sinon), sur cluster réel.
-- **Assertion pure** (logique de décision isolée, testée hors cluster en
-  `test/unit/*.bats` — ADR 0017) : classe un état observé en ok/ko, réutilisée
-  par le gate.
+- **Unitaire** — assertion pure (logique de décision isolée, hors cluster,
+  `test/unit/*.bats`, ADR 0017).
+- **Intégration** — **gate de phase** (`run-phases.sh`) : vérification bloquante
+  en fin de phase (exit ≠ 0 sinon), sur cluster réel.
+- **Scénario** — comportement de bout en bout (`test/scenarios/NN-*.sh`) :
+  résilience, sécurité, observabilité, **et la chaîne GitOps→DataOps** (sc. 27).
+
+Synthèse par couche (le détail des 3 niveaux est dans le plan de tests) :
 
 | Couche / phase   | Gate de phase (preuve sur banc)                                                                      | Assertion (test unitaire) |
 | ---------------- | ---------------------------------------------------------------------------------------------------- | ------------------------- |
@@ -101,10 +117,21 @@ de ses couches passent**, et le run est **consigné** (ADR 0034/0042). Les
 chemins diffèrent donc aussi par leur **batterie de preuves** :
 
 - `socle` : gates `up` → `bootstrap` → `storage-simple`.
-- `atlas` : ceux de `socle` + `monitoring` + `gitops` (+ e2e GitOps→DataOps
-  #231).
+- `atlas` : ceux de `socle` + `monitoring` + `gitops`, **scellés par le scénario
+  27** (push Gitea → Argo CD `Synced/Healthy` → run Dagster + lineage Marquez) —
+  c'est lui qui prouve que _la chaîne complète part d'un push_. Implémentation
+  #231.
 - `cluster` : `up` → `bootstrap` → `ceph` → `sc` → `datalake` → `monitoring` →
-  `dataops` (jusqu'au lineage réel).
+  `dataops` (jusqu'au lineage réel), + les scénarios 01–26.
+
+**Scénario 27 — chaîne GitOps→DataOps (le test qui scelle le chemin `atlas`).**
+Un **push sur Gitea** doit provoquer un **déploiement par Argo CD** qui **lance
+toute la chaîne DataOps**. Étapes (chacune un gate) : (1) push d'un manifeste
+`Application` + code-location atlas dans Gitea ; (2) le **webhook** déclenche la
+réconciliation (pas le polling) ; (3) l'`Application` atteint `Synced/Healthy` ;
+(4) la chaîne tourne : run Dagster réussi + **lineage ingéré par Marquez**. Spec
+détaillée : [plan de tests](../architecture/plan-de-tests.md) ; implémentation
+[#231](https://github.com/univ-lehavre/cluster/issues/231).
 
 ### 5. Le profil de stockage se propage
 
