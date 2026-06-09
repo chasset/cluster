@@ -29,6 +29,7 @@
 #   test/lima/run-phases.sh atlas          # socle léger → monitoring → gitops → dataops (banc atlas, local-path)
 #   test/lima/run-phases.sh storage-real   # socle Ceph → datalake → smoke S3 (RGW) + montage WordPress (preuve stockage réel)
 #   test/lima/run-phases.sh cluster-dataops # socle Ceph → datalake → monitoring → dataops (chaîne DataOps sur Ceph)
+#   test/lima/run-phases.sh atlas-ceph     # banc atlas COMPLET sur Ceph : datalake → monitoring → gitops → dataops → gitops-seed + UI (#232)
 #   ── Axe orthogonal durcissement (#240) : combinable avec tout chemin ──
 #   WITH_HARDENING=1 test/lima/run-phases.sh atlas  # même chemin + secure.yml (audit,detection) après le socle
 #   test/lima/run-phases.sh kubeconfig     # (ré)exporte le kubeconfig banc
@@ -574,13 +575,21 @@ phase_wordpress() {
         die "smoke WordPress : pas de réponse HTTP < 400 (obtenu '${wp_code:-aucune}')"
     fi
 
-    # Cleanup : l'exemple n'a pas vocation à rester (le chemin prouve le montage,
-    # pas un service durable). KEEP_WORDPRESS=1 pour le conserver.
+    # Cleanup COMPLET : l'exemple n'a pas vocation à rester (le chemin prouve le
+    # montage, pas un service durable). On supprime les workloads + Service ET les
+    # PVC bloc Ceph (sinon volumes RBD orphelins) + le Secret. KEEP_WORDPRESS=1
+    # conserve tout pour inspection.
     if [ "${KEEP_WORDPRESS:-0}" = 1 ]; then
-        log "ℹ️  KEEP_WORDPRESS=1 — WordPress conservé."
+        log "ℹ️  KEEP_WORDPRESS=1 — WordPress conservé (pods + PVC + secret)."
     else
+        log "  Cleanup WordPress (workloads + PVC bloc Ceph + secret)"
         "${KUBECTL[@]}" delete -f "${REPO}/storage/ceph/wordpress/wordpress.yaml" --wait=false 2> /dev/null || true
         "${KUBECTL[@]}" delete -f "${REPO}/storage/ceph/wordpress/mysql.yaml" --wait=false 2> /dev/null || true
+        # PVC + Secret ne sont pas dans les manifestes delete -f ci-dessus (le PVC
+        # y est mais on force, et le Secret est créé par la phase, pas versionné).
+        "${KUBECTL[@]}" -n default delete pvc mysql-pv-claim wp-pv-claim --wait=false 2> /dev/null || true
+        "${KUBECTL[@]}" -n default delete secret wordpress-secret 2> /dev/null || true
+        ok "WordPress nettoyé — aucun volume RBD ni secret résiduel"
     fi
 }
 
@@ -706,13 +715,25 @@ phase_gitops() {
     [ -f "${INVENTORY}" ] || die "inventaire absent — lancer 'bootstrap' d'abord"
     log "Phase gitops — socle GitOps via Ansible (Gitea → Argo CD)"
 
-    # storageClass du PVC Gitea : local-path sur le banc atlas (ADR 0044).
-    # argocd_apply_gateway=false : pas de cert-manager garanti sur le banc léger.
+    # storageClass du PVC Gitea + exposition UI : SUIVENT le profil du banc
+    # (comme dataops/monitoring) — WITH_CEPH=1 ⇒ stockage Ceph (sinon le PVC
+    # demande local-path, absent en mode Ceph → Gitea Pending). En mode Ceph,
+    # cert-manager est présent (posé par dataops, prérequis Barman) → on peut
+    # exposer l'UI Argo CD via Gateway ; en léger, non (pas de cert-manager garanti).
+    local sc apply_gw
+    if [ "${WITH_CEPH:-0}" = 1 ]; then
+        sc=rook-ceph-block-replicated
+        apply_gw=true
+    else
+        sc=local-path
+        apply_gw=false
+    fi
+    log "  gitea_storage_class=${sc}, argocd_apply_gateway=${apply_gw}"
     KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
         "${REPO}/bootstrap/gitops.yaml" \
         -e dataops_k8s_host=localhost \
-        -e gitea_storage_class=local-path \
-        -e argocd_apply_gateway=false \
+        -e "gitea_storage_class=${sc}" \
+        -e "argocd_apply_gateway=${apply_gw}" \
         || die "gitops.yaml : échec du déploiement du socle GitOps"
     ok "socle GitOps déployé (Ansible) — Gitea + Argo CD Ready"
 
@@ -1135,6 +1156,29 @@ case "${1:-}" in
         time_phase monitoring phase_monitoring
         time_phase dataops phase_dataops
         log "🎉 Chemin 'cluster-dataops' (Ceph) : datalake → monitoring → dataops."
+        record_if_fresh "${run_start}"
+        ;;
+    # ── atlas-ceph : banc atlas COMPLET sur stockage réel (Ceph) + GitOps + UI. ──
+    # L'ordre est CODÉ (ne jamais enchaîner ces phases à la main) : le socle Ceph,
+    # puis datalake (RGW — requis par Loki/monitoring en mode Ceph ET par Barman),
+    # monitoring (observe la suite), gitops (Gitea+Argo CD, SC Ceph car WITH_CEPH),
+    # dataops (CNPG/Dagster/Marquez + build émetteur), enfin gitops-seed (pousse le
+    # workflow qui référence l'image émetteur buildée par dataops). C'est le banc
+    # sur lequel on vérifie les UI/portail (#232, scénario 28) en mode Ceph.
+    atlas-ceph)
+        TARGET="atlas-ceph"
+        WITH_CEPH=1
+        chemin_prelude
+        run_start=$(date +%s)
+        run_socle
+        run_hardening_if_requested
+        time_phase datalake phase_datalake
+        time_phase monitoring phase_monitoring
+        time_phase gitops phase_gitops
+        time_phase dataops phase_dataops
+        time_phase gitops-seed phase_gitops_seed
+        log "🎉 Chemin 'atlas-ceph' : Ceph → datalake → monitoring → gitops → dataops → gitops-seed."
+        log "ℹ️  UI exposées : vérifier via le scénario 28 (URLs via Gateway, #232)."
         record_if_fresh "${run_start}"
         ;;
     status) phase_status ;;
