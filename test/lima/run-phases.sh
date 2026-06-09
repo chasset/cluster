@@ -61,14 +61,17 @@ CP=cp1 # nœud control-plane (kubeconfig + cni.sh)
 # Port hôte du forward de l'API du control-plane (127.0.0.1:API_PORT → guest 6443).
 API_PORT=6443
 
-# Ressources par VM. Historique : 5 GiB OK socle seul ; 8 GiB pour le pic de
-# build arm64 marquez-web (drift L28). Porté à 12 GiB pour le banc COMPLET en
-# mode Ceph (chemin atlas-ceph) : un nœud porte alors OSD/mon Ceph + k8s + CNPG +
-# Dagster/Marquez + monitoring simultanément — pic mesuré ~9 GiB/cluster et Ceph
-# est sensible à la pression mémoire (OSD lents → boot/HEALTH qui traînent).
-# 3×12 = 36 GiB sur un hôte 48 GiB : marge confortable pour macOS.
+# Ressources par VM. La RAM DÉRIVE du profil (ADR 0046 : pas de valeur de profil
+# codée en dur) :
+#   - mode Ceph (WITH_CEPH=1) : 12 GiB — un nœud porte OSD/mon Ceph + k8s + CNPG +
+#     Dagster/Marquez + monitoring (chemin atlas-ceph). Pic mesuré ~9 GiB/cluster ;
+#     Ceph sensible à la pression mémoire (OSD lents → boot/HEALTH qui traînent).
+#   - mode léger (local-path) : 8 GiB — suffit (drift L28 : pic de build
+#     marquez-web arm64) sans gaspiller (banc atlas léger).
+# 3×12 = 36 GiB sur un hôte 48 GiB : marge OK pour macOS. Surchargeable via VM_MEMORY.
 VM_CPUS=2
-VM_MEMORY=12GiB
+VM_MEMORY_DEFAULT=$([ "${WITH_CEPH:-0}" = 1 ] && echo 12GiB || echo 8GiB)
+VM_MEMORY=${VM_MEMORY:-${VM_MEMORY_DEFAULT}}
 VM_DISK=20GiB
 
 # CRDs Gateway API (alignées sur Cilium 1.19.x — ADR 0006 ; cf. platform/cilium-expo).
