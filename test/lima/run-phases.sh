@@ -522,7 +522,11 @@ phase_smoke_s3() {
     preflight
     [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
     log "Phase smoke-s3 — PUT/GET/DELETE sur le RGW Ceph (scénario 06)"
-    KEEP_DATALAKE=1 bash "${REPO}/test/scenarios/06-object-store-smoke.sh" \
+    # KUBECONFIG exporté EN ABSOLU pour le scénario externe : il fait du kubectl
+    # qui lit l'env (pas le tableau KUBECTL du harnais) ; sans ça il tombe sur
+    # localhost:8080 (même piège que L50). Le scénario fait `cd` → chemin absolu.
+    KUBECONFIG="${KUBECONFIG_LOCAL}" KEEP_DATALAKE=1 \
+        bash "${REPO}/test/scenarios/06-object-store-smoke.sh" \
         || die "smoke-test S3 (RGW) en échec — voir la sortie ci-dessus"
     ok "smoke-test S3 réussi (PUT/GET/DELETE sur le RGW Ceph)"
 }
