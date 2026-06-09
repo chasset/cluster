@@ -539,6 +539,13 @@ phase_wordpress() {
     preflight
     [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
     log "Phase wordpress — montage PVC bloc RWO sur la SC Ceph (storage/ceph/wordpress/)"
+    # Secret `wordpress-secret` (mot de passe MySQL) : NON versionné (ADR 0023) ;
+    # mysql.yaml/wordpress.yaml le référencent en secretKeyRef. Le banc le crée
+    # avec une valeur GÉNÉRIQUE de test (idempotent) — sans lui, les pods restent
+    # en CreateContainerConfigError (« secret wordpress-secret not found »).
+    "${KUBECTL[@]}" -n default create secret generic wordpress-secret \
+        --from-literal=password='banc-wordpress-example' \
+        --dry-run=client -o yaml | "${KUBECTL[@]}" apply -f - >/dev/null
     "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/wordpress/mysql.yaml"
     "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/wordpress/wordpress.yaml"
 
