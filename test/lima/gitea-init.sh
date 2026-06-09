@@ -76,12 +76,13 @@ main() {
         2>&1 | grep -v "user already exists" || true
 
     echo "[gitea-init] 2/6 — token API"
-    # Crée un token via la CLI (scope all) ; idempotent par nom.
-    local token
+    # `--raw` affiche UNIQUEMENT la valeur du token (pas de préfixe à parser) ;
+    # `--scopes all` (scope valide de Gitea 1.26). Nom de token unique par run
+    # (un nom déjà pris ferait échouer la commande) → suffixe horodaté.
+    local token token_name="atlas-init-${RANDOM}"
     token=$(gitea_cli gitea admin user generate-access-token \
-        --username "${GITEA_ADMIN_USER}" --token-name "atlas-init-$(date +%s)" \
-        --scopes "write:organization,write:repository,write:admin" 2>/dev/null \
-        | grep -oE 'token: [a-f0-9]+' | awk '{print $2}') || true
+        --username "${GITEA_ADMIN_USER}" --token-name "${token_name}" \
+        --scopes all --raw 2>/dev/null | tr -d '[:space:]') || true
     [ -n "${token}" ] || { echo "gitea-init: token API non obtenu" >&2; return 1; }
 
     # Helper API : appel REST depuis le pod (réseau intra-cluster).
@@ -101,17 +102,25 @@ main() {
 
     echo "[gitea-init] 4/6 — push du workflow jouet (Contents API, idempotent)"
     # Pousse workflow-job.yaml via l'API Contents (create-or-update). On lit le
-    # SHA existant pour une mise à jour idempotente.
-    local content sha payload path="workflow-job.yaml"
+    # SHA existant pour une mise à jour idempotente. La réponse est CAPTURÉE et
+    # vérifiée (un PUT/POST raté laissait silencieusement l'ANCIENNE version dans
+    # Gitea → Argo CD déployait un manifeste périmé : drift à ne pas reproduire).
+    local content sha payload path="workflow-job.yaml" resp
     content=$(base64 < "${SAMPLE_DIR}/workflow-job.yaml" | tr -d '\n')
     sha=$(api GET "/repos/${GITEA_ORG}/${GITEA_REPO}/contents/${path}" 2>/dev/null \
         | grep -oE '"sha":"[a-f0-9]+"' | head -1 | cut -d'"' -f4) || true
     if [ -n "${sha}" ]; then
         payload="{\"content\":\"${content}\",\"sha\":\"${sha}\",\"message\":\"update workflow (atlas-init)\"}"
-        api PUT "/repos/${GITEA_ORG}/${GITEA_REPO}/contents/${path}" "${payload}" >/dev/null
+        resp=$(api PUT "/repos/${GITEA_ORG}/${GITEA_REPO}/contents/${path}" "${payload}")
     else
         payload="{\"content\":\"${content}\",\"message\":\"add workflow (atlas-init)\"}"
-        api POST "/repos/${GITEA_ORG}/${GITEA_REPO}/contents/${path}" "${payload}" >/dev/null
+        resp=$(api POST "/repos/${GITEA_ORG}/${GITEA_REPO}/contents/${path}" "${payload}")
+    fi
+    # La réponse de succès porte un objet "content" avec le nouveau "sha" ; une
+    # erreur porte un "message". On échoue explicitement si pas de commit.
+    if ! printf '%s' "${resp}" | grep -q '"commit"'; then
+        echo "gitea-init: push du workflow ÉCHOUÉ — réponse: ${resp}" >&2
+        return 1
     fi
 
     echo "[gitea-init] 5/6 — secret partagé webhook.gitea.secret (argocd-secret)"

@@ -41,8 +41,12 @@ spec:
             - name: OPENLINEAGE_NAMESPACE
               value: 'dagster'
           command: ['dagster', 'asset', 'materialize', '--select', '*', '-m', 'toy_assets']
+          # PAS de readOnlyRootFilesystem (drift L54) : `dagster asset materialize`
+          # écrit un DAGSTER_HOME temporaire dans plusieurs emplacements (cwd,
+          # $HOME/.dagster, /.dagster selon le contexte) — aligné sur l'émetteur
+          # de référence `dataops_chain_emit_and_verify` (qui tourne sans RO). On
+          # garde le reste du durcissement (non-root, drop ALL, seccomp).
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
