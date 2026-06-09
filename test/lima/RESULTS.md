@@ -439,6 +439,11 @@ Drifts de cette campagne :
   inconditionnellement, même sur cache hit (up/bootstrap/storage sautés, absents
   de `PHASE_DURATIONS`). Correctif : ne consigner que les runs **from-scratch**
   (flag `socle_built`) ; run sur cache → message, pas d'entrée. Fausse entrée
-  retirée. **NB** : la validation gitops ci-dessus a tourné sur cache (socle
-  déjà monté) ; le run **from-scratch** consigné reste à faire
-  (`NO_CACHE=1 run-phases.sh all`).
+  retirée.
+
+> **✅ Run from-scratch consigné (2026-06-09, commit `24cb7e5`).**
+> `NO_CACHE=1 run-phases.sh all` monté de zéro :
+> `up 169s → bootstrap 406s → storage-simple 13s → gitops 75s` (total **663s**,
+> profil local-path). Entrée appendée automatiquement dans
+> [`runs-history.yaml`](runs-history.yaml) — preuve ADR 0034/0042 (et validation
+> du correctif L49 : l'entrée est complète, pas tronquée).
