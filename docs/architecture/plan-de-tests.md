@@ -101,7 +101,10 @@ phase `dataops` a posé l'infra (orchestrateurs vides). Étapes (chacune un gate
 4. un **run Dagster réel** s'exécute et **émet du lineage ingéré par Marquez**
    (réutilise la logique de `dataops-assert.bats`).
 
-Implémentation :
+Le contenu poussé (workflow jouet d'exemple générique) vit dans
+[`test/lima/atlas-workflow-sample/`](../../test/lima/atlas-workflow-sample/) ;
+l'init du dépôt Gitea est faite par la phase `gitops-seed`
+([`test/lima/gitea-init.sh`](../../test/lima/gitea-init.sh)). Implémentation :
 [issue #231](https://github.com/univ-lehavre/cluster/issues/231).
 
 ## Voir aussi
