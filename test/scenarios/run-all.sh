@@ -34,6 +34,16 @@
 # Sortie : 0 si tous les scénarios joués passent, 1 sinon.
 set -uo pipefail
 
+# KUBECONFIG en chemin ABSOLU avant le `cd` (drift L50) : ce runner se déplace
+# dans son propre dossier, donc un KUBECONFIG relatif (ex.
+# `test/lima/.work/kubeconfig`) deviendrait invalide → kubectl retomberait sur
+# localhost:8080 et TOUS les scénarios échoueraient/skipperaient à tort. On le
+# résout depuis le CWD courant pendant qu'il est encore correct.
+if [ -n "${KUBECONFIG:-}" ] && [ "${KUBECONFIG#/}" = "${KUBECONFIG}" ]; then
+    KUBECONFIG="$(cd "$(dirname "${KUBECONFIG}")" && pwd)/$(basename "${KUBECONFIG}")"
+    export KUBECONFIG
+fi
+
 cd "$(dirname "${BASH_SOURCE[0]}")" || exit 2
 
 SKIP=${SKIP:-}

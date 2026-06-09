@@ -35,18 +35,20 @@ tourne le **vrai `kubeadm` 1.34** (pas de distribution alternative type k3d/kind
 en changeant d'installeur. Temps mesurés sur M3 Max
 ([tableau de bord](../docs/architecture/lecons-des-runs.md)).
 
-| Besoin (ce qu'on itère)                          | Profil                      | Temps   | Fidélité | Commande                                                 |
-| ------------------------------------------------ | --------------------------- | ------- | -------- | -------------------------------------------------------- |
-| Manifeste / brique **sans stockage réel**        | `multi-node-3` (local-path) | ~11 min | ★★       | `run-phases.sh all` (mode rapide)                        |
-| **Intégration** : chaîne complète, Ceph, DataOps | `multi-node-3` (ceph)       | ~30 min | ★★★      | `WITH_CEPH=1 run-phases.sh all` → `datalake` → `dataops` |
+| Besoin (ce qu'on itère)                          | Profil                      | Temps   | Fidélité | Commande                                                         |
+| ------------------------------------------------ | --------------------------- | ------- | -------- | ---------------------------------------------------------------- |
+| Manifeste / brique **sans stockage réel**        | `multi-node-3` (local-path) | ~11 min | ★★       | `run-phases.sh socle` (smoke rapide)                             |
+| **Banc atlas** : socle GitOps + DataOps (léger)  | `multi-node-3` (local-path) | ~20 min | ★★       | `run-phases.sh atlas` (monitoring → gitops → dataops)            |
+| **Intégration** : chaîne complète, Ceph, DataOps | `multi-node-3` (ceph)       | ~30 min | ★★★      | `run-phases.sh cluster` (Ceph → datalake → monitoring → dataops) |
 
-> **`(local-path)` = profil d'itération, PAS une preuve.** Même topologie et
-> même `kubeadm` que le Ceph, mais sans stockage réel : idéal pour itérer vite
-> sur des manifestes/NetworkPolicies/rôles. Il **ne monte pas** la chaîne
-> DataOps (CNPG + Barman exigent le RGW Ceph). Un changement validé en
-> local-path **doit** repasser sur le profil **`(ceph)`** avant d'être déclaré
-> validé ([ADR 0034](../docs/decisions/0034-validation-e2e-from-scratch.md) : la
-> preuve est un run e2e from-scratch). Le profil est un axe **orthogonal** à la
+> **`(local-path)` = profil d'itération, PAS une preuve de stockage réel.** Même
+> topologie et même `kubeadm` que le Ceph, mais sans stockage répliqué : idéal
+> pour itérer vite. La chaîne DataOps **y tourne** (chemin `atlas`) avec un
+> backing S3 **SeaweedFS** au lieu du RGW Ceph (ADR 0036). Mais un changement
+> qui touche le **stockage** (réplication, EC, RGW) **doit** repasser sur le
+> profil **`(ceph)`** (chemin `cluster`) avant d'être déclaré validé
+> ([ADR 0034](../docs/decisions/0034-validation-e2e-from-scratch.md) : la preuve
+> est un run e2e from-scratch). Le profil est un axe **orthogonal** à la
 > topologie (ADR 0030) — noté `(ceph)` / `(local-path)`.
 
 ## Réserves transversales

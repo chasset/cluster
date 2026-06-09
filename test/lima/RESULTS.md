@@ -447,3 +447,39 @@ Drifts de cette campagne :
 > profil local-path). Entrée appendée automatiquement dans
 > [`runs-history.yaml`](runs-history.yaml) — preuve ADR 0034/0042 (et validation
 > du correctif L49 : l'entrée est complète, pas tronquée).
+
+## Chemins d'installation + scénarios atlas (#237, 2026-06-09)
+
+> **✅ Chemin `atlas` validé from-scratch (commit `98e7467`).** ADR 0045
+> implémenté : cibles `socle`/`atlas`/`cluster`.
+> `NO_CACHE=1 run-phases.sh atlas` de zéro :
+> `up 194s → bootstrap 402s → storage-simple 11s → monitoring 188s → gitops 75s → dataops 694s`
+> (total **1564s**, local-path, RAM pic 9191 MiB). Première exécution de l'ordre
+> **monitoring AVANT dataops** : SeaweedFS posé par monitoring, consommé par
+> dataops — ordre validé. Consigné dans
+> [`runs-history.yaml`](runs-history.yaml).
+
+**Scénarios pertinents joués sur le banc `atlas` (9/9 PASS)** — preuve de
+comportement par-dessus les gates d'intégration (sous-ensemble applicable au
+profil local-path, cf.
+[plan de tests](../../docs/architecture/plan-de-tests.md)) :
+
+| #   | Scénario                     | Résultat                                            |
+| --- | ---------------------------- | --------------------------------------------------- |
+| 10  | Pod Security admission       | ✅ pod dangereux rejeté, conforme admis             |
+| 11  | NetworkPolicy default-deny   | ✅ egress coupé, allow-dns ciblé rouvre             |
+| 12  | securityContext runtime      | ✅ non-root + rootfs RO vérifiés au runtime         |
+| 17  | Pod d'évasion → PSA          | ✅ hostPath/hostPID/hostIPC rejetés                 |
+| 18  | Exfiltration → NetworkPolicy | ✅ canal coupé, DNS légitime préservé               |
+| 23  | Marquez ← OpenLineage        | ✅ lineage d'un run Dagster réel ingéré             |
+| 24  | Prometheus scrape + Grafana  | ✅ 22 targets UP, Grafana health ok                 |
+| 25  | PrometheusRule → alerte      | ✅ `Watchdog` firing (pipeline d'alerting vivant)   |
+| 26  | Loki ← LogQL                 | ✅ round-trip push → LogQL (+ backing S3 SeaweedFS) |
+
+Drift de cette campagne :
+
+- **L50** (harnais, _corrigé_) : `run-all.sh` lancé avec un **KUBECONFIG en
+  chemin relatif** faisait échouer/skipper tous les scénarios
+  (`localhost:8080 refused`) — le runner fait `cd` dans son dossier, invalidant
+  le chemin relatif. Correctif : résoudre `KUBECONFIG` en **absolu avant le
+  `cd`**. Validé (ONLY=24 avec KUBECONFIG relatif passe).

@@ -168,8 +168,7 @@ Accepted (2026-06-09).
   (monitoring = Prometheus + Loki + SeaweedFS, quelques minutes). D'où la
   distinction `socle` (rapide) vs `atlas` (complet), pour ne pas alourdir le
   smoke.
-- **À faire (suite)** : implémenter les cibles nommées dans
-  [`test/lima/run-phases.sh`](../../test/lima/run-phases.sh) (insérer
-  `monitoring` avant `gitops` dans le chemin léger ; cibles `socle`/`atlas`/
-  `cluster`), mettre à jour la doc du harnais, et consigner un run de chaque
-  chemin (ADR 0034/0042). Hors périmètre de #230 (qui livre la brique GitOps).
+- **Implémentation (#237)** : cibles nommées `socle`/`atlas`/`cluster` dans
+  [`test/lima/run-phases.sh`](../../test/lima/run-phases.sh), `monitoring` avant
+  `gitops`+`dataops` dans le chemin léger, `all` conservé comme alias. Reste à
+  consigner un run from-scratch de chaque chemin (ADR 0034/0042).
