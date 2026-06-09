@@ -75,27 +75,30 @@ gate/assertion par couche, et leur regroupement en **chemins d'installation**
 ([ADR 0025](../decisions/0025-securite-active-chaos-attaques-controlees.md),
 [ADR 0042](../decisions/0042-fraicheur-preuves-banc.md)) :
 
-| Plage  | Famille                                                                                            |
-| ------ | -------------------------------------------------------------------------------------------------- |
-| 01–09  | Stockage, résilience, restauration etcd                                                            |
-| 10–15  | Durcissement (pod, hôte, réseau, etcd)                                                             |
-| 16–22  | Sécurité active (offensif D/A/R, chaos)                                                            |
-| 23–26  | Intégration DataOps + observabilité                                                                |
-| **27** | **e2e GitOps → DataOps** (push Gitea → Argo CD → run Dagster + lineage) — **à implémenter (#231)** |
+| Plage  | Famille                                                                                                                          |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| 01–09  | Stockage, résilience, restauration etcd                                                                                          |
+| 10–15  | Durcissement (pod, hôte, réseau, etcd)                                                                                           |
+| 16–22  | Sécurité active (offensif D/A/R, chaos)                                                                                          |
+| 23–26  | Intégration DataOps + observabilité                                                                                              |
+| **27** | **e2e GitOps → workflows atlas** (push Gitea → Argo CD déploie les workflows → run Dagster + lineage) — **à implémenter (#231)** |
 
-### Scénario 27 — chaîne complète GitOps → DataOps
+### Scénario 27 — workflows atlas déployés par GitOps
 
 Le scénario qui prouve le **cœur du banc atlas** (ADR
 [0044](../decisions/0044-topologie-deploiement-banc-atlas.md)/[0045](../decisions/0045-chemins-installation-banc-couches.md))
-: qu'un **push sur Gitea déclenche un déploiement par Argo CD qui lance toute la
-chaîne DataOps**. Étapes (chacune un gate) :
+: qu'un **push sur Gitea déclenche le déploiement par Argo CD des workflows
+`atlas`** sur l'infra DataOps déjà montée (CNPG/Dagster/Marquez par Ansible —
+Argo CD **ne déploie pas l'infra**, seulement les workflows). Pré-requis : la
+phase `dataops` a posé l'infra (orchestrateurs vides). Étapes (chacune un gate)
+:
 
-1. **push** un manifeste (`Application` + code-location atlas) dans le dépôt
-   Gitea ;
+1. **push** les **workflows atlas** (code-locations / assets Dagster) dans le
+   dépôt Gitea ;
 2. le **webhook** Gitea → Argo CD déclenche la réconciliation (pas le polling) ;
-3. l'`Application` atteint **`Synced/Healthy`** ;
-4. la chaîne DataOps déployée **tourne** : run Dagster réussi + **lineage ingéré
-   par Marquez** (réutilise la logique de `dataops-assert.bats`).
+3. l'`Application` (workflows) atteint **`Synced/Healthy`** ;
+4. un **run Dagster réel** s'exécute et **émet du lineage ingéré par Marquez**
+   (réutilise la logique de `dataops-assert.bats`).
 
 Implémentation :
 [issue #231](https://github.com/univ-lehavre/cluster/issues/231).

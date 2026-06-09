@@ -72,13 +72,24 @@ premier instant, pas après coup.
 
 - **`socle`** — `up → bootstrap → storage-simple` : smoke-test rapide du socle
   (le rôle « rapide » historique de `all`, inchangé).
-- **`atlas`** (mode léger, ADR 0044) — `socle → monitoring → gitops`. Banc atlas
-  utilisable ; `dataops` n'y figure **pas** : sur le banc atlas, la chaîne
-  DataOps est réconciliée **par Argo CD depuis Gitea** (GitOps, #231), pas par
-  Ansible (frontière ADR 0022).
+- **`atlas`** (mode léger, ADR 0044) — `socle → monitoring → gitops → dataops`.
+  La phase Ansible **`dataops`** monte **toute l'infrastructure DataOps**
+  (CNPG + orchestrateurs Dagster/Marquez, **livrés vides**,
+  [ADR 0026](0026-orchestration-dagster.md)). **Argo CD ne déploie PAS cette
+  infra** : il déploie uniquement les **workflows implémentés par `atlas`**
+  (code-locations, assets, jobs) depuis Gitea (scénario 27, #231).
 - **`cluster`** (mode Ceph, preuve stockage réel) —
-  `up → bootstrap → ceph → sc → datalake → monitoring → dataops` : la chaîne
-  DataOps par Ansible reste légitime ici (pas d'Argo CD dans ce chemin).
+  `up → bootstrap → ceph → sc → datalake → monitoring → dataops` : même phase
+  Ansible `dataops`, sur stockage Ceph ; ici sans GitOps (pas d'Argo CD dans ce
+  chemin).
+
+> **Frontière `dataops` Ansible vs Argo CD (ADR 0022/0026).** Ansible
+> (`dataops`) pose **l'infrastructure DataOps** : la base CNPG et les
+> orchestrateurs Dagster/ Marquez **sans workflow**. Argo CD **ne touche pas à
+> cette infra** ; il déploie seulement les **workflows d'`atlas`**
+> (code-locations, assets, jobs), poussés dans Gitea. Ansible monte donc la
+> _plateforme_, Argo CD y injecte les _workflows métier_ — aucune ressource
+> n'est gérée par les deux.
 
 `all` est conservé pour compatibilité mais documenté comme **alias du chemin
 selon `WITH_CEPH`** ; les noms ci-dessus sont la référence.
@@ -117,9 +128,10 @@ de ses couches passent**, et le run est **consigné** (ADR 0034/0042). Les
 chemins diffèrent donc aussi par leur **batterie de preuves** :
 
 - `socle` : gates `up` → `bootstrap` → `storage-simple`.
-- `atlas` : ceux de `socle` + `monitoring` + `gitops`, **scellés par le scénario
-  27** (push Gitea → Argo CD `Synced/Healthy` → run Dagster + lineage Marquez) —
-  c'est lui qui prouve que _la chaîne complète part d'un push_. Implémentation
+- `atlas` : ceux de `socle` + `monitoring` + `gitops` + `dataops` (infra DataOps
+  vide), **scellés par le scénario 27** (push Gitea → Argo CD `Synced/Healthy` →
+  run Dagster + lineage Marquez) — c'est lui qui prouve que les _workflows
+  atlas_ arrivent bien _par un push_ sur l'infra DataOps montée. Implémentation
   #231.
 - `cluster` : `up` → `bootstrap` → `ceph` → `sc` → `datalake` → `monitoring` →
   `dataops` (jusqu'au lineage réel), + les scénarios 01–26.
