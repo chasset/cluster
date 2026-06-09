@@ -35,9 +35,11 @@ contenu atlas, enregistrer le webhook Gitea → Argo CD) est une étape de
 | [`deployment.yaml`](deployment.yaml)                           | Pod Gitea **rootless** (uid 1000), durci, image par digest.     |
 | [`service.yaml`](service.yaml)                                 | Service ClusterIP `gitea-http` :80 → 3000.                      |
 
-NetworkPolicies sous default-deny :
-[`platform/network-policies/gitea/`](../network-policies/gitea/) (default-deny +
-DNS + ingress `:3000` + egress webhook → `argocd-server`, **pas d'Internet**).
+NetworkPolicies sous default-deny
+([`00-default-deny.yaml`](../network-policies/gitea/00-default-deny.yaml) +
+[`allow-dns.yaml`](../network-policies/gitea/allow-dns.yaml) +
+[`allow-gitea.yaml`](../network-policies/gitea/allow-gitea.yaml)) : ingress
+`:3000` + egress webhook → `argocd-server`, **pas d'Internet**.
 
 ## Choix d'implémentation
 
