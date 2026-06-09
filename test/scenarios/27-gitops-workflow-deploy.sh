@@ -68,21 +68,40 @@ rev_before=$(kubectl -n "${ARGOCD_NS}" get application "${APP}" \
     -o jsonpath='{.status.sync.revision}' 2>/dev/null || true)
 log "[1/4] révision synchronisée avant push : ${rev_before:-∅}"
 
-# ── 2. Push un changement dans Gitea (touche un fichier → nouveau commit) ────
-# Via l'API Contents (update du workflow avec un commit horodaté) — réutilise
-# l'admin/token créés par gitea-init.sh (Secret gitea-admin).
-log "[2/4] push d'un commit sur ${GITEA_ORG}/${GITEA_REPO} (déclenche le webhook)"
-"$(dirname "${BASH_SOURCE[0]}")/../lima/gitea-init.sh" >/dev/null 2>&1 \
-    || skip_or_fail "réexécution de l'init (push) a échoué"
+# ── 2. Push un changement dans Gitea (nouveau fichier → nouveau commit) ──────
+# On CRÉE un fichier de déclenchement unique (POST Contents = toujours un commit
+# neuf, donc une nouvelle révision) — plus fiable qu'un update du workflow (qui
+# exige le sha courant) et suffisant pour prouver que le PUSH déclenche le
+# webhook. Le contenu déployé (le workflow) est posé par l'init en amont.
+log "[2/4] push d'un commit de déclenchement sur ${GITEA_ORG}/${GITEA_REPO}"
+gitea_pod=$(kubectl -n "${GITEA_NS}" get pod -l app=gitea -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+[ -n "${gitea_pod}" ] || skip_or_fail "pod gitea introuvable"
+# Token API éphémère (admin créé par l'init). --raw : valeur seule.
+gitea_token=$(kubectl -n "${GITEA_NS}" exec "${gitea_pod}" -- \
+    gitea admin user generate-access-token -u atlas-admin -t "sc27-${RANDOM}" --scopes all --raw 2>/dev/null | tr -d '[:space:]')
+[ -n "${gitea_token}" ] || skip_or_fail "token Gitea non obtenu (init faite ?)"
+# Fichier unique → create garanti (pas de sha à fournir) → commit + webhook.
+trigger_path="triggers/sc27-${RANDOM}${RANDOM}.txt"
+trigger_b64=$(printf 'scenario 27 trigger\n' | base64 | tr -d '\n')
+push_resp=$(kubectl -n "${GITEA_NS}" exec "${gitea_pod}" -- curl -sS \
+    -X POST -H "Authorization: token ${gitea_token}" -H "Content-Type: application/json" \
+    "http://localhost:3000/api/v1/repos/${GITEA_ORG}/${GITEA_REPO}/contents/${trigger_path}" \
+    -d "{\"content\":\"${trigger_b64}\",\"message\":\"scenario 27 trigger\"}" 2>/dev/null)
+printf '%s' "${push_resp}" | grep -q '"commit"' \
+    || { log "✗ push du commit de déclenchement échoué — réponse: ${push_resp}"; exit 1; }
 
-# ── 3. Argo CD réconcilie via webhook → Synced/Healthy sur une nouvelle rev ──
-log "[3/4] attente réconciliation Argo CD (Synced/Healthy via webhook, max 3 min)"
-sync='' health='' rev_after=''
+# ── 3. Argo CD réconcilie via webhook → NOUVELLE révision + Synced/Healthy ───
+# Condition de sortie = la révision a CHANGÉ (rev_after != rev_before) ET
+# Synced/Healthy. Attendre seulement Synced/Healthy sortirait à la 1ʳᵉ
+# itération (l'app était déjà Synced sur l'ancienne révision) sans prouver que
+# le push a déclenché quoi que ce soit.
+log "[3/4] attente réconciliation Argo CD (nouvelle révision via webhook, max 3 min)"
+sync='' health='' rev_after="${rev_before}"
 for _ in $(seq 1 36); do
     sync=$(kubectl -n "${ARGOCD_NS}" get application "${APP}" -o jsonpath='{.status.sync.status}' 2>/dev/null || true)
     health=$(kubectl -n "${ARGOCD_NS}" get application "${APP}" -o jsonpath='{.status.health.status}' 2>/dev/null || true)
     rev_after=$(kubectl -n "${ARGOCD_NS}" get application "${APP}" -o jsonpath='{.status.sync.revision}' 2>/dev/null || true)
-    [ "${sync}" = "Synced" ] && [ "${health}" = "Healthy" ] && break
+    [ "${rev_after}" != "${rev_before}" ] && [ "${sync}" = "Synced" ] && [ "${health}" = "Healthy" ] && break
     sleep 5
 done
 verdict=$(classify_argocd_app "${sync}" "${health}")
