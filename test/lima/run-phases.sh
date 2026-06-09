@@ -20,7 +20,11 @@
 #   test/lima/run-phases.sh dataops        # chaîne DataOps via Ansible (dataops.yaml) + lineage (#173/#148)
 #   test/lima/run-phases.sh gitops         # socle GitOps : Gitea + Argo CD via Ansible (gitops.yaml) + gate Ready (#230)
 #   test/lima/run-phases.sh monitoring     # observabilité (Prometheus + Grafana + Loki), profil selon WITH_CEPH
-#   test/lima/run-phases.sh all            # RAPIDE : up → bootstrap → storage-simple
+#   ── Chemins d'installation nommés (ADR 0045) ──
+#   test/lima/run-phases.sh socle          # up → bootstrap → stockage (smoke rapide)
+#   test/lima/run-phases.sh atlas          # socle léger → monitoring → gitops → dataops (banc atlas, local-path)
+#   test/lima/run-phases.sh cluster        # socle Ceph → datalake → monitoring → dataops (preuve stockage réel)
+#   test/lima/run-phases.sh all            # alias : 'atlas' (léger) | socle Ceph si WITH_CEPH=1
 #   WITH_CEPH=1 test/lima/run-phases.sh all  # COMPLET : ajoute ceph → sc (~15 min)
 #   test/lima/run-phases.sh kubeconfig     # (ré)exporte le kubeconfig banc
 #   test/lima/run-phases.sh status         # état du banc : VMs, nœuds, phases, UIs, dernier run (#149)
@@ -532,6 +536,10 @@ phase_dataops() {
     #   - mode léger (défaut)      : storageClass local-path ; backups CNPG →
     #     SeaweedFS (déployé par la phase monitoring). Permet la chaîne DataOps
     #     SANS Ceph (banc léger, ADR 0036).
+    # DÉPENDANCE (ADR 0045) : en mode léger, `dataops` ne déploie PAS SeaweedFS —
+    # il en CONSOMME l'endpoint. Le backing doit donc être posé AVANT (par
+    # `monitoring`). Les chemins `atlas`/`cluster` garantissent cet ordre ;
+    # lancer `dataops` seul en léger sans `monitoring` préalable échouerait.
     local sc backing endpoint
     if [ "${WITH_CEPH:-0}" = 1 ]; then
         sc=rook-ceph-block-replicated
@@ -839,6 +847,60 @@ phase_down() {
     ok "banc démonté — rien ne subsiste"
 }
 
+# ── Chemins d'installation (ADR 0045) ───────────────────────────────────────
+# Trois chemins nommés, du plus court au plus complet. Chacun monte d'abord le
+# SOCLE (up → bootstrap → stockage, avec cache #219), puis ses couches
+# applicatives. L'observabilité (monitoring) est posée TÔT (avant gitops/dataops)
+# pour capter leur démarrage, et fournit le backing S3 SeaweedFS que dataops
+# consomme en mode léger. `all` est conservé comme alias (selon WITH_CEPH).
+#
+# Variable globale `SOCLE_BUILT` (0/1) : posée par run_socle, lue à la fin pour
+# ne consigner QUE les runs from-scratch (drift L49).
+SOCLE_BUILT=0
+
+# Monte le socle (up → bootstrap → stockage selon profil), avec cache du socle
+# (#219). Pose SOCLE_BUILT=1 si le socle a RÉELLEMENT été bâti (pas réutilisé).
+run_socle() {
+    local profil
+    profil=$(metro_profil "${WITH_CEPH:-0}")
+    SOCLE_BUILT=0
+    if metro_cache_valid "${profil}"; then
+        ok "socle réutilisé depuis le cache (clé inchangée) — up/bootstrap sautés (#219)"
+        log "ℹ️  Forcer un rebuild from-scratch (preuve ADR 0034) : NO_CACHE=1 $0 ${TARGET:-all}"
+        return 0
+    fi
+    time_phase up phase_up
+    time_phase bootstrap phase_bootstrap
+    if [ "${WITH_CEPH:-0}" = 1 ]; then
+        time_phase ceph phase_ceph
+        time_phase sc phase_sc
+        log "🎉 Socle monté (mode Ceph) : up → bootstrap → ceph → storageClasses."
+    else
+        time_phase storage-simple phase_storage_simple
+        log "🎉 Socle monté (mode rapide) : up → bootstrap → storage-simple."
+    fi
+    metro_cache_save "${profil}"
+    SOCLE_BUILT=1
+}
+
+# Consigne le run SI from-scratch (socle réellement bâti). Un run sur cache (#219)
+# ne rejoue pas le socle → PHASE_DURATIONS partiel → fausse preuve (drift L49).
+record_if_fresh() {
+    local started=$1
+    if [ "${SOCLE_BUILT}" = 1 ]; then
+        record_full_run "$(( $(date +%s) - started ))"
+    else
+        log "ℹ️  Run sur cache (socle réutilisé) — NON consigné dans runs-history.yaml"
+        log "    (seul un run from-scratch est une preuve ADR 0034/0042 ; NO_CACHE=1 pour consigner)"
+    fi
+}
+
+# Prélude commun aux chemins agrégés : workdir + relevé de durées propre + start.
+chemin_prelude() {
+    mkdir -p "${WORKDIR}"
+    : > "${PHASE_DURATIONS}" # repart d'un relevé propre pour CE run
+}
+
 # ── Dispatch ─────────────────────────────────────────────────────────────────
 case "${1:-}" in
     up) time_phase up phase_up ;;
@@ -852,54 +914,67 @@ case "${1:-}" in
     ceph) time_phase ceph phase_ceph ;;
     sc) time_phase sc phase_sc ;;
     kubeconfig) preflight; fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}" ;;
-    all)
-        # Mode RAPIDE par défaut : stockage simple (local-path), sans Ceph.
-        # WITH_CEPH=1 ajoute le stockage réel (Rook/Ceph + StorageClasses, ~15 min).
-        mkdir -p "${WORKDIR}"
-        : > "${PHASE_DURATIONS}" # repart d'un relevé propre pour CE run
+    # ── socle : up → bootstrap → stockage. Smoke-test rapide (ADR 0045). ──────
+    socle)
+        TARGET=socle
+        chemin_prelude
         run_start=$(date +%s)
-        profil=$(metro_profil "${WITH_CEPH:-0}")
-        # Cache du socle (#219) : on saute up+bootstrap(+ceph+sc) SI le socle en
-        # cache est encore valable (VMs up, cluster Ready, contenu inchangé).
-        # NO_CACHE=1 force le rebuild from-scratch (la PREUVE, ADR 0034).
-        socle_built=0 # 1 seulement si up/bootstrap/storage ont RÉELLEMENT tourné
-        if metro_cache_valid "${profil}"; then
-            ok "socle réutilisé depuis le cache (clé inchangée) — up/bootstrap sautés (#219)"
-            log "ℹ️  Forcer un rebuild from-scratch (preuve ADR 0034) : NO_CACHE=1 $0 all"
-        else
-            time_phase up phase_up
-            time_phase bootstrap phase_bootstrap
-            if [ "${WITH_CEPH:-0}" = 1 ]; then
-                time_phase ceph phase_ceph
-                time_phase sc phase_sc
-                log "🎉 Banc Lima validé (mode Ceph) : up → bootstrap → ceph → storageClasses."
-            else
-                time_phase storage-simple phase_storage_simple
-                log "🎉 Banc Lima validé (mode rapide) : up → bootstrap → storage-simple."
-                log "ℹ️  Pour le stockage réel : WITH_CEPH=1 $0 all  (ou : $0 ceph && $0 sc)"
-            fi
-            metro_cache_save "${profil}" # socle bâti → réutilisable au prochain run
-            socle_built=1
+        run_socle
+        log "🎉 Chemin 'socle' : socle monté (profil $(metro_profil "${WITH_CEPH:-0}"))."
+        record_if_fresh "${run_start}"
+        ;;
+    # ── atlas : socle léger → monitoring → gitops → dataops (ADR 0044/0045). ──
+    # Observabilité d'abord (capte la suite + pose SeaweedFS) ; puis socle GitOps
+    # (Gitea + Argo CD) ; puis l'INFRA DataOps (CNPG/Dagster/Marquez vides — les
+    # workflows atlas viendront par Argo CD, scénario 27 / #231). Profil local-path
+    # (pas de Ceph sur le banc atlas).
+    atlas)
+        TARGET=atlas
+        if [ "${WITH_CEPH:-0}" = 1 ]; then
+            die "chemin 'atlas' = profil local-path (ADR 0044) ; ne pas combiner avec WITH_CEPH=1 (utiliser 'cluster')"
         fi
-        # Socle GitOps (Gitea + Argo CD) PAR-DESSUS le socle, hors cache (c'est de
-        # l'applicatif, pas le socle cluster). Profil banc atlas = local-path, donc
-        # uniquement en mode léger (ADR 0044 ; le mode Ceph cible d'autres preuves).
-        if [ "${WITH_CEPH:-0}" != 1 ]; then
+        chemin_prelude
+        run_start=$(date +%s)
+        run_socle
+        time_phase monitoring phase_monitoring
+        time_phase gitops phase_gitops
+        time_phase dataops phase_dataops
+        log "🎉 Chemin 'atlas' : monitoring → gitops → dataops (infra DataOps vide)."
+        log "ℹ️  Workflows atlas par GitOps : scénario 27 (#231)."
+        record_if_fresh "${run_start}"
+        ;;
+    # ── cluster : socle Ceph → datalake → monitoring → dataops (ADR 0045). ────
+    # Preuve stockage réel : Ceph + RGW. Pas de GitOps dans ce chemin.
+    cluster)
+        TARGET=cluster
+        WITH_CEPH=1
+        chemin_prelude
+        run_start=$(date +%s)
+        run_socle
+        time_phase datalake phase_datalake
+        time_phase monitoring phase_monitoring
+        time_phase dataops phase_dataops
+        log "🎉 Chemin 'cluster' (Ceph) : datalake → monitoring → dataops."
+        record_if_fresh "${run_start}"
+        ;;
+    # ── all : alias de compatibilité (ADR 0045). ─────────────────────────────
+    # WITH_CEPH=1 → comportement historique (socle Ceph) ; sinon → chemin 'atlas'.
+    all)
+        chemin_prelude
+        run_start=$(date +%s)
+        if [ "${WITH_CEPH:-0}" = 1 ]; then
+            TARGET=all
+            run_socle
+            log "🎉 'all' (mode Ceph) : socle monté. (Chemin nommé : 'cluster' pour datalake/dataops.)"
+        else
+            TARGET=atlas
+            run_socle
+            time_phase monitoring phase_monitoring
             time_phase gitops phase_gitops
-            log "🎉 Socle GitOps déployé : Gitea (forge) + Argo CD (moteur)."
+            time_phase dataops phase_dataops
+            log "🎉 'all' (mode léger) = chemin 'atlas' : monitoring → gitops → dataops."
         fi
-        # Consigne le run dans runs-history.yaml UNIQUEMENT s'il est from-scratch
-        # (socle réellement bâti). Un run sur CACHE (#219) ne rejoue pas up/
-        # bootstrap/storage : ses PHASE_DURATIONS sont partiels (p. ex. `gitops`
-        # seul) — le consigner produirait une fausse preuve (total_s tronqué,
-        # phases manquantes) qui tromperait le garde-fou de fraîcheur (ADR 0042).
-        # Seul un run from-scratch est LA preuve (ADR 0034 ; cf. NO_CACHE=1).
-        if [ "${socle_built}" = 1 ]; then
-            record_full_run "$(( $(date +%s) - run_start ))"
-        else
-            log "ℹ️  Run sur cache (socle réutilisé) — NON consigné dans runs-history.yaml"
-            log "    (seul un run from-scratch est une preuve ADR 0034/0042 ; NO_CACHE=1 pour consigner)"
-        fi
+        record_if_fresh "${run_start}"
         ;;
     status) phase_status ;;
     down) phase_down ;;
