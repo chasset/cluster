@@ -687,3 +687,20 @@ drifts:
       explicite, PAS d'entrée. Seul un run from-scratch est une preuve (ADR
       0034/0042 ; NO_CACHE=1 pour forcer). Fausse entrée a855ec8 retirée.
     statut: corrige
+
+  - id: L50
+    campagne: "chemins d'installation + scénarios atlas (#237)"
+    portee: harnais
+    symptome: >-
+      `KUBECONFIG=test/lima/.work/kubeconfig ONLY=… test/scenarios/run-all.sh`
+      (chemin RELATIF) : tous les scénarios échouent ou skippent à tort
+      (`connection to localhost:8080 refused`), alors qu'un `kubectl` direct avec
+      le même kubeconfig joint bien le cluster.
+    cause: >-
+      `run-all.sh` fait `cd "$(dirname …)"` (dans test/scenarios/) au démarrage.
+      Un KUBECONFIG en chemin relatif au CWD d'appel devient invalide après ce
+      `cd` → kubectl retombe sur le contexte par défaut (localhost:8080).
+    correctif: >-
+      Résoudre KUBECONFIG en chemin ABSOLU AVANT le `cd` (si défini et relatif).
+      Validé : ONLY=24 avec KUBECONFIG relatif passe (Prometheus 22 targets UP).
+    statut: corrige
