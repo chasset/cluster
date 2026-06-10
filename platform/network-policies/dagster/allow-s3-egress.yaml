@@ -1,0 +1,38 @@
+# Egress des pods Dagster (run workers K8sRunLauncher, code-locations) vers le
+# backing S3 du datalake — les jobs d'ingestion ÉCRIVENT leurs objets dans S3 :
+#   - Banc léger : SeaweedFS (ns `s3`, port 8333).
+#   - Topologie bare-metal : RGW Ceph (ns `rook-ceph`, port 80).
+# Indispensable sous default-deny (ADR 0019) : sans cette policy, un
+# `rclone copy → S3 interne` depuis un pod de run est DROPPÉ (TCP SYN sans
+# réponse) → retries en boucle, transferts « ~100× plus lents » voire timeouts
+# (diagnostic issue #264 — le coupable réel, pas le throttling CPU).
+# podSelector {} : les run workers sont éphémères, labels non maîtrisés ici
+# (même idiome que les autres egress du ns).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-s3-egress
+  namespace: dagster
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Banc léger : SeaweedFS.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: s3
+      ports:
+        - protocol: TCP
+          port: 8333
+    # Topologie Ceph : RGW (Service rook-ceph-rgw-datalake:80, pod 8080).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rook-ceph
+      ports:
+        - protocol: TCP
+          port: 80 # Service RGW
+        - protocol: TCP
+          port: 8080 # port du POD rgw (cible réelle après DNAT — piège L53)
