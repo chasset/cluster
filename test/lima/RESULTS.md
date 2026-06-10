@@ -627,3 +627,37 @@ Verdict du harnais :
 > n'était PAS en cause), la cause isolée dans la fonction `egress_probe_code`,
 > le correctif porté dans `run-phases.sh` (code versionné), puis **re-prouvé par
 > un run** — jamais corrigé par un `kubectl`/patch laissé en l'état.
+
+## Chemin atlas opérationnel pour atlas — scénarios 27/28 + metrics-server (#252/#256, 2026-06-10)
+
+Objectif : **le chemin `atlas` doit livrer un banc consommable par les
+développements du dépôt `atlas`**. Vérifié sur le banc `atlas` (`local-path`,
+`multi-node-3` arm64) en complétant l'état (`gitops-seed` + Gateways via
+`access.sh --no-hosts`), puis en jouant les scénarios d'intégration en mode
+**STRICT** :
+
+| Preuve                                      | Résultat                                                                           |
+| ------------------------------------------- | ---------------------------------------------------------------------------------- |
+| **metrics-server** (`phase_metrics_server`) | ✅ APIService `Available:True`, `kubectl top nodes` opérant (#252, L58)            |
+| **Scénario 27** (`STRICT_GITOPS=1`)         | ✅ push Gitea → webhook → Argo CD `Synced/Healthy` → run Dagster → lineage Marquez |
+| **Scénario 28** (`STRICT_UI=1`)             | ✅ 5 UI via Gateway : argocd 200, dagster 200, gitea 403, marquez 200, grafana 302 |
+
+Corrections de fond apportées au chemin (code versionné) :
+
+- **metrics-server** désormais posé nativement par le chemin `atlas` (palier 1,
+  avant `monitoring`) — plus de `kubectl apply` manuel (#252).
+- **NP `allow-internet-egress`** ajoutée à la loop du rôle `platform-dagster` :
+  elle existait dans le repo mais n'était PAS posée from-scratch → le sync
+  OpenAlex serait resté coupé (#256).
+- **Disques bruts conditionnés à Ceph** dans `phase_up` (#235) : le banc léger
+  ne crée plus que le disque OS.
+
+> **Réserve d'honnêteté (ADR 0034/0046) — à re-prouver from-scratch.** Sur ce
+> run, la NP egress et `metrics-server` ont été observés sur un banc dont l'état
+> avait été **complété à la main** (l'Application, les Gateways, et la NP egress
+> posés hors `bootstrap`). Trois choses ne sont donc PAS encore prouvées par un
+> run **from-scratch** : (a) que le rôle `platform-dagster` pose bien
+> `allow-internet-egress` tout seul ; (b) l'enchaînement complet du chemin avec
+> `metrics-server` à sa place ; (c) le `phase_up` léger #235 (VMs **sans**
+> disque brut). À couvrir par un `run-phases.sh atlas` (léger) **et** un
+> `WITH_CEPH=1 … all` from-scratch, runs consignés ici.
