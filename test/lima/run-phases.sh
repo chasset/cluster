@@ -10,9 +10,10 @@
 # À lancer depuis le POSTE DE CONTRÔLE (Mac), pas dans une VM.
 #
 # Usage :
-#   test/lima/run-phases.sh up             # crée disques bruts + VMs + gate vd* présents
+#   test/lima/run-phases.sh up             # VMs + (si WITH_CEPH=1) disques bruts + gate vd* (#235)
 #   test/lima/run-phases.sh bootstrap      # bootstrap Ansible + Cilium + gate 3 nœuds Ready
 #   test/lima/run-phases.sh storage-simple # local-path-provisioner (rapide) + gate PVC Bound
+#   test/lima/run-phases.sh metrics-server # Metrics API (kubectl top) + gate APIService Available (#252)
 #   test/lima/run-phases.sh platform-prereqs # CRDs Gateway API + containerd insecure-registry
 #   test/lima/run-phases.sh ceph           # Rook-Ceph (metadataDevice=vde) + gate HEALTH_OK
 #   test/lima/run-phases.sh sc             # StorageClasses Ceph + gate PVC Bound
@@ -26,7 +27,7 @@
 #   test/lima/run-phases.sh monitoring     # observabilité (Prometheus + Grafana + Loki), profil selon WITH_CEPH
 #   ── Chemins d'installation nommés (ADR 0045) ──
 #   test/lima/run-phases.sh socle          # up → bootstrap → stockage (smoke rapide)
-#   test/lima/run-phases.sh atlas          # socle léger → monitoring → gitops → dataops (banc atlas, local-path)
+#   test/lima/run-phases.sh atlas          # socle léger → metrics-server → monitoring → gitops → dataops → gitops-seed (banc atlas, local-path)
 #   test/lima/run-phases.sh storage-real   # socle Ceph → datalake → smoke S3 (RGW) + montage WordPress (preuve stockage réel)
 #   test/lima/run-phases.sh cluster-dataops # socle Ceph → datalake → monitoring → dataops (chaîne DataOps sur Ceph)
 #   test/lima/run-phases.sh atlas-ceph     # banc atlas COMPLET sur Ceph : datalake → monitoring → gitops → dataops → gitops-seed + UI (#232)
@@ -272,25 +273,40 @@ POD
 # ── Phase 0 — VMs Lima + disques bruts ───────────────────────────────────────
 phase_up() {
     preflight
-    log "Phase 0 — VMs Lima + disques bruts"
+    # Disques bruts = SEULEMENT en mode Ceph (#235) : local-path provisionne sur
+    # le filesystem du nœud (disque OS vda), Rook-Ceph est le seul à consommer
+    # vdb/vdc/vdd (data) + vde (block.db). En mode léger on ne crée donc que le
+    # disque OS — up/down plus rapides, pas de réservation disque inutile.
+    local with_ceph="${WITH_CEPH:-0}"
+    log "Phase 0 — VMs Lima$([ "${with_ceph}" = 1 ] && echo " + disques bruts (Ceph)" || echo " (local-path : disque OS seul)")"
     mkdir -p "${WORKDIR}"
     local entry vm role
     for entry in "${NODES[@]}"; do
         vm="${entry%%:*}"
         role="${entry##*:}"
-        # Disques bruts (créés AVANT le start ; idempotent).
-        local i
-        for i in $(seq 1 "${HDD_COUNT}"); do
-            lima_disk_create "${vm}-hdd${i}" "${HDD_SIZE}"
-        done
-        lima_disk_create "${vm}-blockdb" "${BLOCKDB_SIZE}"
-        # Config VM rendue (additionalDisks ; portForward API pour le CP) puis start.
+        local disks=""
+        if [ "${with_ceph}" = 1 ]; then
+            # Disques bruts (créés AVANT le start ; idempotent).
+            local i
+            for i in $(seq 1 "${HDD_COUNT}"); do
+                lima_disk_create "${vm}-hdd${i}" "${HDD_SIZE}"
+            done
+            lima_disk_create "${vm}-blockdb" "${BLOCKDB_SIZE}"
+            disks="$(node_disks "${vm}")"
+        fi
+        # Config VM rendue (additionalDisks SI Ceph ; portForward API pour le CP)
+        # puis start. disks vide ⇒ lima_render_node n'écrit pas additionalDisks.
         local cfg="${WORKDIR}/${vm}.yaml" api_port=""
         [ "${role}" = control ] && api_port="${API_PORT}"
-        lima_render_node "${cfg}" "${VM_CPUS}" "${VM_MEMORY}" "${VM_DISK}" "$(node_disks "${vm}")" "${api_port}"
+        lima_render_node "${cfg}" "${VM_CPUS}" "${VM_MEMORY}" "${VM_DISK}" "${disks}" "${api_port}"
         lima_start_node "${vm}" "${cfg}"
     done
 
+    # GATE disques : SEULEMENT en mode Ceph (sans Ceph, aucun disque brut attendu).
+    if [ "${with_ceph}" != 1 ]; then
+        ok "mode local-path : pas de disque brut attendu (#235)"
+        return 0
+    fi
     # GATE : disques data bruts présents (vdb) + block.db (vde) sur chaque nœud.
     # NB : `limactl shell <vm> '<cmd avec |>'` ne passe PAS par un shell → on
     # enveloppe dans `sh -c`. Lima attache aussi un disque cidata (vdf, iso9660,
@@ -367,6 +383,29 @@ phase_storage_simple() {
     "${KUBECTL[@]}" -n local-path-storage rollout status deploy/local-path-provisioner --timeout=120s
     set_default_sc local-path
     gate_test_pvc local-path
+}
+
+# ── Phase metrics-server — Metrics API (kubectl top) ─────────────────────────
+# Palier 1 AUTONOME (ADR 0016, #252) : pas de dépendance Prometheus. Sans cette
+# brique, `kubectl top nodes/pods` renvoie « Metrics API not available » — un
+# développeur atlas qui consomme le banc n'a aucune visibilité usage CPU/RAM.
+# Le chemin `atlas` la posait PAS (drift L58) ; on la rend native. Gate = l'API
+# agrégée `v1beta1.metrics.k8s.io` passe Available:True (ce qui rend `top` opérant,
+# pas seulement le Deployment Ready). Idempotent.
+phase_metrics_server() {
+    preflight
+    [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
+    log "Phase metrics-server — Metrics API (kubectl top)"
+    "${KUBECTL[@]}" apply -f "${REPO}/platform/metrics-server/metrics-server.yaml"
+    "${KUBECTL[@]}" -n kube-system rollout status deploy/metrics-server --timeout=120s
+    # shellcheck disable=SC2329  # invoquée indirectement par `retry`
+    metrics_api_available() {
+        [ "$("${KUBECTL[@]}" get apiservice v1beta1.metrics.k8s.io \
+            -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null)" = "True" ]
+    }
+    retry 120 5 metrics_api_available \
+        || die "Metrics API v1beta1.metrics.k8s.io pas Available : $("${KUBECTL[@]}" get apiservice v1beta1.metrics.k8s.io -o wide 2>&1 | tail -3)"
+    ok "Metrics API disponible — kubectl top nodes/pods opérant"
 }
 
 # ── Phase platform-prereqs — pré-requis transverses de la couche plateforme ──
@@ -1183,6 +1222,7 @@ case "${1:-}" in
     up) time_phase up phase_up ;;
     bootstrap) time_phase bootstrap phase_bootstrap ;;
     storage-simple) time_phase storage-simple phase_storage_simple ;;
+    metrics-server) time_phase metrics-server phase_metrics_server ;;
     platform-prereqs) time_phase platform-prereqs phase_platform_prereqs ;;
     datalake) time_phase datalake phase_datalake ;;
     smoke-s3) time_phase smoke-s3 phase_smoke_s3 ;;
@@ -1220,6 +1260,9 @@ case "${1:-}" in
         run_start=$(date +%s)
         run_socle
         run_hardening_if_requested
+        # metrics-server AVANT monitoring : palier 1 autonome (#252), rend
+        # `kubectl top` opérant dès le socle — un dev atlas voit l'usage CPU/RAM.
+        time_phase metrics-server phase_metrics_server
         time_phase monitoring phase_monitoring
         time_phase gitops phase_gitops
         time_phase dataops phase_dataops
@@ -1227,7 +1270,7 @@ case "${1:-}" in
         # l'image émetteur (buildée par dataops) et cible le ns dagster (monté
         # par dataops). Argo CD réconcilie ensuite le workflow depuis Gitea.
         time_phase gitops-seed phase_gitops_seed
-        log "🎉 Chemin 'atlas' : monitoring → gitops → dataops → gitops-seed."
+        log "🎉 Chemin 'atlas' : metrics-server → monitoring → gitops → dataops → gitops-seed."
         log "ℹ️  Preuve e2e des workflows atlas par GitOps : scénario 27 (#231)."
         log "👉 Accès dev (URLs *.cluster.lan + secrets + .env atlas) : test/lima/access.sh (ADR 0048)."
         record_if_fresh "${run_start}"
