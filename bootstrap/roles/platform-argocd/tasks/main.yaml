@@ -74,7 +74,7 @@
       retries: '{{ argocd_ready_retries }}'
       delay: '{{ argocd_ready_delay }}'
 
-  # Rollback AU PLUS PRÈS (ADR 0036 #236) : un apply k8s est DÉCLARATIF/idempotent
+  # Rollback AU PLUS PRÈS (ADR 0050, issue #236) : un apply k8s est DÉCLARATIF/idempotent
   # — un « rollback » qui supprimerait Argo CD serait contre-productif (on veut
   # réparer, pas tout défaire, et un re-run reprend là où ça a cassé). Le rescue
   # utile ici est DIAGNOSTIQUE : capturer l'état réel (pods non prêts, derniers

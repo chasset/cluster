@@ -99,6 +99,7 @@
       ansible.builtin.command: containerd config default
       register: containerd_default
       changed_when: false
+      check_mode: false # lecture pure consommée en aval — doit tourner même en --check (ADR 0051)
 
     - name: Write containerd config with the systemd cgroup driver
       ansible.builtin.copy:
