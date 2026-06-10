@@ -159,8 +159,10 @@ record_full_run() {
     profil=$(metro_profil "${WITH_CEPH:-0}")
     # Échantillonnage Prometheus sur la fenêtre du run (best-effort, non bloquant).
     block=$(METRO_METRICS_BLOCK='' metro_sample_prometheus "${total}" || true)
+    # TARGET (chemin nommé courant, suffixe +hardening inclus) consigné pour la
+    # fraîcheur PAR CHEMIN (ADR 0045 §6 / #244).
     METRO_METRICS_BLOCK="${block}" \
-        metro_record_run "${profil}" "multi-node-3" "${total}" "${PHASE_DURATIONS}"
+        metro_record_run "${profil}" "multi-node-3" "${total}" "${PHASE_DURATIONS}" "${TARGET:-}"
 }
 
 # Noms des disques nommés Lima d'un nœud (data hdd1..N + blockdb).

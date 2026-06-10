@@ -164,3 +164,69 @@ setup() {
     out=$(metro_sample_prometheus 600 2>/dev/null)
     [ -z "$out" ]
 }
+
+# ─── metro_last_date_for_target (fraîcheur par chemin, #244) ──────────────────
+
+# Fixture : trois chemins, dont un atlas+hardening (replié sur atlas) et deux
+# entrées atlas (la 2ᵉ plus récente doit gagner).
+hist_fixture() {
+    cat <<'YAML'
+runs:
+  - id: 2026-01-01T00-local-path-aaa
+    target: atlas
+    date: 2026-01-01T00:00:00Z
+  - id: 2026-02-01T00-ceph-bbb
+    target: storage-real
+    date: 2026-02-01T00:00:00Z
+  - id: 2026-03-01T00-local-path-ccc
+    target: atlas+hardening
+    date: 2026-03-01T00:00:00Z
+YAML
+}
+
+@test "metro_last_date_for_target : atlas capte le run atlas+hardening (repli)" {
+    run bash -c 'source "'"${BATS_TEST_DIRNAME}"'/../lima/metrology.sh"; '"$(declare -f hist_fixture)"'; hist_fixture | metro_last_date_for_target atlas'
+    [ "$output" = "2026-03-01T00:00:00Z" ]
+}
+
+@test "metro_last_date_for_target : storage-real isolé de atlas" {
+    run bash -c 'source "'"${BATS_TEST_DIRNAME}"'/../lima/metrology.sh"; '"$(declare -f hist_fixture)"'; hist_fixture | metro_last_date_for_target storage-real'
+    [ "$output" = "2026-02-01T00:00:00Z" ]
+}
+
+@test "metro_last_date_for_target : chemin sans run → vide" {
+    run bash -c 'source "'"${BATS_TEST_DIRNAME}"'/../lima/metrology.sh"; '"$(declare -f hist_fixture)"'; hist_fixture | metro_last_date_for_target cluster-dataops'
+    [ -z "$output" ]
+}
+
+@test "metro_last_date_for_target : deux runs même chemin → le plus récent" {
+    run bash -c 'printf "runs:\n  - id: a\n    target: atlas\n    date: 2026-01-01T00:00:00Z\n  - id: b\n    target: atlas\n    date: 2026-05-01T00:00:00Z\n" | { source "'"${BATS_TEST_DIRNAME}"'/../lima/metrology.sh"; metro_last_date_for_target atlas; }'
+    [ "$output" = "2026-05-01T00:00:00Z" ]
+}
+
+# ─── metro_seuil_for_target (cadences ADR 0045 §6, #244) ──────────────────────
+
+@test "metro_seuil_for_target : atlas → 7" {
+    run metro_seuil_for_target atlas
+    [ "$output" = "7" ]
+}
+
+@test "metro_seuil_for_target : storage-real → 30" {
+    run metro_seuil_for_target storage-real
+    [ "$output" = "30" ]
+}
+
+@test "metro_seuil_for_target : cluster-dataops → 90" {
+    run metro_seuil_for_target cluster-dataops
+    [ "$output" = "90" ]
+}
+
+@test "metro_seuil_for_target : surcharge par env SEUIL_STORAGE_REAL" {
+    SEUIL_STORAGE_REAL=45 run metro_seuil_for_target storage-real
+    [ "$output" = "45" ]
+}
+
+@test "metro_seuil_for_target : chemin inconnu → SEUIL_JOURS (défaut 7)" {
+    run metro_seuil_for_target inconnu
+    [ "$output" = "7" ]
+}
