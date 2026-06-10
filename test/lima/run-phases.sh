@@ -800,6 +800,17 @@ phase_gitops_seed() {
     log "Preuve e2e : test/scenarios/27-gitops-workflow-deploy.sh"
 }
 
+# ── Phase access — accès développeur (URLs cliquables + secrets + .env atlas) ──
+# Délègue à access.sh (#232, ADR 0048) : pose les Gateways des UI, ouvre un
+# forward SSH par Gateway, /etc/hosts *.cluster.lan, regroupe les secrets et
+# génère ../atlas/.env.cluster.local. C'est l'étape qui rend le banc consommable
+# depuis l'hôte (« git push et ça marche »). Args transmis (--no-hosts, --stop…).
+phase_access() {
+    preflight
+    [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'run-phases.sh atlas' d'abord"
+    "${HERE}/access.sh" "$@"
+}
+
 # ── Phase monitoring — observabilité (Prometheus + Grafana + Loki) ───────────
 # Déploie kube-prometheus-stack + Loki via bootstrap/monitoring.yaml (ADR
 # 0016/0036). Profil de stockage choisi selon le mode du banc :
@@ -966,10 +977,14 @@ phase_status() {
     # 3. Liens vers les UIs exposées (port-forward suggéré, pas lancé).
     printf '\n  \033[1mAccès UIs\033[0m (port-forward à lancer si besoin)\n'
     status_ui "API K8s" "https://127.0.0.1:${API_PORT}" ""
-    status_ui_pf "Grafana" monitoring svc/grafana 3000 80
+    # Grafana : le Service du chart s'appelle `kube-prometheus-stack-grafana`
+    # (pas `grafana`) — drift L57. Port-forward de secours ; l'accès recommandé
+    # passe par `access.sh` (Gateway + /etc/hosts, ADR 0048).
+    status_ui_pf "Grafana" monitoring svc/kube-prometheus-stack-grafana 3000 80
     status_ui_pf "Prometheus" monitoring svc/prometheus-operated 9090 9090
     status_ui_pf "Marquez (web)" marquez svc/marquez-web 3000 3000
     status_ui_pf "Dagster" dagster svc/dagster-dagster-webserver 3001 80
+    printf '    %-16s \033[2mtest/lima/access.sh\033[0m → URLs *.cluster.lan cliquables + secrets + .env atlas\n' "Tout (dev)"
 
     status_last_run
 }
@@ -1117,6 +1132,7 @@ case "${1:-}" in
     gitops) time_phase gitops phase_gitops ;;
     gitops-seed) time_phase gitops-seed phase_gitops_seed ;;
     monitoring) time_phase monitoring phase_monitoring ;;
+    access) phase_access "${@:2}" ;;
     ceph) time_phase ceph phase_ceph ;;
     sc) time_phase sc phase_sc ;;
     kubeconfig) preflight; fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}" ;;
@@ -1153,6 +1169,7 @@ case "${1:-}" in
         time_phase gitops-seed phase_gitops_seed
         log "🎉 Chemin 'atlas' : monitoring → gitops → dataops → gitops-seed."
         log "ℹ️  Preuve e2e des workflows atlas par GitOps : scénario 27 (#231)."
+        log "👉 Accès dev (URLs *.cluster.lan + secrets + .env atlas) : test/lima/access.sh (ADR 0048)."
         record_if_fresh "${run_start}"
         ;;
     # ── storage-real : socle Ceph → datalake → smoke S3 + WordPress (ADR 0045). ─
