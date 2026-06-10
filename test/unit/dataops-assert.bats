@@ -134,3 +134,36 @@ setup() {
     run parse_ol_job_count '{"namespaces":[]}'
     [ "$output" = "?" ]
 }
+
+# ─── parse_ansible_changed + classify_idempotence (gate idempotence) ─────────
+
+@test "parse_ansible_changed : somme les changed= du RECAP" {
+    run bash -c 'printf "PLAY RECAP ***\nlocalhost : ok=12 changed=3 unreachable=0 failed=0\ncp1 : ok=5 changed=2 failed=0\n" | { source "'"${BATS_TEST_DIRNAME}"'/../lima/dataops-assert.sh"; parse_ansible_changed; }'
+    [ "$output" = "5" ]
+}
+
+@test "parse_ansible_changed : rejeu idempotent → 0" {
+    run bash -c 'printf "localhost : ok=12 changed=0 unreachable=0 failed=0\n" | { source "'"${BATS_TEST_DIRNAME}"'/../lima/dataops-assert.sh"; parse_ansible_changed; }'
+    [ "$output" = "0" ]
+}
+
+@test "parse_ansible_changed : pas de RECAP → ?" {
+    run bash -c 'printf "rien à voir\n" | { source "'"${BATS_TEST_DIRNAME}"'/../lima/dataops-assert.sh"; parse_ansible_changed; }'
+    [ "$output" = "?" ]
+}
+
+@test "classify_idempotence : 0 → ok" {
+    run classify_idempotence 0
+    [[ "$output" == ok\|* ]]
+}
+
+@test "classify_idempotence : >0 → fail" {
+    run classify_idempotence 4
+    [[ "$output" == fail\|* ]]
+    [[ "$output" == *"4 tâche"* ]]
+}
+
+@test "classify_idempotence : ? → skip" {
+    run classify_idempotence '?'
+    [[ "$output" == skip\|* ]]
+}

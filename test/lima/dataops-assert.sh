@@ -138,3 +138,32 @@ if isinstance(d, dict):
 print("?")
 ' 2>/dev/null || printf '?\n'
 }
+
+# parse_ansible_changed RECAP
+#   Somme les `changed=N` de toutes les lignes du `PLAY RECAP` d'un run
+#   ansible-playbook (passé sur stdin). Sert au gate d'idempotence : un 2ᵉ
+#   passage d'un rôle/playbook idempotent doit donner un total `changed=0`.
+#   Renvoie l'entier total sur stdout, ou "?" si aucune ligne RECAP exploitable.
+#   PUR (grep/sed/awk, pas de réseau). Format Ansible :
+#     host : ok=12 changed=0 unreachable=0 failed=0 skipped=3 ...
+parse_ansible_changed() {
+    local n
+    n=$(grep -oE 'changed=[0-9]+' | grep -oE '[0-9]+' | awk '{s+=$1} END{print s}')
+    [ -n "${n}" ] && printf '%s\n' "${n}" || printf '?\n'
+}
+
+# classify_idempotence CHANGED
+#   Verdict d'idempotence sur le total `changed=` d'un 2ᵉ passage (rejeu) d'une
+#   phase Ansible. Pur.
+#   - "0"        → ok   (idempotent : rien n'a changé au rejeu)
+#   - "?"/vide   → skip (récap illisible — phase non Ansible, ou sortie absente)
+#   - >0         → fail (N tâches « changed » au rejeu : idempotence cassée,
+#                        typiquement un changed_when:true fautif — ADR 0051)
+classify_idempotence() {
+    local changed=${1:-}
+    case "${changed}" in
+        0) printf 'ok|Idempotence : rejeu sans changement (changed=0)\n' ;;
+        '' | '?') printf 'skip|Idempotence : récap Ansible illisible (rejeu non mesuré)\n' ;;
+        *) printf 'fail|Idempotence CASSÉE : %s tâche(s) changed au rejeu (changed_when fautif ? ADR 0051)\n' "${changed}" ;;
+    esac
+}

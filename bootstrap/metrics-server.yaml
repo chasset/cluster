@@ -1,0 +1,38 @@
+---
+# Déploie metrics-server (Metrics API — kubectl top) via le rôle Ansible
+# platform-metrics-server (ADR 0033/0049/0016). Manifeste figé appliqué via
+# kubernetes.core.k8s ; gate sur l'APIService agrégée. Palier 1 autonome (pas de
+# dépendance Prometheus) — à jouer une fois le cluster Ready.
+#
+# Hôte d'exécution k8s : `dataops_k8s_host` (défaut localhost), comme
+# monitoring.yaml / dataops.yaml (kubeconfig rapatrié ; prod : surcharger).
+- name: Metrics API (metrics-server)
+  hosts: "{{ dataops_k8s_host | default('localhost') }}"
+  gather_facts: false
+  # PAS d'audit-log ici : ce play pilote k8s depuis l'HÔTE (localhost), il
+  # n'écrit pas dans /var/log d'un nœud (l'audit-log nœud exige sudo + facts,
+  # hors sujet sur localhost — cf. monitoring.yaml / gitops.yaml qui ne
+  # l'appellent pas non plus). L'audit-log reste réservé aux plays « nœuds ».
+  pre_tasks:
+    # kubernetes.core exige la lib Python `kubernetes` ; certifi fournit le CA.
+    - name: Ensure the Python kubernetes client is present
+      ansible.builtin.pip:
+        name:
+          - kubernetes
+          - certifi
+        state: present
+    - name: Resolve the certifi CA bundle path
+      ansible.builtin.command: "{{ ansible_python_interpreter | default('python3') }} -c 'import certifi; print(certifi.where())'"
+      register: metrics_certifi
+      changed_when: false
+      check_mode: false
+    - name: Set the CA bundle for HTTPS requests
+      ansible.builtin.set_fact:
+        metrics_ca_bundle: '{{ metrics_certifi.stdout | trim }}'
+  environment:
+    SSL_CERT_FILE: '{{ metrics_ca_bundle | default(omit) }}'
+  tasks:
+    - name: Metrics API (metrics-server)
+      ansible.builtin.import_role:
+        name: platform-metrics-server
+      tags: metrics-server

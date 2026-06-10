@@ -1,0 +1,13 @@
+---
+# Valeurs par défaut du rôle platform-local-path (ADR 0033/0049).
+# Provisioner local-path (banc léger / profil sans Ceph) — manifeste vendored
+# figé appliqué via kubernetes.core.k8s.
+
+platform_repo_dir: '{{ playbook_dir }}/..'
+
+# Nom de la StorageClass à marquer « default » du cluster.
+local_path_storage_class: local-path
+
+# Attente du provisioner Ready.
+local_path_ready_retries: 24
+local_path_ready_delay: 5
