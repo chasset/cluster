@@ -1,0 +1,41 @@
+# code: language=ansible
+# Rôle platform-metrics-server (ADR 0033/0049/0016) — Metrics API (kubectl top).
+# Porte la phase shell `phase_metrics_server` (test/lima/run-phases.sh) en rôle
+# Ansible : manifeste officiel figé (platform/metrics-server/metrics-server.yaml,
+# épinglé par digest ADR 0006) appliqué via kubernetes.core.k8s, puis gate sur
+# l'APIService agrégée v1beta1.metrics.k8s.io (ce qui rend `kubectl top` opérant,
+# pas seulement le Deployment Ready).
+- name: Deploy metrics-server
+  run_once: true
+  block:
+    - name: Apply metrics-server manifest
+      kubernetes.core.k8s:
+        state: present
+        src: '{{ platform_repo_dir }}/platform/metrics-server/metrics-server.yaml'
+
+    - name: Wait for the metrics-server Deployment to be Ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        name: metrics-server
+        namespace: kube-system
+      register: metrics_server_deploy
+      until: >-
+        metrics_server_deploy.resources | length > 0
+        and (metrics_server_deploy.resources[0].status.readyReplicas | default(0)) == 1
+      retries: '{{ metrics_server_ready_retries }}'
+      delay: '{{ metrics_server_ready_delay }}'
+
+    # Gate réel : l'API agrégée doit passer Available:True (kubectl top opérant).
+    - name: Wait for the aggregated Metrics API to be Available
+      kubernetes.core.k8s_info:
+        api_version: apiregistration.k8s.io/v1
+        kind: APIService
+        name: v1beta1.metrics.k8s.io
+      register: metrics_apiservice
+      until: >-
+        metrics_apiservice.resources | length > 0
+        and (metrics_apiservice.resources[0].status.conditions
+             | selectattr('type', 'equalto', 'Available')
+             | selectattr('status', 'equalto', 'True') | list | length) > 0
+      retries: '{{ metrics_server_ready_retries }}'
+      delay: '{{ metrics_server_ready_delay }}'

@@ -1,0 +1,10 @@
+---
+# Valeurs par défaut du rôle platform-metrics-server (ADR 0033/0049/0016).
+# Metrics API (kubectl top) — manifeste officiel figé (platform/metrics-server/),
+# appliqué via kubernetes.core.k8s (pas de .j2 du rendu, ADR 0051).
+
+platform_repo_dir: '{{ playbook_dir }}/..'
+
+# Attente de disponibilité de l'API agrégée (rend `kubectl top` opérant).
+metrics_server_ready_retries: 24
+metrics_server_ready_delay: 5

@@ -165,6 +165,34 @@ record_full_run() {
         metro_record_run "${profil}" "multi-node-3" "${total}" "${PHASE_DURATIONS}" "${TARGET:-}"
 }
 
+# Joue un playbook Ansible de plateforme (depuis l'hôte, kubeconfig banc) PUIS
+# prouve son IDEMPOTENCE en le REJOUANT : un rôle idempotent doit donner
+# `changed=0` au 2ᵉ passage (gate d'idempotence — décision « pas de Molecule, on
+# prouve par le banc » ; attrape les changed_when:true fautifs, ADR 0051). Le
+# verdict passe par la fonction PURE classify_idempotence (testée bats).
+# Args : $1 = chemin du playbook (relatif à REPO), puis args -e supplémentaires.
+run_ansible_phase() {
+    local playbook=$1; shift
+    # shellcheck source=test/lima/dataops-assert.sh
+    . "${HERE}/dataops-assert.sh"
+    # 1er passage : déploie (échec dur si le playbook échoue).
+    KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
+        "${REPO}/${playbook}" -e dataops_k8s_host=localhost "$@" \
+        || die "${playbook} : échec du déploiement"
+    # 2e passage : rejeu pour prouver l'idempotence (capture le PLAY RECAP).
+    log "  rejeu idempotence — ${playbook}"
+    local recap changed verdict
+    recap=$(KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
+        "${REPO}/${playbook}" -e dataops_k8s_host=localhost "$@" 2>&1 | tail -20)
+    changed=$(printf '%s\n' "${recap}" | parse_ansible_changed)
+    verdict=$(classify_idempotence "${changed}")
+    case "${verdict%%|*}" in
+        ok) ok "${verdict#*|}" ;;
+        skip) log "    ${verdict#*|}" ;;
+        *) die "${verdict#*|}" ;;
+    esac
+}
+
 # Noms des disques nommés Lima d'un nœud (data hdd1..N + blockdb).
 node_disks() {
     local vm=$1 i
@@ -391,22 +419,16 @@ phase_storage_simple() {
 # Palier 1 AUTONOME (ADR 0016, #252) : pas de dépendance Prometheus. Sans cette
 # brique, `kubectl top nodes/pods` renvoie « Metrics API not available » — un
 # développeur atlas qui consomme le banc n'a aucune visibilité usage CPU/RAM.
-# Le chemin `atlas` la posait PAS (drift L58) ; on la rend native. Gate = l'API
-# agrégée `v1beta1.metrics.k8s.io` passe Available:True (ce qui rend `top` opérant,
-# pas seulement le Deployment Ready). Idempotent.
+# PORTÉ EN RÔLE ANSIBLE (platform-metrics-server, ADR 0033/0049) : le manifeste
+# figé n'est plus appliqué en kubectl shell ici mais par le playbook, qui gate
+# sur l'APIService agrégée Available:True (kubectl top opérant) — et le rejeu
+# prouve l'idempotence. Anti-double-source : aucun kubectl d'apply dans la phase.
 phase_metrics_server() {
     preflight
     [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
-    log "Phase metrics-server — Metrics API (kubectl top)"
-    "${KUBECTL[@]}" apply -f "${REPO}/platform/metrics-server/metrics-server.yaml"
-    "${KUBECTL[@]}" -n kube-system rollout status deploy/metrics-server --timeout=120s
-    # shellcheck disable=SC2329  # invoquée indirectement par `retry`
-    metrics_api_available() {
-        [ "$("${KUBECTL[@]}" get apiservice v1beta1.metrics.k8s.io \
-            -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' 2>/dev/null)" = "True" ]
-    }
-    retry 120 5 metrics_api_available \
-        || die "Metrics API v1beta1.metrics.k8s.io pas Available : $("${KUBECTL[@]}" get apiservice v1beta1.metrics.k8s.io -o wide 2>&1 | tail -3)"
+    [ -f "${INVENTORY}" ] || die "inventaire absent — lancer 'bootstrap' d'abord"
+    log "Phase metrics-server — Metrics API (kubectl top) via Ansible"
+    run_ansible_phase bootstrap/metrics-server.yaml
     ok "Metrics API disponible — kubectl top nodes/pods opérant"
 }
 
