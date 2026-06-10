@@ -1,13 +1,16 @@
 name: Bench freshness
 
-# Garde-fou de fraîcheur des preuves de banc (ADR 0042). Le banc Lima NE PEUT
-# PAS tourner en CI (nested virt, arm64, ~30 min) : ce workflow n'EXÉCUTE pas
-# l'e2e — il OBSERVE la date du dernier run consigné (test/lima/runs-history.yaml)
-# et ALERTE quand elle dépasse le seuil. NON BLOQUANT : cron seulement, jamais
-# sur `push`/`pull_request`, donc aucune PR n'est verrouillée par la fraîcheur.
+# Garde-fou de fraîcheur des preuves de banc (ADR 0042 amendé / ADR 0045 §6). Le
+# banc Lima NE PEUT PAS tourner en CI (nested virt, arm64, ~30 min) : ce workflow
+# n'EXÉCUTE pas l'e2e — il OBSERVE la date du dernier run de CHAQUE chemin nommé
+# (test/lima/runs-history.yaml, champ `target`) et ALERTE quand l'un dépasse SA
+# cadence (atlas 7 j, storage-real 30 j ; cluster-dataops 90 j en warn-only). Un
+# run atlas frais ne masque donc plus un storage-real périmé (#244). NON BLOQUANT
+# : cron seulement, jamais sur `push`/`pull_request`.
 #
-# Cron quotidien (08:00 UTC). Au-delà du seuil (7 j, ADR 0042 §2), le job échoue
-# de façon VISIBLE et ouvre/met à jour une issue de rappel.
+# Cron quotidien (08:00 UTC). Si un chemin obligatoire dépasse sa cadence, le job
+# échoue de façon VISIBLE et ouvre/met à jour une issue de rappel nommant le(s)
+# chemin(s) périmé(s).
 on:
   schedule:
     - cron: '0 8 * * *'
@@ -55,8 +58,11 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUMMARY: ${{ steps.check.outputs.summary }}
         run: |
-          TITLE="⏰ Preuve de banc périmée — relancer test/lima/run-phases.sh all"
-          BODY=$(printf '%s\n\n— Détecté par .github/workflows/bench-freshness.yml (ADR 0042). Refermer après un run consigné.' "$SUMMARY")
+          TITLE="⏰ Preuve de banc périmée — relancer le(s) chemin(s) concerné(s)"
+          NOTE="— Détecté par bench-freshness.yml (ADR 0042 / ADR 0045 §6). Le détail"
+          NOTE="${NOTE} ci-dessus nomme le(s) chemin(s) périmé(s) ; relancer ce(s) chemin(s)"
+          NOTE="${NOTE} (test/lima/run-phases.sh <chemin>) et committer le run. Refermer ensuite."
+          BODY=$(printf '%s\n\n%s' "$SUMMARY" "$NOTE")
           EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number' --repo "$GITHUB_REPOSITORY")
           if [ -n "$EXISTING" ]; then
             gh issue comment "$EXISTING" --body "$BODY" --repo "$GITHUB_REPOSITORY"

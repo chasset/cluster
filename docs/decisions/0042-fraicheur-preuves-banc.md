@@ -38,6 +38,16 @@ dernier run consigné dépasse un seuil — sans bloquer les PR.**
    sur le poste) n'est pas tenable (week-ends, congés → alerte permanente, donc
    ignorée). Un seuil **hebdomadaire** garde la pression sur la fraîcheur tout
    en restant réaliste. Le seuil est une **variable** du workflow, ajustable.
+
+   > **Amendé (ADR 0045 §6 / #244) : seuil PAR CHEMIN.** Le seuil unique global
+   > masquait l'asymétrie entre chemins (un `atlas` frais cachait un
+   > `storage-real` périmé). Le garde-fou lit désormais le `target` de chaque
+   > entrée et compare le **dernier run de chaque chemin** à **sa** cadence —
+   > `atlas` 7 j et `storage-real` 30 j (obligatoires), `cluster-dataops` 90 j
+   > (warn-only) — surchargeables par `SEUIL_ATLAS` / `SEUIL_STORAGE_REAL` /
+   > `SEUIL_CLUSTER_DATAOPS`. Les 7 j ci-dessus restent le défaut d'`atlas` et
+   > le repli global si l'historique n'a pas de `target`.
+
 3. **Source de fraîcheur = un champ daté machine-lisible**, pas le mtime Git (le
    checkout CI ne préserve pas les dates de fichiers). Le run consigne sa date
    dans un artefact versionné dédié — l'**historique des runs**
@@ -69,11 +79,13 @@ l'historique des runs daté (`runs-history.yaml`) dont elle dépend.
 - **Dépendance** : nécessite l'historique des runs daté ; à séquencer après lui.
 - **Anti-faux-positif** : seuil hebdomadaire + variable, pour que l'alerte reste
   un signal utile et non un bruit permanent qu'on finit par ignorer.
-- **Seuil par chemin (à venir, ADR 0045 §6)** : ce cadrage pose **un** seuil
+- **Seuil par chemin (implémenté, #244)** : ce cadrage posait **un** seuil
   global. La matrice de couverture de
   l'[ADR 0045](0045-chemins-installation-banc-couches.md) §6 distingue des
   cadences **par chemin** (`atlas` 7 j, `storage-real` 30 j, `cluster-dataops`
-  90 j) : un run `atlas` frais ne doit plus masquer un `storage-real` périmé. Le
-  garde-fou devra donc lire le **dernier run par `TARGET`** dans
-  `runs-history.yaml` et comparer chacun à **sa** cadence — évolution à porter
-  quand le garde-fou sera implémenté.
+  90 j) : un run `atlas` frais ne doit plus masquer un `storage-real` périmé.
+  C'est désormais en place — le run consigne son `target` dans
+  `runs-history.yaml`, et `check-freshness.sh` lit le **dernier run par chemin**
+  (`metro_last_date_for_target`, `+hardening` replié sur le chemin de base) pour
+  le comparer à **sa** cadence (`metro_seuil_for_target`), en nommant le chemin
+  périmé.

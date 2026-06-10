@@ -55,6 +55,25 @@ metro_freshness_verdict() {
     [ "${age}" -le "${seuil}" ] && printf 'frais' || printf 'perime'
 }
 
+# Seuil de fraîcheur (jours) d'un CHEMIN nommé — cadences ADR 0045 §6. Les
+# défauts sont SURCHARGEABLES par variable d'env `SEUIL_<CHEMIN>` (chemin en
+# majuscules, tirets → underscores : SEUIL_STORAGE_REAL, SEUIL_CLUSTER_DATAOPS).
+# Un chemin inconnu retombe sur SEUIL_JOURS (défaut 7). PUR (lit l'env, pas le fs).
+# Usage : metro_seuil_for_target <chemin>
+metro_seuil_for_target() {
+    local target=$1 var val
+    # Nom de variable d'env dérivé : storage-real → SEUIL_STORAGE_REAL.
+    var="SEUIL_$(printf '%s' "${target}" | tr 'a-z-' 'A-Z_')"
+    eval "val=\${${var}:-}"
+    if [ -n "${val}" ]; then printf '%s' "${val}"; return; fi
+    case "${target}" in
+        atlas) printf '7' ;;
+        storage-real) printf '30' ;;
+        cluster-dataops) printf '90' ;;
+        *) printf '%s' "${SEUIL_JOURS:-7}" ;;
+    esac
+}
+
 # Extrait la date (champ `date:`) de la DERNIÈRE entrée d'un runs-history.yaml
 # passé sur stdin. Renvoie la valeur brute ISO, ou vide si aucune entrée.
 # Pur : ne lit pas le filesystem (le fichier est caté par l'appelant).
@@ -63,6 +82,33 @@ metro_last_date() {
     # tête de liste (`  - date: …`). On capture la valeur après `date:`.
     grep -oE 'date:[[:space:]]*[^[:space:]"'\'']+' | tail -1 \
         | sed -E 's/^date:[[:space:]]*//'
+}
+
+# Extrait la date de la DERNIÈRE entrée d'un runs-history.yaml (stdin) dont le
+# `target:` correspond au CHEMIN demandé. Le suffixe `+hardening` est REPLIÉ sur
+# le chemin de base : pour la fraîcheur, `atlas+hardening` compte comme `atlas`
+# (un run durci prouve aussi que le chemin a tourné récemment — #244). Renvoie la
+# date ISO la plus récente pour ce chemin, ou vide si aucun run. PUR (awk only).
+# Usage : metro_last_date_for_target <chemin>   (ex. atlas, storage-real)
+metro_last_date_for_target() {
+    local want=$1
+    awk -v want="${want}" '
+        # Début d'\''une entrée : "  - id: …" → on remet à zéro l'\''entrée courante.
+        /^[[:space:]]*-[[:space:]]*id:/ { cur_t=""; cur_d=""; next }
+        # target de l'\''entrée courante (on replie +hardening sur le chemin de base).
+        /^[[:space:]]*target:/ {
+            t=$2; sub(/\+.*/, "", t); cur_t=t; maybe()
+        }
+        # date de l'\''entrée courante.
+        /^[[:space:]]*date:/ { cur_d=$2; maybe() }
+        function maybe() {
+            # Dès que target ET date sont connus pour cette entrée et que le
+            # target matche, on retient la date (le fichier est chronologique →
+            # la dernière retenue est la plus récente).
+            if (cur_t == want && cur_d != "") last=cur_d
+        }
+        END { if (last != "") print last }
+    '
 }
 
 # Convertit une durée en secondes au format lisible "<m>m<ss>s".
@@ -124,7 +170,8 @@ metro_history_init() {
 # Une entrée est appendée par run `all` COMPLÉTÉ (test/lima/run-phases.sh). Les
 # valeurs sont génériques (ADR 0023) : pas d'identifiant réel de déploiement.
 #
-# Schéma : id, date (ISO 8601 UTC), branche, commit, profil (ceph|local-path),
+# Schéma : id, [target] (chemin nommé : atlas|storage-real|…, +hardening
+# éventuel), date (ISO 8601 UTC), branche, commit, profil (ceph|local-path),
 # topologie, arch, hote, total_s, phases{nom: secondes}, [metriques{…}].
 
 runs:
@@ -135,9 +182,13 @@ HDR
 # Append une entrée de run à l'historique. Appelé en fin de run `all` réussi.
 # Lit la date système UNE fois ici (effet de bord assumé, hors fonctions pures).
 # Args : $1=profil  $2=topologie  $3=total_s  $4=fichier_durees_phase (tsv: nom\tsec)
+#        $5=target (chemin nommé : atlas, storage-real… ; suffixe +hardening
+#           éventuel ; optionnel — omis du YAML si vide, rétrocompat).
 # Optionnel via env : METRO_METRICS_BLOCK = bloc YAML "      metriques:\n …" déjà rendu.
+# Le champ `target` permet au garde-fou de fraîcheur de raisonner PAR CHEMIN
+# (cadence propre, ADR 0045 §6) et pas seulement sur la dernière entrée globale.
 metro_record_run() {
-    local profil=$1 topo=$2 total=$3 phases_tsv=$4
+    local profil=$1 topo=$2 total=$3 phases_tsv=$4 target=${5:-}
     local f iso commit branche arch hote id
     f=$(metro_history_file)
     metro_history_init
@@ -150,6 +201,7 @@ metro_record_run() {
 
     {
         printf '  - id: %s\n' "${id}"
+        [ -n "${target}" ] && printf '    target: %s\n' "${target}"
         printf '    date: %s\n' "${iso}"
         printf '    branche: %s\n' "${branche}"
         printf '    commit: %s\n' "${commit}"

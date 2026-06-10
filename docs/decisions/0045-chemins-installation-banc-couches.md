@@ -235,9 +235,14 @@ Un chemin **optionnel** garde une cadence (lâche) : « optionnel » signifie
 **joué à la demande, vieillit lentement**, jamais **jamais prouvé**.
 
 > Les cadences (7 / 30 / 90 j) sont des **variables** du garde-fou, ajustables
-> comme le seuil unique de l'ADR 0042 — pas des constantes gravées.
-> Implémentation du seuil par chemin : amende l'ADR 0042 (suivi côté #226 /
-> garde-fou).
+> comme le seuil unique de l'ADR 0042 (surcharge `SEUIL_ATLAS`,
+> `SEUIL_STORAGE_REAL`, `SEUIL_CLUSTER_DATAOPS`) — pas des constantes gravées.
+> **Implémenté (#244)** : le run consigne son `target` dans `runs-history.yaml`
+> ; `check-freshness.sh` itère les chemins obligatoires (`atlas`,
+> `storage-real`) avec leur cadence et alerte en nommant le chemin périmé ;
+> `cluster-dataops` est surveillé en warn-only. Le suffixe `+hardening` est
+> replié sur le chemin de base pour la fraîcheur. Amende l'ADR 0042 §2 (seuil
+> unique → seuil par chemin).
 
 ## Statut
 
