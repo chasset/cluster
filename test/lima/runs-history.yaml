@@ -110,3 +110,24 @@ runs:
       cpu_core_s: 1180
       ram_peak_mib: 14796
       ram_mean_mib: 10777
+  - id: 2026-06-10T02-local-path-e6c8b5b
+    date: 2026-06-10T02:32:46Z
+    branche: main
+    commit: e6c8b5b
+    profil: local-path
+    topologie: multi-node-3
+    arch: arm64
+    hote: 'Mac15,9'
+    total_s: 1586
+    phases:
+      up: 221
+      bootstrap: 426
+      storage-simple: 14
+      monitoring: 193
+      gitops: 85
+      dataops: 645
+      gitops-seed: 2
+    metriques:
+      cpu_core_s: 631
+      ram_peak_mib: 9318
+      ram_mean_mib: 5939

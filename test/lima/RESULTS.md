@@ -572,3 +572,26 @@ Drifts révélés (détail : registre-drifts.yaml) :
 > été validés **à chaud** sur le banc courant (diagnostic + restart operator) ;
 > le prochain run `atlas-ceph` doit reproduire le scénario 28 PASS
 > **nativement** (sans intervention) — c'est la vraie preuve (ADR 0046).
+
+## Observabilité incomplète sur le chemin `atlas` léger (2026-06-10)
+
+Run **from-scratch `atlas`** (profil `local-path`, `multi-node-3` arm64)
+**réussi** : 3 nœuds Ready, `monitoring → gitops → dataops → gitops-seed`,
+`Application` `atlas-workflows` `Synced/Healthy`. Durées dans
+`runs-history.yaml` (total ~26 min, pic RAM 9,3 GiB). En **testant l'accès local
+aux UIs** depuis l'hôte (port-forward), deux manques d'observabilité — **hors
+run, non bloquants** — ont été relevés. Ce ne sont pas des écarts de montage
+mais des **trous de périmètre** du chemin, suivis dans l'**issue #252**
+(prioritaire) :
+
+| #   | Symptôme                                            | Cause                                                                                                       | Correctif (visé #252)                                                            | Portée |
+| --- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------ |
+| L57 | accès Grafana cassé dans `run-phases.sh status`     | `status` propose `kubectl … port-forward svc/grafana` (ns `monitoring`) — **service inexistant**            | pointer le vrai service `kube-prometheus-stack-grafana` (port 80) + secret admin | code   |
+| L58 | `kubectl top nodes` → « Metrics API not available » | le chemin `atlas` ne pose **pas** `metrics-server` (palier 1, ADR 0016) ; `apply` manuel rend `top` opérant | poser `platform/metrics-server/` automatiquement dans le chemin `atlas`          | atlas  |
+
+> **Pourquoi ce ne sont pas des drifts « classiques ».** Le run lui-même
+> n'échoue pas : L57/L58 ont été trouvés **en consommant le banc** (accès
+> UI/`top`), pas par une phase. Conformément à l'honnêteté des Runs (ADR 0023)
+> on les consigne tels quels — manques de périmètre à corriger **dans le code**
+> (#252) puis à **re-prouver par un run** (ADR 0034/0046), jamais par un
+> `kubectl apply` laissé en l'état.
