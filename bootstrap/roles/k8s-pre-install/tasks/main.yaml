@@ -92,6 +92,7 @@
       ansible.builtin.command: swapon --show
       register: output_swapon
       changed_when: false
+      check_mode: false # état du swap consommé par le when du swapoff — doit tourner même en --check (ADR 0051)
 
     - name: Disable all swap immediately
       ansible.builtin.command: swapoff -a

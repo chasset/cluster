@@ -1,0 +1,7 @@
+# code: language=ansible
+# Handler de rechargement systemd (ADR 0051 : daemon_reload par handler, pas
+# inline) — notifié par le dépôt des unités .service/.timer, donc joué SEULEMENT
+# si une unité a changé (idempotence : pas de reload à chaque run).
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true

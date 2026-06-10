@@ -26,7 +26,7 @@ set -euo pipefail
 umask 077
 
 BACKUP_DIR=/var/lib/etcd-backups
-KEEP=24
+KEEP={{ etcd_backup_keep }}
 STAMP=$(date +%Y%m%d-%H%M%S)
 DEST="${BACKUP_DIR}/etcd-${STAMP}.db"
 DEST_PARTIAL="${DEST}.partial"

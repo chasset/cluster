@@ -1,0 +1,12 @@
+---
+# Valeurs par défaut du rôle etcd-backup. Politique de sauvegarde = valeurs
+# d'exemple génériques (ADR 0023/0051 (f)), surchargeables par group_vars selon
+# le déploiement (RPO/rétention propres au site). Les chemins système
+# (/var/lib/etcd-backups, /usr/local/sbin/…) restent inline (intrinsèques).
+
+# Cadence du snapshot etcd (format systemd OnCalendar).
+etcd_backup_on_calendar: hourly
+# Jitter d'exécution du timer (secondes) — évite les pics simultanés.
+etcd_backup_randomized_delay_sec: 300
+# Nombre de snapshots conservés (rétention glissante). 24 horaires = 1 jour.
+etcd_backup_keep: 24

@@ -10,6 +10,7 @@
   register: img_present
   changed_when: false
   failed_when: false
+  check_mode: false # pré-check de présence qui pilote le when du build — doit tourner même en --check (ADR 0051)
 
 - name: 'Build (arm64) or retag (x86) image — {{ img.name }}'
   when: img_present.rc != 0

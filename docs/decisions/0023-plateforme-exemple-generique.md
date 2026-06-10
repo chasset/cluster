@@ -117,6 +117,31 @@ génériques. On **réutilise les patrons existants** (rien de neuf) :
 - **sélection de topologie** (« activer un stack ») : pointer l'inventaire/les
   variables de la topologie voulue, comme `run-phases.sh` le fait pour le banc.
 
+**Aucune constante _dépendant du déploiement_ codée en dur — dans TOUS les
+langages** (Ansible, **shell**, **Python**, manifestes). Toute valeur qui change
+selon le déploiement ou la topologie (IP/plages réseau, devices `nvme1n1` / glob
+`/dev/sd[a-z]`, tailles, comptes, noms d'hôtes/buckets, seuils) est **extraite
+en variable surchargeable**, le défaut versionné étant la valeur d'exemple
+générique (= valeur PROD) :
+
+- **Ansible** → `defaults/main.yaml` surchargé par `group_vars` (cf.
+  [ADR 0051](0051-options-natives-ansible.md) (f)) ;
+- **shell** → `${VAR:-<défaut générique>}` (patron déjà en place :
+  `storage/ceph/cleanup.sh` `NVME_BLOCK_DEVICE`/`DATA_DEVICE_GLOB`,
+  `bootstrap/state.sh`) ;
+- **Python** → lu d'un `os.environ.get('VAR', '<défaut>')` ou d'un argument,
+  jamais gravé dans le source.
+
+Le mécanisme **commun** de surcharge est le couple **`.env` (gitignoré) /
+`.env.example` (versionné, valeurs génériques)** — déjà la convention du dépôt
+(`bootstrap/security/.env-example`) ; un shell le source (`set -a; . .env`), un
+script Python lit `os.environ`, Ansible peut l'exposer via `lookup('env', …)`.
+**Restent inline** (les variabiliser nuirait à la lisibilité, ADR 0049) : les
+**constantes intrinsèques** — chemins système (`/etc/kubernetes`), ports
+standard (`6443`), versions épinglées (ADR 0006), valeurs imposées par un
+protocole. Critère : _« cette valeur changerait-elle d'un déploiement à l'autre
+? »_ → oui = variable, non = inline.
+
 ### 4. Exceptions explicites
 
 - **Le banc Vagrant (`192.168.67.0/24`) reste tel quel** : c'est un exemple

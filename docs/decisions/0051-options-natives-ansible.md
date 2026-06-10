@@ -45,6 +45,15 @@ patron de rôle posé par l'[ADR 0049](0049-doctrine-choix-outil-par-action.md)
   `systemctl restart` inline. Constat : déjà respecté partout sauf le
   `daemon_reload` inline d'`etcd-backup` → à passer en handler notifié par les
   `copy` d'unités.
+- **(f) Aucune constante _dépendant du déploiement_ codée en dur dans une
+  tâche.** Application Ansible de la règle transverse posée par
+  l'[ADR 0023](0023-plateforme-exemple-generique.md) §3 (vraie pour Ansible,
+  shell ET Python) : toute valeur qui change selon le déploiement/topologie (IP,
+  devices `nvme1n1`/`/dev/sd[a-z]`, tailles, comptes, seuils) vit dans
+  `defaults/main.yaml` (défaut = valeur d'exemple générique = PROD)
+  surchargeable par `group_vars` ; les **constantes intrinsèques** (chemins
+  système, ports standard, versions épinglées ADR 0006) restent inline. Critère
+  : _« cette valeur changerait-elle d'un déploiement à l'autre ? »_
 
 ## Statut
 
