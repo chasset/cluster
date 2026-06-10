@@ -726,6 +726,12 @@ phase_dataops() {
     dataops_chain_emit_and_verify
     ok "🎉 chaîne DataOps validée — lineage d'un run Dagster réel visible dans Marquez"
 
+    # Preuve de l'egress Internet du ns dagster (NP allow-internet-egress, #256) :
+    # un run peut sortir sur 443 AVEC la policy, bloqué SANS. Indispensable au sync
+    # du snapshot OpenAlex (aws s3 sync --no-sign-request) sous default-deny.
+    log "  Preuve egress Internet — sortie 443 du ns dagster (avec/sans la NP)"
+    dataops_egress_internet_check
+
     log "Consigner ce run dans test/lima/RESULTS.md (honnêteté des Runs, ADR 0023)."
 }
 
@@ -931,6 +937,52 @@ marquez_job_count() {
         --image=busybox:1.36 --quiet -- \
         sh -c "wget -qO- 'http://marquez.marquez.svc.cluster.local:5000/api/v1/namespaces/${ol_ns}/jobs' 2>/dev/null" 2>/dev/null)
     parse_ol_job_count "${json}"
+}
+
+# Code HTTP curl d'une sortie HTTPS vers une IP publique depuis un pod éphémère du
+# ns `dagster` (preuve du FLUX egress Internet, pas d'un service S3 précis). On
+# vise une IP littérale stable (Cloudflare 1.1.1.1) pour ne PAS dépendre du DNS ni
+# d'un endpoint AWS mouvant : ce qu'on prouve, c'est qu'un paquet sortant sur 443
+# atteint le « world ». "%{http_code}" = 000 si la connexion n'aboutit pas
+# (timeout/refus) ; tout autre code (2xx/3xx/4xx) prouve que la sortie a abouti.
+egress_probe_code() {
+    "${KUBECTL[@]}" -n dagster run egress-probe-$$ --rm -i --restart=Never \
+        --image=curlimages/curl:8.11.1 --quiet -- \
+        curl -sS -o /dev/null --max-time 8 -w '%{http_code}' https://1.1.1.1/ \
+        2>/dev/null || printf '000'
+}
+
+# PREUVE de la NP allow-internet-egress (#256) : un run du ns `dagster` peut sortir
+# sur Internet (443) AVEC la policy, et est bloqué SANS (default-deny mord). On ne
+# mocke PAS S3 — un mock intra-cluster n'emprunte pas la règle `ipBlock 0.0.0.0/0`
+# (sous Cilium les pods du cluster sont exclus du CIDR « world »). Méthode :
+#   1. probe AVEC la NP (déjà déployée par la phase dataops) → doit aboutir ;
+#   2. retire la NP, re-probe → doit timeouter (000) ;
+#   3. RÉAPPLIQUE la NP depuis le manifeste versionné (corriger le code/l'état du
+#      banc, pas l'inventer — ADR 0046 : le retrait est interne au test et se
+#      RECONVERGE ; un trap garantit la réapplication même si la probe échoue).
+# Le verdict est rendu par la fonction PURE classify_egress_probe (testée bats).
+dataops_egress_internet_check() {
+    local np=platform/network-policies/dagster/allow-internet-egress.yaml
+    local with_np without_np verdict
+    # 1. État nominal (NP présente, posée par le playbook dataops).
+    with_np=$(egress_probe_code)
+
+    # 2/3. Bascule SANS la NP, puis garantit la réapplication quoi qu'il arrive.
+    # shellcheck disable=SC2329  # invoquée par le trap RETURN
+    _restore_egress_np() { "${KUBECTL[@]}" apply -f "${REPO}/${np}" >/dev/null 2>&1 || true; }
+    trap _restore_egress_np RETURN
+    "${KUBECTL[@]}" delete -f "${REPO}/${np}" --ignore-not-found >/dev/null 2>&1 || true
+    without_np=$(egress_probe_code)
+    _restore_egress_np
+    trap - RETURN
+
+    verdict=$(classify_egress_probe "${with_np}" "${without_np}")
+    case "${verdict%%|*}" in
+        ok) ok "${verdict#*|}" ;;
+        skip) log "    ${verdict#*|}" ;;
+        *) die "${verdict#*|} — NP allow-internet-egress à vérifier" ;;
+    esac
 }
 
 # ── Status — visualisation de l'état du banc (#149) ──────────────────────────
