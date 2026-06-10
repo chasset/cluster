@@ -943,13 +943,21 @@ marquez_job_count() {
 # ns `dagster` (preuve du FLUX egress Internet, pas d'un service S3 précis). On
 # vise une IP littérale stable (Cloudflare 1.1.1.1) pour ne PAS dépendre du DNS ni
 # d'un endpoint AWS mouvant : ce qu'on prouve, c'est qu'un paquet sortant sur 443
-# atteint le « world ». "%{http_code}" = 000 si la connexion n'aboutit pas
-# (timeout/refus) ; tout autre code (2xx/3xx/4xx) prouve que la sortie a abouti.
+# atteint le « world ». curl imprime LUI-MÊME "000" via `-w '%{http_code}'` quand
+# la connexion n'aboutit pas (timeout/refus) — PAS de fallback `|| printf 000`
+# (curl sort alors en erreur ET a déjà imprimé 000 → la valeur doublerait en
+# "000000", faux verdict). On normalise : toute sortie non « 3 chiffres » (pod qui
+# ne démarre pas, etc.) est ramenée à "000".
 egress_probe_code() {
-    "${KUBECTL[@]}" -n dagster run egress-probe-$$ --rm -i --restart=Never \
+    local code
+    code=$("${KUBECTL[@]}" -n dagster run egress-probe-$$ --rm -i --restart=Never \
         --image=curlimages/curl:8.11.1 --quiet -- \
         curl -sS -o /dev/null --max-time 8 -w '%{http_code}' https://1.1.1.1/ \
-        2>/dev/null || printf '000'
+        2>/dev/null)
+    case "$code" in
+        [0-9][0-9][0-9]) printf '%s' "$code" ;;
+        *) printf '000' ;;
+    esac
 }
 
 # PREUVE de la NP allow-internet-egress (#256) : un run du ns `dagster` peut sortir
