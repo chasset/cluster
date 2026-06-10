@@ -269,81 +269,86 @@ surchargeables par l'environnement (`GITEA_ORG`, `GITEA_REPO`,
 [0023](decisions/0023-plateforme-exemple-generique.md)). Adaptez aux valeurs de
 votre déploiement.
 
-### Atteindre les UIs et services depuis votre poste
+### Une seule commande pour tout brancher : `access.sh`
 
-Les hostnames `*.cluster.lan` (`https://dagster.cluster.lan`,
-`argocd.cluster.lan`…) sont des **placeholders** : ils ne résolvent pas en
-local, et l'IP du Gateway (`LB-IPAM`, réseau interne de la VM) n'est pas
-routable depuis l'hôte. La voie fiable en local est **`kubectl port-forward`**,
-avec le kubeconfig du banc :
+Vous ne devez pas **opérer le cluster** pour travailler. Après le banc monté,
+une commande rend tout consommable depuis votre poste
+([ADR 0048](decisions/0048-acces-local-developpeur.md)) :
 
 ```bash
-export KUBECONFIG=test/lima/.work/kubeconfig
-
-# Argo CD : http://127.0.0.1:8080  (server.insecure ⇒ HTTP en clair, pas https)
-kubectl -n argocd port-forward svc/argocd-server 8080:80
-# Gitea   : http://127.0.0.1:3000
-kubectl -n gitea  port-forward svc/gitea-http   3000:80
-# Dagster : http://127.0.0.1:3001
-kubectl -n dagster port-forward svc/dagster-dagster-webserver 3001:80
-# Marquez : http://127.0.0.1:3002
-kubectl -n marquez port-forward svc/marquez-web 3002:3000
-# Grafana : http://127.0.0.1:3003  (identifiants : admin / cf. secret ci-dessous)
-kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3003:80
+test/lima/access.sh
 ```
 
-> **Nom du service Grafana.** Il s'appelle `kube-prometheus-stack-grafana`
-> (préfixe du chart), pas `grafana`. Mot de passe admin :
-> `kubectl -n monitoring get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d`.
+Elle fait, en une fois :
 
-Mots de passe d'admin (lus depuis les Secrets, jamais en clair dans le dépôt) :
+- **expose les UIs** : pose les Gateways manquants et ouvre un tunnel par UI,
+  puis écrit dans votre `/etc/hosts` (sudo demandé) un bloc
+  `*.cluster.lan → 127.0.0.1`. Les URLs deviennent **cliquables** (TLS par la CA
+  interne — à accepter une fois) : `https://argocd.cluster.lan:8443`,
+  `https://gitea.cluster.lan:8445`, `https://grafana.cluster.lan:8446`,
+  `https://dagster.cluster.lan:8444`, `https://marquez.cluster.lan:8447` (les
+  ports exacts sont affichés à la fin).
+- **affiche les secrets** d'un coup (Argo CD, Gitea, Grafana, rôles Postgres).
+- **génère `../atlas/.env.cluster.local`** (gitignoré) : un `.env` prêt à
+  consommer côté `atlas` (Postgres, OpenLineage, registry, URL de push Gitea).
+  Patron versionné :
+  [`contract/atlas.env.cluster.example`](../contract/atlas.env.cluster.example).
 
-```bash
-# Argo CD (utilisateur admin)
-kubectl -n argocd get secret argocd-initial-admin-secret \
-  -o jsonpath='{.data.password}' | base64 -d; echo
-# Gitea (utilisateur atlas-admin, créé par gitops-seed)
-kubectl -n gitea get secret gitea-admin \
-  -o jsonpath='{.data.password}' | base64 -d; echo
-```
+Pour tout arrêter (tunnels + bloc `/etc/hosts`) : `test/lima/access.sh --stop`.
+Pour ne pas toucher `/etc/hosts` : `test/lima/access.sh --no-hosts` (les URLs
+s'ouvrent alors via `curl --resolve <host>:<port>:127.0.0.1`).
+
+> **Pourquoi des tunnels ?** Le réseau de la VM n'est pas routable depuis l'hôte
+> macOS et `*.cluster.lan` n'y résout pas (placeholders,
+> [ADR 0020](decisions/0020-exposition-reseau-tout-cilium.md)). `access.sh` fait
+> le pont, sans rien installer ni rebooter. **En déploiement réel**
+> (bare-metal), rien de tout ça : l'admin réseau pose le DNS et les URLs
+> marchent nativement.
 
 ### Pousser sur Gitea
 
 C'est l'acte central de la boucle : **vous poussez vos manifestes dans le dépôt
-Gitea du banc**, Argo CD les réconcilie (vous ne faites **jamais** de
-`kubectl apply` de vos workflows — frontière ADR
-[0022](decisions/0022-argocd-gitops-applicatif.md)). Comme Gitea n'est joignable
-qu'en intra-cluster, on passe par un **port-forward** :
+Gitea du banc**, Argo CD les réconcilie — vous ne faites **jamais** de
+`kubectl apply` de vos workflows (frontière ADR
+[0022](decisions/0022-argocd-gitops-applicatif.md)). `access.sh` a déjà écrit
+l'URL de push (creds inclus) dans le `.env` généré (`GITEA_PUSH_URL`) :
 
 ```bash
-# 1) Forward du HTTP Gitea (laisser tourner dans un terminal) :
-export KUBECONFIG=test/lima/.work/kubeconfig
-kubectl -n gitea port-forward svc/gitea-http 3000:80
+# Charger le .env généré par access.sh (depuis le dépôt atlas) :
+set -a; . .env.cluster.local; set +a
 
-# 2) Récupérer les identifiants atlas-admin :
-GITEA_USER=$(kubectl -n gitea get secret gitea-admin -o jsonpath='{.data.username}' | base64 -d)
-GITEA_PW=$(kubectl -n gitea get secret gitea-admin   -o jsonpath='{.data.password}' | base64 -d)
-
-# 3) Cloner le dépôt seedé (org/dépôt = exemples génériques atlas/workflows) :
-git clone "http://${GITEA_USER}:${GITEA_PW}@127.0.0.1:3000/atlas/workflows.git"
-cd workflows
-
-# 4) Modifier/ajouter un manifeste (Application, patch de workspace…), committer,
-#    puis pousser sur main → le webhook déclenche Argo CD :
+git clone "${GITEA_PUSH_URL}" workflows && cd workflows
+# Modifier/ajouter un manifeste (Application, patch de workspace…), puis :
 git add . && git commit -m "feat: nouveau workflow"
-git push origin main
+git push origin main          # → le webhook déclenche Argo CD
 ```
 
-> **Authentification.** Mettre le mot de passe dans l'URL est commode pour un
-> banc jetable ; préférez un **token d'accès personnel** (UI Gitea → _Settings →
-> Applications_) ou un credential helper pour un usage répété. Le webhook `push`
-> → Argo CD est déjà posé par `gitops-seed` : un `push` réussi entraîne la
-> réconciliation (visible dans l'UI Argo CD, `Synced/Healthy`). À défaut de
-> webhook, Argo CD repolle de toute façon périodiquement.
+> **Authentification.** `GITEA_PUSH_URL` embarque le mot de passe (commode pour
+> un banc jetable) ; pour un usage répété, préférez un **token d'accès
+> personnel** (UI Gitea → _Settings → Applications_). Le webhook `push` → Argo
+> CD est posé par `gitops-seed` : un `push` réussi déclenche la réconciliation
+> (visible dans l'UI Argo CD, `Synced/Healthy`) ; à défaut, Argo CD repolle
+> périodiquement.
 
 Vérifier le résultat : l'`Application` passe `Synced/Healthy` (UI Argo CD), le
 run s'exécute (`K8sRunLauncher` → Job K8s) et **émet du lineage** ingéré par
 Marquez.
+
+### Accès bas-niveau (dépannage)
+
+Si vous préférez un accès manuel sans `access.sh` (ou pour diagnostiquer), un
+`kubectl port-forward` par service reste possible :
+
+```bash
+export KUBECONFIG=test/lima/.work/kubeconfig
+# Argo CD sert en HTTP clair (server.insecure) : http, pas https.
+kubectl -n argocd      port-forward svc/argocd-server 8080:80
+kubectl -n gitea       port-forward svc/gitea-http 3000:80
+kubectl -n monitoring  port-forward svc/kube-prometheus-stack-grafana 3003:80  # pas svc/grafana
+```
+
+Lire un secret à la main :
+`kubectl -n <ns> get secret <nom> -o jsonpath='{.data.<clé>}' | base64 -d`.
 
 ## Pour aller plus loin
 

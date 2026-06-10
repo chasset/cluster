@@ -22,7 +22,7 @@ export default defineConfig({
   // légitimement — VitePress ne les sert pas (il ne rend que le Markdown), mais
   // ils sont valides sur GitHub. lychee (CI) couvre déjà ces liens fichiers.
   ignoreDeadLinks: [
-    /\.(sh|pl|py|j2|tmpl|yaml|yml|toml|cff|conf|log)$/, // fichiers de code/config/logs
+    /\.(sh|pl|py|j2|tmpl|yaml|yml|toml|cff|conf|log|example)$/, // fichiers de code/config/logs
     /\/Justfile$/,
     /\/Vagrantfile$/,
     /\/Dockerfile$/,
@@ -53,6 +53,7 @@ export default defineConfig({
       { text: 'Accueil', link: '/' },
       { text: 'Par où commencer', link: '/docs/demarrage' },
       { text: 'Guide dev data', link: '/docs/guide-dev-data' },
+      { text: 'Dev atlas', link: '/docs/dev-atlas' },
       { text: 'Glossaire', link: '/docs/glossaire' },
       { text: "Plan d'action", link: '/docs/audit/12-plan-action' },
       { text: 'Banc de test', link: '/test/' },
@@ -64,6 +65,7 @@ export default defineConfig({
           { text: 'Accueil', link: '/' },
           { text: 'Par où commencer', link: '/docs/demarrage' },
           { text: 'Guide du développeur data', link: '/docs/guide-dev-data' },
+          { text: 'Développeur atlas (point d’entrée)', link: '/docs/dev-atlas' },
           { text: 'Glossaire', link: '/docs/glossaire' },
           { text: 'Garde-fous', link: '/SAFEGUARDS' },
           { text: 'Contribuer', link: '/CONTRIBUTING' },

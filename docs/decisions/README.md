@@ -67,3 +67,4 @@ Format léger inspiré de Michael Nygard :
 | 0045 | [Chemins d'installation du banc : couches, dépendances, tests associés](0045-chemins-installation-banc-couches.md) | Accepted |
 | 0046 | [Corriger le code d'installation, pas l'état du cluster](0046-corriger-le-code-pas-l-etat.md)                      | Accepted |
 | 0047 | [Topologie `ha-3cp` : CP dédié, VIP kube-vip, etcd 2/3](0047-topologie-ha-3cp-control-plane-dedie.md)              | Accepted |
+| 0048 | [Accès local développeur (URLs cliquables + secrets + `.env`)](0048-acces-local-developpeur.md)                    | Accepted |

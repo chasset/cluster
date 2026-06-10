@@ -7,6 +7,7 @@ composant…).
 | Page                                     | Contenu                                                                                         |
 | ---------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | [`demarrage.md`](demarrage.md)           | Par où commencer (public, prérequis, parcours 1→5)                                              |
+| [`dev-atlas.md`](dev-atlas.md)           | Point d'entrée du développeur atlas : tous les liens utiles (démarrer, contrat, commandes, ADR) |
 | [`guide-dev-data.md`](guide-dev-data.md) | Consommer la plateforme depuis son code (contrat d'interface : endpoints, secrets, paramétrage) |
 | [`composants.md`](composants.md)         | La pile technologique brique par brique (rôle et raison d'être de chaque techno)                |
 | [`glossaire.md`](glossaire.md)           | Définitions des termes techniques en langage simple                                             |
