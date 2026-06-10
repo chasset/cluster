@@ -56,6 +56,7 @@
         executable: /bin/bash
       register: ceph_data_disks
       changed_when: false
+      check_mode: false # comptage lu par l'assert suivant — doit tourner même en --check (ADR 0051)
 
     - name: Assert enough raw data disks are present
       ansible.builtin.assert:

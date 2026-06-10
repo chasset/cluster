@@ -50,6 +50,7 @@
       [Service]
       Type=oneshot
       ExecStart=/usr/local/sbin/etcd-snapshot.sh
+  notify: Reload systemd daemon
 
 - name: Déposer le timer systemd
   ansible.builtin.copy:
@@ -62,17 +63,20 @@
       Description=Snapshot etcd toutes les heures
 
       [Timer]
-      OnCalendar=hourly
+      OnCalendar={{ etcd_backup_on_calendar }}
       Persistent=true
-      RandomizedDelaySec=300
+      RandomizedDelaySec={{ etcd_backup_randomized_delay_sec }}
       Unit=etcd-snapshot.service
 
       [Install]
       WantedBy=timers.target
+  notify: Reload systemd daemon
 
-- name: Recharger systemd
-  ansible.builtin.systemd:
-    daemon_reload: true
+# Le daemon_reload est désormais un handler (ADR 0051) notifié ci-dessus ; on le
+# FLUSHE avant d'activer le timer pour que systemd voie les unités à jour dès le
+# 1er run (les handlers se joueraient sinon en fin de play, après l'activation).
+- name: Recharger systemd si les unités ont changé
+  ansible.builtin.meta: flush_handlers
 
 - name: Activer et démarrer le timer
   ansible.builtin.systemd:

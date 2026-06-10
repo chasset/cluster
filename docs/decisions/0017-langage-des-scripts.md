@@ -1,5 +1,12 @@
 # 0017 — Langage des scripts (bash / jq / Python / bats)
 
+> **Superseded by [ADR 0049](0049-doctrine-choix-outil-par-action.md)**
+> (Doctrine du choix d'outil par action). L'ADR 0049 reprend intégralement les
+> principes ci-dessous (bash/jq/Python/bats/Node, exclusion de Go) et les étend
+> : Ansible promu langage de plein droit, Perl traité comme dette en sursis,
+> cadre de pondération à 8 critères. Cet ADR reste lisible pour la trace
+> historique.
+
 ## Contexte
 
 L'audit ([09-langage-scripts](../audit/09-langage-scripts.md)) a remis en cause

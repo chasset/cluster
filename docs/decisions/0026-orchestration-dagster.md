@@ -14,10 +14,12 @@ ici on déploie l'**orchestrateur seul**.
 ## Décision
 
 **Dagster** sur Kubernetes (chart `dagster/dagster` 1.13.7), dans
-[`platform/dagster/`](../../platform/dagster/), déployé par `kubectl apply`
-comme les autres addons ([ADR 0022](0022-argocd-gitops-applicatif.md) — pas Argo
-CD pour l'infra ; le namespace `dagster` reste destinataire Argo CD pour le
-**code** d'atlas).
+[`platform/dagster/`](../../platform/dagster/), appliqué par le rôle Ansible
+`platform-dagster` comme les autres addons plateforme (manifeste `helm template`
+figé appliqué via `kubernetes.core.k8s`, ADR
+[0033](0033-orchestration-ansible-platform-dataops.md)/[0049](0049-doctrine-choix-outil-par-action.md)
+— pas Argo CD pour l'infra ; le namespace `dagster` reste destinataire Argo CD
+pour le **code** d'atlas).
 
 - **Composants** : webserver (UI), daemon (schedules/sensors/run queue),
   **`K8sRunLauncher`** — chaque run devient un **Job Kubernetes** dans le
