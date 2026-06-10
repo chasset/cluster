@@ -408,10 +408,12 @@ phase_bootstrap() {
 phase_storage_simple() {
     preflight
     [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
-    log "Phase storage-simple — local-path-provisioner"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/local-path/local-path-storage.yaml"
-    "${KUBECTL[@]}" -n local-path-storage rollout status deploy/local-path-provisioner --timeout=120s
-    set_default_sc local-path
+    [ -f "${INVENTORY}" ] || die "inventaire absent — lancer 'bootstrap' d'abord"
+    log "Phase storage-simple — local-path-provisioner via Ansible"
+    # PORTÉ EN RÔLE ANSIBLE (platform-local-path) : apply du manifeste figé +
+    # StorageClass default (exactement 1) dans le rôle ; anti-double-source (plus
+    # de kubectl apply / set_default_sc shell ici). gate_test_pvc reste un TEST.
+    run_ansible_phase bootstrap/local-path.yaml
     gate_test_pvc local-path
 }
 

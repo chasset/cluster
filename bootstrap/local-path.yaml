@@ -1,0 +1,32 @@
+---
+# Déploie le provisioner local-path (profil banc léger sans Ceph) via le rôle
+# platform-local-path (ADR 0033/0049). Manifeste figé appliqué via
+# kubernetes.core.k8s ; marque la StorageClass default (exactement une).
+#
+# Hôte d'exécution k8s : `dataops_k8s_host` (défaut localhost). Play localhost →
+# pas d'audit-log (cf. monitoring.yaml / metrics-server.yaml).
+- name: Stockage local-path (provisioner + StorageClass default)
+  hosts: "{{ dataops_k8s_host | default('localhost') }}"
+  gather_facts: false
+  pre_tasks:
+    - name: Ensure the Python kubernetes client is present
+      ansible.builtin.pip:
+        name:
+          - kubernetes
+          - certifi
+        state: present
+    - name: Resolve the certifi CA bundle path
+      ansible.builtin.command: "{{ ansible_python_interpreter | default('python3') }} -c 'import certifi; print(certifi.where())'"
+      register: local_path_certifi
+      changed_when: false
+      check_mode: false
+    - name: Set the CA bundle for HTTPS requests
+      ansible.builtin.set_fact:
+        local_path_ca_bundle: '{{ local_path_certifi.stdout | trim }}'
+  environment:
+    SSL_CERT_FILE: '{{ local_path_ca_bundle | default(omit) }}'
+  tasks:
+    - name: Provisioner local-path + StorageClass default
+      ansible.builtin.import_role:
+        name: platform-local-path
+      tags: local-path
