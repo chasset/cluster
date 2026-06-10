@@ -92,15 +92,23 @@ Dans l'ordre de priorité décroissant :
 ### Exceptions — restent délibérément en bash
 
 `cni.sh` (orchestration du CLI `cilium` + pose de CRs, tourne dans la VM sans
-repo) ; `state.sh` / `report.sh` (diagnostic lecture seule multi-couches —
-Ansible = convergence, pas reporting) ; `cleanup.sh` (wipe destructif lancé
-consciemment) ; `first-access.sh` (pré-accès SSH **avant** qu'Ansible puisse
-piloter) ; `gitea-init.sh` (étape de **données** post-bootstrap, ADR 0044) ; les
-tests bats / `*-assert.sh` ; le harnais de banc jetable et l'émetteur
-OpenLineage (outillage e2e, pas une brique plateforme — ADR 0033 §5).
-**Mailpit** est dans cette catégorie : c'est un **puits SMTP de test du banc**
-(« pas déployé en prod », cf. `platform/mailpit/README.md`), pas une brique
-plateforme à porter.
+repo) — **et avec lui les CRDs Gateway API + les CRs d'exposition
+`cilium-expo`** (GatewayClass, `CiliumLoadBalancerIPPool`,
+`CiliumL2AnnouncementPolicy`) qu'il pose en heredoc : leurs **valeurs sont
+dérivées du terrain au bootstrap** (`L2_INTERFACE`, plage LB-IPAM du réseau
+réel) et les CRDs doivent exister **avant Cilium** (drift L56). Les porter en
+rôle Ansible déplacerait cette dérivation sans la réduire et toucherait la
+séquence Cilium critique ; les manifestes `platform/cilium-expo/*.yaml` restent
+donc des **références versionnées**, la **source d'exécution est `cni.sh`** (à
+garder alignés). `state.sh` / `report.sh` (diagnostic lecture seule
+multi-couches — Ansible = convergence, pas reporting) ; `cleanup.sh` (wipe
+destructif lancé consciemment) ; `first-access.sh` (pré-accès SSH **avant**
+qu'Ansible puisse piloter) ; `gitea-init.sh` (étape de **données**
+post-bootstrap, ADR 0044) ; les tests bats / `*-assert.sh` ; le harnais de banc
+jetable et l'émetteur OpenLineage (outillage e2e, pas une brique plateforme —
+ADR 0033 §5). **Mailpit** est dans cette catégorie : c'est un **puits SMTP de
+test du banc** (« pas déployé en prod », cf. `platform/mailpit/README.md`), pas
+une brique plateforme à porter.
 
 ### Intrinsèquement manuel (hors de tout langage de script)
 
@@ -125,11 +133,12 @@ Accepted. Supersede l'ADR 0017 ; amende l'ADR 0033.
   `platform-dagster` et `platform-marquez` sont des rôles Ansible. À corriger.
 - **Portages déclenchés** (chacun **banc-requis** — un nouveau rôle qui
   s'applique sur un cluster change le comportement de déploiement et se
-  re-prouve par un run, ADR 0034) : Ceph côté cluster, metrics-server,
-  StorageClasses/datalake, CRDs Gateway API + CRs `cilium-expo`. Suivis par
-  l'épopée #262. **Invariant** : un portage **retire** sa source shell (la
-  `phase_*` de `run-phases.sh`, le heredoc `cni.sh`) une fois le rôle prouvé —
-  il ne la **double** pas.
+  re-prouve par un run, ADR 0034) : metrics-server **(fait)**, local-path
+  **(fait)**, StorageClasses/datalake, Ceph côté cluster. Suivis par l'épopée
+  #262. Les **CRDs Gateway API + `cilium-expo`** ne sont **pas** dans cette
+  liste (exception `cni.sh`, cf. ci-dessus). **Invariant** : un portage
+  **retire** sa source shell (la `phase_*` de `run-phases.sh`) une fois le rôle
+  prouvé — il ne la **double** pas.
 - **Bénéfice** : un contributeur sait, par catégorie d'action, quel outil
   retenir et pourquoi. **Prix** : la doctrine n'élimine pas le polyglottisme,
   elle le gouverne (le coût de diversité reste réel). **Garde-fou** : aucun
