@@ -82,6 +82,19 @@ spec:
             - -s3.config=/etc/seaweedfs/s3.json
             - -s3.port=8333
             - -ip.bind=0.0.0.0
+            # Volumes de 1 Gio (défaut 30 Go !) : sur le petit disque du banc
+            # (SeaweedFS = banc léger uniquement, ADR 0036), le master exige
+            # volumeSizeLimitMB d'espace libre PAR nouveau volume — avec le défaut
+            # 30 Go, plus aucun slot dès que le disque a < 30 Go libres → « Not
+            # enough data nodes found » (diagnostic issue #264).
+            - -master.volumeSizeLimitMB=1024
+            # volume.max = nombre MAX de volumes que le data node peut créer. Le
+            # défaut (et volume.max=0) plafonne trop bas (13 sur ce banc) → une
+            # fois ces volumes pleins, toute écriture d'une NOUVELLE collection
+            # (perf264, cnpg-backups…) échoue (« 0 node candidates »). On élargit
+            # largement ; la borne réelle reste l'espace disque (un volume n'est
+            # créé qu'au besoin).
+            - -volume.max=100
           ports:
             - name: s3
               containerPort: 8333
