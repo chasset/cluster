@@ -15,9 +15,11 @@ fait qu'**ingérer et visualiser** — il ne pilote rien.
 ## Décision
 
 **Marquez** (API + UI web) sur Kubernetes (chart `marquezproject/marquez`
-0.51.1), dans [`platform/marquez/`](../../platform/marquez/), déployé par
-`kubectl apply` comme les autres addons
-([ADR 0022](0022-argocd-gitops-applicatif.md) — pas Argo CD pour l'infra).
+0.51.1), dans [`platform/marquez/`](../../platform/marquez/), appliqué par le
+rôle Ansible `platform-marquez` comme les autres addons plateforme (manifeste
+`helm template` figé appliqué via `kubernetes.core.k8s`, ADR
+[0033](0033-orchestration-ansible-platform-dataops.md)/[0049](0049-doctrine-choix-outil-par-action.md)
+— pas Argo CD pour l'infra).
 
 - **Composants** : API Marquez (collecte/agrégation, port 5000 ; health 5001) et
   **UI web** (visualisation, port 3000). L'UI appelle l'API en intra-cluster.
