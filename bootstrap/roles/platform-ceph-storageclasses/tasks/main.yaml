@@ -7,16 +7,54 @@
 - name: Deploy Ceph StorageClasses
   run_once: true
   block:
+    # Les manifestes block-*/fs.yaml contiennent des CR Rook (CephBlockPool,
+    # CephFilesystem) que l'operator DENSIFIE après création (defaults du spec) →
+    # generation N→N+1 → faux « changed » au rejeu immédiat (run_ansible_phase),
+    # même mécanisme que le CephCluster. hidden_fields:[metadata.managedFields,
+    # status] retire ce bruit du diff (sans effet sur les SC/objets simples qui
+    # n'ont pas ces champs) ; force_conflicts car Rook co-possède le spec.
     - name: Apply the Ceph StorageClasses (block + CephFS)
       kubernetes.core.k8s:
         state: present
         src: '{{ ceph_sc_dir }}/{{ item }}'
+        server_side_apply:
+          field_manager: ansible-ceph-sc
+          force_conflicts: true
+        hidden_fields:
+          - metadata.managedFields
+          - status
       loop:
         - block-replicated.yaml
         - block-ec-retain.yaml
         - block-ec-delete.yaml
         - filesystem/fs.yaml
         - filesystem/storageclass.yaml
+
+    # Stabilisation des CR Rook (CephBlockPool/CephFilesystem) : on re-applique
+    # jusqu'à changed=0 (absorbe la densification résiduelle par l'operator AVANT
+    # de finir), comme pour le CephCluster. Seuls les CR Rook se densifient ; on
+    # cible donc les 3 block-* + fs.yaml (pas les SC/objets simples). changed_when
+    # false : convergence interne, pas un changement de la phase.
+    - name: Stabilise the Rook StorageClass CRs (absorb operator defaulting)
+      kubernetes.core.k8s:
+        state: present
+        src: '{{ ceph_sc_dir }}/{{ item }}'
+        server_side_apply:
+          field_manager: ansible-ceph-sc
+          force_conflicts: true
+        hidden_fields:
+          - metadata.managedFields
+          - status
+      register: ceph_sc_stabilise
+      until: not ceph_sc_stabilise.changed
+      retries: '{{ ceph_csi_ready_retries }}'
+      delay: '{{ ceph_csi_ready_delay }}'
+      changed_when: false
+      loop:
+        - block-replicated.yaml
+        - block-ec-retain.yaml
+        - block-ec-delete.yaml
+        - filesystem/fs.yaml
 
     # ── StorageClass default : exactement une (réutilise le patron local-path) ──
     - name: List all StorageClasses
