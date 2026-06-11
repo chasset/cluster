@@ -957,3 +957,41 @@ cours d'instruction ; **repli fiable** documenté :
 > **Bilan exposition** : la chaîne d'infrastructure (eBPF → LB-IPAM → L2 →
 > Gateway → TLS de bordure) est validée de bout en bout, et l'**UI Argo CD est
 > pleinement accessible en HTTPS**. Seul le **CLI gRPC-Web** reste à finaliser.
+
+## Run #14 (2026-06-11) — portage Ceph en rôles Ansible, from-scratch (banc Lima, commit `e8b0a60`)
+
+Première validation du **portage Ceph shell → Ansible** (rôle
+`platform-ceph-cluster`, `phase_ceph` recâblée sur `run_ansible_phase`). Chemin
+`storage-real` `NO_CACHE=1 WITH_CEPH=1`, donc `down` → disques vierges →
+bootstrap K8s → **Ceph from-scratch**. Banc Lima arm64, profil atlas-ceph (3
+nœuds, OSD sur `vde`, 512Mi).
+
+| Étape                               | Gate                                                                                                          | Résultat |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------- |
+| `down` + `up` (disques bruts)       | VMs détruites puis recréées, disques `vd[b-e]` vierges présents                                               | ✅       |
+| Bootstrap K8s (init + join, rescue) | 3 nœuds `Ready` (rôles k8s-initialization/k8s-join-cluster avec rescue ADR 0050)                              | ✅       |
+| Ceph from-scratch (rôle Ansible)    | operator → CephCluster (apply fusionné) → toolbox ; **9 OSD formés sur disques vierges**, CephCluster `Ready` | ✅       |
+| Santé Ceph                          | `HEALTH_OK` atteint (9/9 OSD up)                                                                              | 🟠 aidé  |
+| Idempotence (rejeu)                 | `changed=0` confirmé **2×** sur cluster stabilisé                                                             | 🟠 voir  |
+
+### Réserves d'honnêteté (ADR 0052)
+
+- **🟠 Santé aidée à la main** : au démarrage, le module mgr `prometheus` crashe
+  (race connue, bénin) → `HEALTH_WARN` dont le **seul** motif est
+  `RECENT_MGR_MODULE_CRASH`. L'ancienne gate exigeait `HEALTH_OK` strict et
+  épuisait ses retries ; débloquée par un `ceph crash archive-all` manuel
+  (diagnostic ADR 0046). **Code corrigé** (commit `e8b0a60` : la gate `k8s_info`
+  tolère ce WARN bénin via `.status.ceph.details`, vérifié en isolation) **mais
+  pas encore re-prouvé sans intervention** → à re-jouer from-scratch.
+- **🟠 Idempotence transitoire** : le rejeu du run, joué juste après l'archivage
+  (cluster en cours de restabilisation), a vu 1 tâche `changed`. Deux rejeux
+  ultérieurs sur cluster stable donnent `changed=0`. L'idempotence du rôle est
+  donc établie sur cluster stable ; le « 1 changed » était un état transitoire.
+- **Chemin incomplet** : `datalake` / smoke S3 / WordPress non atteints (le run
+  a stoppé sur la gate idempotence avant correction). À couvrir au prochain run.
+
+> **Bilan** : le **déploiement Ceph from-scratch fonctionne** (OSD formés sur
+> disques vierges, cluster `Ready`) et le rôle est **idempotent sur cluster
+> stable** (`changed=0`). Restent à re-prouver SANS intervention, en un seul run
+> `down → storage-real` avec le code corrigé : la tolérance WARN bénin et la
+> chaîne datalake/S3/WordPress.
