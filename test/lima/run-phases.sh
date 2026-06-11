@@ -550,11 +550,12 @@ _fault_redeploy() {
             verdict=$(classify_redeploy_recovery "${first_rc}" "${second_rc}" "")
             case "${verdict%%|*}" in ok) ok "${verdict#*|}" ;; *) die "${verdict#*|}" ;; esac
             return 0 ;;
-        # argocd : supprime une NetworkPolicy allow pendant la convergence →
-        # argocd-server jamais Ready → le rescue DIAGNOSTIQUE existant se déclenche.
+        # argocd : supprime la NetworkPolicy d'ingress argocd-server (nom réel
+        # `allow-argocd-server`, posée par allow-server-ingress.yaml) pendant la
+        # convergence → le re-jeu de gitops la re-pose et argocd reconverge.
         argocd-netpol)
-            inject_desc="delete netpol allow-server-ingress (argocd)"
-            "${KUBECTL[@]}" -n argocd delete networkpolicy allow-server-ingress --ignore-not-found >/dev/null 2>&1 || true
+            inject_desc="delete netpol allow-argocd-server (argocd)"
+            "${KUBECTL[@]}" -n argocd delete networkpolicy allow-argocd-server --ignore-not-found >/dev/null 2>&1 || true
             pb=(gitops)
             gate_pred=argocd_server_ready ;;
         # addon générique : supprime le Deployment metrics-server pendant le wait.
@@ -589,7 +590,16 @@ cri_keyring_ok() { vm_sh "${CP}" sh -c 'sudo gpg --show-keys /etc/apt/keyrings/k
 argocd_server_ready() { [ "$("${KUBECTL[@]}" -n argocd get deploy argocd-server -o jsonpath='{.status.readyReplicas}' 2>/dev/null)" = 1 ]; }
 metrics_server_ready() { [ "$("${KUBECTL[@]}" -n kube-system get deploy metrics-server -o jsonpath='{.status.readyReplicas}' 2>/dev/null)" = 1 ]; }
 # SC par défaut selon le profil (Ceph → block-replicated ; léger → local-path).
-ceph_default_sc_or_localpath() { [ "${WITH_CEPH:-0}" = 1 ] && echo rook-ceph-block-replicated || echo local-path; }
+# SC par défaut selon le profil RÉEL du banc (détecté du cluster, pas de
+# WITH_CEPH qui n'est pas exporté dans la session bootstrap-fault) : si la SC
+# Ceph existe → mode Ceph, sinon local-path.
+ceph_default_sc_or_localpath() {
+    if "${KUBECTL[@]}" get storageclass rook-ceph-block-replicated > /dev/null 2>&1; then
+        echo rook-ceph-block-replicated
+    else
+        echo local-path
+    fi
+}
 
 # ── Phase storage-simple — local-path-provisioner (mode rapide, sans Ceph) ───
 # Provisionneur de stockage simple (PVC sur disque local du nœud) pour itérer
