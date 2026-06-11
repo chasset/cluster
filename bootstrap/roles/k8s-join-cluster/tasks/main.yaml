@@ -1,4 +1,11 @@
 # code: language=ansible
+# Reprise après incident (ADR 0050, cas (b) — étape à effet de bord NON
+# idempotent). Un `kubeadm join` AVORTÉ laisse un kubelet/PKI partiel sur le
+# worker → un re-join nu échoue. Le rescue COMPENSE (`kubeadm reset --force`) pour
+# ramener le worker à « non joint propre », re-join-able, puis re-fail actionnable.
+# Le marqueur `creates:` node-joined.log (CHECKPOINT) garantit qu'un join déjà
+# réussi ne re-rentre pas dans le block. Frontière (ADR 0050) : le rescue ne
+# touche PAS containerd / APT (apanage du rollback global k8s-rollback).
 - name: Join worker nodes to cluster
   become: true
   become_method: ansible.builtin.sudo
@@ -20,3 +27,35 @@
         # les nœuds réels / Vagrant (debian) ET sur le banc Lima (/home/lima.guest).
         chdir: '{{ ansible_facts.env.HOME }}'
         creates: node-joined.log
+
+  # ── Reprise après incident (ADR 0050 cas (b)) ──────────────────────────────
+  rescue:
+    - name: Capture the kubelet state for diagnosis
+      ansible.builtin.command: journalctl -u kubelet --no-pager -n 30
+      register: join_kubelet_diag
+      changed_when: false
+      failed_when: false
+    - name: Show the kubelet diagnosis
+      ansible.builtin.debug:
+        var: join_kubelet_diag.stdout_lines
+    # COMPENSATION : reset le demi-join (kubelet config + certs partiels) pour
+    # repartir d'un worker vierge côté K8s. NE touche PAS containerd/APT.
+    - name: Compensate the aborted join (kubeadm reset --force)
+      ansible.builtin.command: kubeadm reset --force
+      register: join_reset
+      changed_when: "'cleaned up' in join_reset.stdout or join_reset.rc == 0"
+      failed_when: false
+    - name: Fail with an actionable message after compensation
+      ansible.builtin.fail:
+        msg: >-
+          `kubeadm join` a échoué et a été compensé (kubeadm reset --force). Le
+          worker est revenu à un état propre, re-join-able : corriger la cause
+          (token expiré → re-jouer k8s-pre-join ; réseau → vérifier l'API du
+          control-plane) puis RE-JOUER le même chemin.
+
+  always:
+    - name: Report the worker join outcome
+      ansible.builtin.debug:
+        msg: >-
+          k8s-join-cluster terminé (node-joined.log présent = join acquis ;
+          sinon le rescue a compensé et fait échouer pour re-jeu).
