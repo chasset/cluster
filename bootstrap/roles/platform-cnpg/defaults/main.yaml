@@ -33,6 +33,14 @@ cnpg_obc_storage_class: rook-ceph-datalake
 cnpg_s3_access_key: seaweedadmin
 cnpg_s3_secret_key: seaweedadmin-secret
 
+# Secrets de mot de passe des rôles managés (pg-role-*, type basic-auth).
+# Défaut = patron .example versionné (valeurs de TEST, banc). En PRODUCTION,
+# surcharger vers des Secrets générés/non versionnés (ADR 0023) — p. ex. les créer
+# d'abord via `bootstrap/cnpg-secrets.yaml` (mots de passe robustes persistés sous
+# secrets/, gitignoré) puis pointer ici, OU laisser vide pour ne PAS (ré)appliquer
+# de patron si les Secrets existent déjà dans le cluster (issue #280).
+cnpg_role_secrets_src: '{{ platform_repo_dir }}/platform/cloudnative-pg/role-secrets.example.yaml'
+
 # Gates (alignés sur les prédicats du shell dataops-chain).
 cnpg_operator_ready_retries: 36 # 36×5s = 180s
 cnpg_operator_ready_delay: 5

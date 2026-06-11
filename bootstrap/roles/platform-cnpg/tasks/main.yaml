@@ -68,12 +68,16 @@
         s3b_secret_key: '{{ cnpg_s3_secret_key }}'
 
     # ── 3. secrets de mot de passe des rôles managés (drift L16) ─────────────
-    # Patron .example versionné = valeurs de test (banc). En prod : Secrets hors
-    # dépôt (config locale non versionnée), mêmes clés.
-    - name: Apply managed role password Secrets
+    # Source surchargeable (cnpg_role_secrets_src) : défaut = patron .example
+    # (valeurs de test, banc). En PRODUCTION, créer les Secrets à part (mots de
+    # passe robustes non versionnés, ADR 0023 — cf. bootstrap/cnpg-secrets.yaml,
+    # issue #280) et mettre `cnpg_role_secrets_src: ''` pour NE PAS les écraser
+    # avec le patron de test. La tâche est sautée quand la source est vide.
+    - name: Apply managed role password Secrets (from overridable source)
       kubernetes.core.k8s:
         state: present
-        src: '{{ platform_repo_dir }}/platform/cloudnative-pg/role-secrets.example.yaml'
+        src: '{{ cnpg_role_secrets_src }}'
+      when: cnpg_role_secrets_src | default('') | length > 0
 
     # ── 4. ObjectStore (RGW) + Cluster (storageClass paramétré) ──────────────
     - name: Apply CNPG ObjectStore (endpoint {{ cnpg_s3_endpoint }})
