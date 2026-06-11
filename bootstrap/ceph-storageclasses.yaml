@@ -1,0 +1,29 @@
+---
+# Pose les StorageClasses Ceph (bloc + CephFS) via platform-ceph-storageclasses
+# (ADR 0033/0049). À jouer APRÈS ceph-cluster (HEALTH_OK + mons en quorum pour
+# peupler la config CSI). Play localhost → pas d'audit-log.
+- name: Ceph StorageClasses (block + CephFS)
+  hosts: "{{ dataops_k8s_host | default('localhost') }}"
+  gather_facts: false
+  pre_tasks:
+    - name: Ensure the Python kubernetes client is present
+      ansible.builtin.pip:
+        name:
+          - kubernetes
+          - certifi
+        state: present
+    - name: Resolve the certifi CA bundle path
+      ansible.builtin.command: "{{ ansible_python_interpreter | default('python3') }} -c 'import certifi; print(certifi.where())'"
+      register: ceph_sc_certifi
+      changed_when: false
+      check_mode: false
+    - name: Set the CA bundle for HTTPS requests
+      ansible.builtin.set_fact:
+        ceph_sc_ca_bundle: '{{ ceph_sc_certifi.stdout | trim }}'
+  environment:
+    SSL_CERT_FILE: '{{ ceph_sc_ca_bundle | default(omit) }}'
+  tasks:
+    - name: Ceph StorageClasses
+      ansible.builtin.import_role:
+        name: platform-ceph-storageclasses
+      tags: ceph-storageclasses

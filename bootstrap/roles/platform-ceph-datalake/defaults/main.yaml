@@ -1,0 +1,11 @@
+---
+# Valeurs par défaut du rôle platform-ceph-datalake (ADR 0033/0049/0036).
+# CephObjectStore RGW (cible S3 des backups Barman/CNPG et de Loki en mode Ceph)
+# + sa StorageClass bucket. Manifestes sans image ni device → AUCUNE surcharge.
+
+platform_repo_dir: '{{ playbook_dir }}/..'
+ceph_datalake_dir: '{{ platform_repo_dir }}/storage/ceph/storageClass/datalake'
+
+# Attente du RGW Ready (gateway instances:3 → on exige >= 1, pas == 1, drift L33).
+ceph_rgw_ready_retries: 30
+ceph_rgw_ready_delay: 10

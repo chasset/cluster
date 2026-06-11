@@ -1,0 +1,142 @@
+# code: language=ansible
+# Rôle platform-ceph-cluster (ADR 0033/0049/0008/0009) — porte phase_ceph
+# (test/lima/run-phases.sh) : operator Rook → CephCluster + toolbox, gate sur la
+# santé RÉELLE (HEALTH_OK ET le bon nombre d'OSD up, pas « vert à 0 OSD »).
+#
+# Manifestes VENDORED figés appliqués via kubernetes.core.k8s ; les surcharges
+# de topologie (metadataDevice, mémoire OSD) sont des PATCHs strategic-merge
+# ciblés (JAMAIS un .j2 du rendu, ADR 0049). L'undigest arm64 reste côté harnais
+# (ceph_cluster_src pointe une copie dé-épinglée sur le banc).
+#
+# IDEMPOTENCE (gate run_ansible_phase, rejeu changed=0, ADR 0052) :
+#  - CRs Rook mutés par l'operator → SSA + field_manager dédié + force_conflicts ;
+#  - tâches de GATE = LECTURES (ceph status) → changed_when: false obligatoire,
+#    sinon le rejeu somme des changed=true parasites (modèle ceph-pre-install).
+- name: Deploy Rook-Ceph cluster
+  run_once: true
+  block:
+    # ── Séquence Rook : CRDs AVANT common AVANT operator (commentaire upstream) ─
+    - name: Apply Rook CRDs (server-side — bundle volumineux)
+      kubernetes.core.k8s:
+        state: present
+        src: '{{ ceph_manifests_dir }}/crds.yaml'
+        server_side_apply:
+          field_manager: ansible-ceph-cluster
+          force_conflicts: true
+
+    - name: Apply Rook common (namespace + RBAC)
+      kubernetes.core.k8s:
+        state: present
+        src: '{{ ceph_manifests_dir }}/common.yaml'
+
+    - name: Apply Rook operator (server-side)
+      kubernetes.core.k8s:
+        state: present
+        src: '{{ ceph_manifests_dir }}/operator.yaml'
+        server_side_apply:
+          field_manager: ansible-ceph-cluster
+          force_conflicts: true
+
+    - name: Wait for the Rook operator to be Ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        name: rook-ceph-operator
+        namespace: rook-ceph
+      register: ceph_operator_deploy
+      until: >-
+        ceph_operator_deploy.resources | length > 0
+        and (ceph_operator_deploy.resources[0].status.readyReplicas | default(0)) == 1
+      retries: '{{ ceph_operator_ready_retries }}'
+      delay: '{{ ceph_operator_ready_delay }}'
+
+    # ── CephCluster : manifeste figé (ceph_cluster_src) + surcharges FUSIONNÉES ──
+    # ceph_cluster_src = vendored intact (prod) OU copie dé-épinglée (banc, undigest
+    # côté harnais). SSA + force_conflicts : Rook co-possède des champs du spec →
+    # sans force_conflicts l'apply au rejeu ÉCHOUE sur managedFields (modèle argocd).
+    #
+    # IDEMPOTENCE (rejeu changed=0, ADR 0051/0052) — PROUVÉE PAR REJEU SUR BANC,
+    # pas supposée. Le piège (constaté banc) : un apply du manifeste figé SUIVI
+    # d'un PATCH séparé des surcharges se BATTENT — l'apply re-pose les valeurs du
+    # manifeste (prod : nvme1n1/2Gi), le patch re-pose les surcharges (banc :
+    # vde/512Mi) → les DEUX tâches ressortent `changed` à CHAQUE rejeu, sans fin.
+    # PARADE : une SEULE tâche, le manifeste figé chargé puis FUSIONNÉ (combine
+    # recursive) avec les surcharges de topologie AVANT l'apply → l'apply est seul
+    # maître du spec, plus de conflit → diff before/after vide au rejeu → changed=0.
+    # FIDÉLITÉ : un vrai changement de spec (digest, valeur surchargée modifiée)
+    # rouvre le diff → la tâche redevient changed. Defaults = prod (ADR 0023) ;
+    # le banc surcharge ceph_metadata_device/ceph_osd_memory_request en -e.
+    #
+    # `hidden_fields: [metadata.managedFields]` : le SSA réécrit managedFields
+    # (ownership entre field managers), non masqué par défaut → bruit qui ferait
+    # un faux `changed`. On masque CE champ (et lui seul) du diff, jamais un champ
+    # de spec. (hidden_fields : kubernetes.core >= 3.0.0 ; dépôt épinglé 6.4.0.)
+    - name: Load the frozen CephCluster manifest
+      ansible.builtin.set_fact:
+        ceph_cluster_manifest: "{{ lookup('file', ceph_cluster_src) | from_yaml }}"
+
+    - name: Merge the topology overrides into the CephCluster spec
+      ansible.builtin.set_fact:
+        ceph_cluster_desired: >-
+          {{ ceph_cluster_manifest | combine({'spec': {
+               'storage': {'config': {'metadataDevice': ceph_metadata_device}},
+               'resources': {'osd': {'requests': {'memory': ceph_osd_memory_request}}}
+             }}, recursive=True) }}
+
+    - name: Apply the CephCluster (server-side, overrides merged)
+      kubernetes.core.k8s:
+        state: present
+        definition: '{{ ceph_cluster_desired }}'
+        server_side_apply:
+          field_manager: ansible-ceph-cluster
+          force_conflicts: true
+        hidden_fields:
+          - metadata.managedFields
+
+    - name: Apply the Rook toolbox
+      kubernetes.core.k8s:
+        state: present
+        src: '{{ ceph_manifests_dir }}/toolbox.yaml'
+
+    - name: Wait for the Rook toolbox to be Ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        name: rook-ceph-tools
+        namespace: rook-ceph
+      register: ceph_tools_deploy
+      until: >-
+        ceph_tools_deploy.resources | length > 0
+        and (ceph_tools_deploy.resources[0].status.readyReplicas | default(0)) == 1
+      retries: '{{ ceph_operator_ready_retries }}'
+      delay: '{{ ceph_operator_ready_delay }}'
+
+    # ── Gate santé : HEALTH_OK ET ceph_osd_expected OSD up (drift L7) ───────────
+    # Lecture du STATUS du CephCluster via k8s_info — PAS via k8s_exec sur la
+    # toolbox. Raison (prouvée banc) : k8s_exec passe par le client Python
+    # kubernetes (WebSocket connect_get_namespaced_pod_exec) qui, sous le contexte
+    # du playbook, échoue de façon SYSTÉMATIQUE et silencieuse (« 'NoneType' object
+    # has no attribute 'decode' » : frame WebSocket vide) — la gate épuise alors
+    # ses 80 retries sans jamais voir le stdout, alors que `kubectl exec` direct
+    # répond. k8s_info lit l'API server (HTTP, pas de WebSocket) → robuste.
+    # Rook publie tout le nécessaire dans .status.ceph :
+    #   - .status.ceph.health            = HEALTH_OK | HEALTH_WARN | …
+    #   - .status.ceph.versions.osd      = dict {version: nb de daemons OSD} →
+    #     la SOMME des valeurs = nombre d'OSD (== ceph_osd_expected attendu).
+    # changed_when:false IMPÉRATIF (lecture, sinon casse le gate d'idempotence).
+    # On tolère HEALTH_OK strict (le status agrège déjà ; un WARN transitoire de
+    # démarrage se résorbe avant que le status passe OK).
+    - name: Wait for the CephCluster to be healthy (HEALTH_OK + expected OSDs)
+      kubernetes.core.k8s_info:
+        api_version: ceph.rook.io/v1
+        kind: CephCluster
+        name: rook-ceph
+        namespace: rook-ceph
+      register: ceph_cluster_status
+      changed_when: false
+      until: >-
+        ceph_cluster_status.resources | length > 0
+        and (ceph_cluster_status.resources[0].status.ceph.health | default('')) == 'HEALTH_OK'
+        and (ceph_cluster_status.resources[0].status.ceph.versions.osd | default({})
+             | dict2items | map(attribute='value') | map('int') | sum)
+            == (ceph_osd_expected | int)
+      retries: '{{ ceph_health_retries }}'
+      delay: '{{ ceph_health_delay }}'

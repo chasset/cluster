@@ -12,6 +12,7 @@
 # Usage :
 #   test/lima/run-phases.sh up             # VMs + (si WITH_CEPH=1) disques bruts + gate vd* (#235)
 #   test/lima/run-phases.sh bootstrap      # bootstrap Ansible + Cilium + gate 3 nœuds Ready
+#   BANC_JETABLE=1 [FAULT_TARGET=init|join] test/lima/run-phases.sh bootstrap-fault # arrêt injecté : preuve du rescue (ADR 0050/0052 §5) — DESTRUCTIF
 #   test/lima/run-phases.sh storage-simple # local-path-provisioner (rapide) + gate PVC Bound
 #   test/lima/run-phases.sh metrics-server # Metrics API (kubectl top) + gate APIService Available (#252)
 #   test/lima/run-phases.sh platform-prereqs # CRDs Gateway API + containerd insecure-registry
@@ -203,7 +204,8 @@ node_disks() {
 # ── Prédicats pour retry (repris de multi-node) ──────────────────────────────
 # Gate générique : tous les nœuds attendus (${#NODES[@]}) sont Ready.
 nodes_ready_all() { [ "$("${KUBECTL[@]}" get nodes --no-headers 2> /dev/null | grep -cw Ready)" -eq "${#NODES[@]}" ]; }
-operator_ready() { [ "$("${KUBECTL[@]}" -n rook-ceph get deploy rook-ceph-operator -o jsonpath='{.status.readyReplicas}' 2> /dev/null)" = "1" ]; }
+# (operator_ready : SUPPRIMÉ — le gate operator Ready est porté dans le rôle
+#  platform-ceph-cluster, ADR 0049. Le diagnostic status garde osds_up/toolbox_ceph.)
 # Nombre d'OSD attendus = nœuds × disques data (3 × 3 = 9).
 OSD_EXPECTED=$(( ${#NODES[@]} * HDD_COUNT ))
 # HEALTH_OK SEUL est un faux-vert au démarrage : un cluster neuf SANS OSD ni pool
@@ -233,27 +235,9 @@ preflight() {
 }
 
 # ── Stockage : helpers partagés (storage-simple ET ceph) ─────────────────────
-# Marque UNE seule StorageClass `default` : pose l'annotation sur $1 et la retire
-# de toutes les autres. Évite le gate « exactement 1 SC default » rouge quand
-# plusieurs provisionneurs coexistent (ex. local-path + Ceph, ou un local-path
-# résiduel — cf. drift #128).
-set_default_sc() {
-    local want=$1 sc
-    for sc in $("${KUBECTL[@]}" get sc -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}'); do
-        if [ "${sc}" = "${want}" ]; then
-            "${KUBECTL[@]}" patch sc "${sc}" -p \
-                '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}' > /dev/null
-        else
-            "${KUBECTL[@]}" patch sc "${sc}" -p \
-                '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}' > /dev/null
-        fi
-    done
-    local ndefault
-    ndefault=$("${KUBECTL[@]}" get sc -o json \
-        | python3 -c "import sys,json;print(sum(1 for i in json.load(sys.stdin)['items'] if i['metadata'].get('annotations',{}).get('storageclass.kubernetes.io/is-default-class')=='true'))")
-    [ "${ndefault}" = "1" ] || die "il faut exactement 1 SC default, trouvé : ${ndefault}"
-    ok "StorageClass default = ${want} (1 seule)"
-}
+# (set_default_sc : SUPPRIMÉ — le marquage « exactement 1 SC default » est porté
+#  dans les rôles Ansible platform-local-path et platform-ceph-storageclasses,
+#  ADR 0049. Anti-double-source.)
 
 # Gate commun : crée un PVC test sur la SC $1 (défaut si vide) et vérifie Bound.
 gate_test_pvc() {
@@ -402,6 +386,86 @@ phase_bootstrap() {
     "${KUBECTL[@]}" get nodes -o wide
 }
 
+# ── Phase bootstrap-fault — ARRÊT INJECTÉ : prouve le rescue (ADR 0050/0052 §5) ─
+# Exerce le chemin de REPRISE d'un rôle à effet de bord non idempotent (init OU
+# join) en INJECTANT une faute, puis vérifie le protocole opposable de la règle 5
+# (ADR 0052) : 1er run ÉCHOUE → compensation `kubeadm reset` TRACÉE → re-jeu du
+# MÊME chemin RÉUSSIT. Le verdict passe par la fonction PURE classify_compensation
+# (testée bats, test/unit/bootstrap-fault.bats) — symétrique de run_ansible_phase.
+#
+# DESTRUCTIF : la faute injectée casse un control-plane/worker SAIN. À ne lancer
+# que sur un banc JETABLE (garde BANC_JETABLE=1). Mode déterministe (ADR 0052 §3) :
+# on retire le marqueur `creates:` d'une étape DÉJÀ acquise puis on rejoue → le
+# rôle re-tente `kubeadm init/join` sur un demi-état réel → le rescue compense.
+#
+# Cible via FAULT_TARGET : `init` (control-plane, défaut) ou `join` (1er worker).
+phase_bootstrap_fault() {
+    preflight
+    [ "${BANC_JETABLE:-0}" = 1 ] || die "phase bootstrap-fault DESTRUCTIVE (casse un nœud sain) — exiger BANC_JETABLE=1 sur un banc jetable"
+    [ -f "${INVENTORY}" ] || die "inventaire absent — lancer 'bootstrap' d'abord"
+    # shellcheck source=test/lima/bootstrap-fault-assert.sh
+    . "${HERE}/bootstrap-fault-assert.sh"
+
+    local target="${FAULT_TARGET:-init}" pb vm marker home
+    case "${target}" in
+        init)
+            pb=initialisation; vm="${CP}"
+            # admin.conf : marqueur de l'init acquis (chemin absolu, root).
+            marker=/etc/kubernetes/admin.conf ;;
+        join)
+            pb=join-workers
+            # 1er worker de l'inventaire (≠ control). node-joined.log est en $HOME.
+            local entry
+            for entry in "${NODES[@]}"; do
+                [ "${entry##*:}" = control ] || { vm="${entry%%:*}"; break; }
+            done
+            [ -n "${vm:-}" ] || die "bootstrap-fault join : aucun worker dans NODES"
+            # $HOME doit s'expandre DANS la VM (côté invité) → single-quote voulu.
+            # shellcheck disable=SC2016
+            home=$(vm_sh "${vm}" sh -c 'echo "$HOME"' | tr -d '\r')
+            marker="${home}/node-joined.log" ;;
+        *) die "FAULT_TARGET inconnu : ${target} (init|join)" ;;
+    esac
+
+    log "Phase bootstrap-fault — arrêt injecté sur '${target}' (${vm}), preuve du rescue ADR 0050"
+
+    # 1. INJECTION : retirer le marqueur de l'étape acquise → le block va re-tenter
+    #    `kubeadm init/join` sur un nœud déjà initialisé (demi-état réel).
+    log "  injection : rm ${marker} sur ${vm} (l'étape ${target} va re-tenter sur un demi-état)"
+    vm_sh "${vm}" sudo rm -f "${marker}" \
+        || die "bootstrap-fault : échec de la suppression du marqueur ${marker}"
+
+    # 2. 1er RUN : doit ÉCHOUER (kubeadm refuse l'état partiel) et le rescue doit
+    #    COMPENSER (kubeadm reset). On capture rc + sortie SANS planter set -e.
+    log "  1er run ${pb}.yaml — DOIT échouer puis compenser (kubeadm reset)"
+    local out1 first_rc reset_seen
+    set +e
+    out1=$(KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
+        "${REPO}/bootstrap/${pb}.yaml" 2>&1)
+    first_rc=$?
+    set -e
+    printf '%s\n' "${out1}" | tail -25
+    reset_seen=$(printf '%s\n' "${out1}" | parse_kubeadm_reset)
+    log "  1er run : rc=${first_rc}, compensation tracée=${reset_seen}"
+
+    # 3. RE-JEU du MÊME chemin : après compensation, le nœud est propre → succès.
+    log "  re-jeu ${pb}.yaml — DOIT réussir (le chemin repart propre)"
+    local second_rc
+    set +e
+    KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
+        "${REPO}/bootstrap/${pb}.yaml"
+    second_rc=$?
+    set -e
+
+    # 4. VERDICT (fonction pure, ADR 0052 §5).
+    local verdict
+    verdict=$(classify_compensation "${first_rc}" "${reset_seen}" "${second_rc}")
+    case "${verdict%%|*}" in
+        ok) ok "${verdict#*|}" ;;
+        *) die "${verdict#*|}" ;;
+    esac
+}
+
 # ── Phase storage-simple — local-path-provisioner (mode rapide, sans Ceph) ───
 # Provisionneur de stockage simple (PVC sur disque local du nœud) pour itérer
 # vite sur la couche applicative/plateforme sans payer les ~15 min de Ceph.
@@ -494,92 +558,62 @@ EOF
 }
 
 # ── Phase 3 — Rook-Ceph ──────────────────────────────────────────────────────
+# Prépare un dossier de manifestes Ceph DÉ-ÉPINGLÉS pour le banc arm64 : les
+# images Ceph sont épinglées par DIGEST amd64 (corrects en prod x86_64, ADR 0006)
+# → `exec format error` sur ce banc ARM64. On retombe sur le TAG multi-arch côté
+# banc UNIQUEMENT (le livrable garde ses digests intacts — surcharge HARNAIS, pas
+# le rôle). Renvoie le chemin du dossier dé-épinglé. Idempotent (refait à chaque
+# run, peu coûteux). Drift Ceph arm64 du banc.
+ceph_undigest_manifests() {
+    local out="${WORKDIR}/ceph-undigest"
+    mkdir -p "${out}/storageClass/datalake" "${out}/storageClass/filesystem"
+    local f
+    for f in crds common operator cluster toolbox; do
+        sed -E 's/(image:[[:space:]]*[^@[:space:]]+)@sha256:[0-9a-f]+/\1/' \
+            "${REPO}/storage/ceph/${f}.yaml" > "${out}/${f}.yaml"
+    done
+    printf '%s' "${out}"
+}
+
 phase_ceph() {
     preflight
     [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
-    log "Phase 3 — Rook-Ceph (banc Lima : metadataDevice=vde)"
+    [ -f "${INVENTORY}" ] || die "inventaire absent — lancer 'bootstrap' d'abord"
+    log "Phase 3 — Rook-Ceph via Ansible (banc Lima : metadataDevice=vde, OSD 512Mi)"
 
-    # /var/lib/rook sur chaque nœud.
+    # /var/lib/rook sur chaque nœud (node-side, reste au harnais).
     local entry vm
     for entry in "${NODES[@]}"; do
         vm="${entry%%:*}"
         vm_sh "${vm}" sh -c 'sudo mkdir -p /var/lib/rook && sudo chmod 755 /var/lib/rook'
     done
 
-    # Manifeste cluster surchargé pour le banc (non committé). Deux surcharges :
-    #  1. metadataDevice vde (block.db virtio-blk Lima, vs nvme1n1 en prod).
-    #  2. osd.requests.memory 2Gi → 512Mi : sur banc 5 GiB/VM, 2Gi ne laisse
-    #     scheduler qu'1 OSD/hôte → les autres restent Pending. 512Mi laisse
-    #     monter les ~3 OSD/hôte. La valeur prod (2Gi) reste correcte — surcharge
-    #     banc. L'awk ne touche QUE le bloc osd: (memory: '2Gi' apparaît aussi
-    #     sous mon:).
-    local cluster_bench="${WORKDIR}/cluster-bench.yaml"
-    sed "s/metadataDevice: 'nvme1n1'/metadataDevice: 'vde'/" \
-        "${REPO}/storage/ceph/cluster.yaml" \
-        | awk '
-            /^[[:space:]]*osd:[[:space:]]*$/ { in_osd = 1 }
-            in_osd && /memory: .2Gi./ { sub(/2Gi/, "512Mi"); in_osd = 0 }
-            { print }
-          ' > "${cluster_bench}"
-    grep -q "metadataDevice: 'vde'" "${cluster_bench}" || die "surcharge metadataDevice=vde non appliquée"
-    grep -q "memory: '512Mi'" "${cluster_bench}" || die "surcharge osd.requests.memory=512Mi non appliquée"
-
-    # SURCHARGE BANC : dé-épingler les images @sha256 (arm64). Les images Ceph
-    # sont épinglées par DIGEST amd64 (corrects en prod x86_64). Sur ce banc
-    # ARM64, l'image amd64 donne `exec format error`. On retombe sur le TAG
-    # (multi-arch) côté banc UNIQUEMENT — le livrable garde son digest intact.
-    undigest() { sed -E 's/(image:[[:space:]]*[^@[:space:]]+)@sha256:[0-9a-f]+/\1/'; }
-
-    log "  apply crds → common → operator (images dé-épinglées pour arm64)"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/crds.yaml"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/common.yaml"
-    undigest < "${REPO}/storage/ceph/operator.yaml" | "${KUBECTL[@]}" apply -f -
-    retry 180 5 operator_ready || die "rook-ceph-operator pas Ready"
-    ok "operator Ready"
-
-    log "  apply cluster-bench.yaml + toolbox (images dé-épinglées pour arm64)"
-    undigest < "${cluster_bench}" | "${KUBECTL[@]}" apply -f -
-    undigest < "${REPO}/storage/ceph/toolbox.yaml" | "${KUBECTL[@]}" apply -f -
-
-    # GATE : HEALTH_OK (peut prendre 5-15 min).
-    log "Attente HEALTH_OK (max 20 min)"
-    retry 1200 15 ceph_healthy \
-        || die "Ceph pas HEALTH_OK : $(toolbox_ceph status 2>&1 | head -20)"
-    ok "Ceph HEALTH_OK"
-    toolbox_ceph status
-    if "${KUBECTL[@]}" -n rook-ceph describe cephcluster 2> /dev/null | grep -qi 'no matches for kind'; then
-        die "erreur CSI 'no matches for kind' — ROOK_USE_CSI_OPERATOR ?"
-    fi
-    ok "pas d'erreur CSI"
+    # PORTÉ EN RÔLE ANSIBLE (platform-ceph-cluster). Le rôle applique les
+    # manifestes figés (SSA + force_conflicts sur les CR mutés par Rook), patche
+    # les surcharges de topologie, et gate sur HEALTH_OK + OSD up. Anti-double-
+    # source : plus de kubectl apply / retry shell ici. Surcharges banc passées
+    # en -e (defaults du rôle = valeurs PROD) : dossier dé-épinglé arm64,
+    # metadataDevice vde, OSD 512Mi, 9 OSD attendus (3 nœuds × 3 HDD).
+    local undig; undig=$(ceph_undigest_manifests)
+    run_ansible_phase bootstrap/ceph-cluster.yaml \
+        -e "ceph_manifests_dir=${undig}" \
+        -e "ceph_cluster_src=${undig}/cluster.yaml" \
+        -e ceph_metadata_device=vde \
+        -e ceph_osd_memory_request=512Mi \
+        -e "ceph_osd_expected=$(( ${#NODES[@]} * HDD_COUNT ))"
+    ok "Ceph HEALTH_OK (operator + cluster + toolbox, OSD up)"
 }
 
 # ── Phase 4 — StorageClasses ─────────────────────────────────────────────────
 phase_sc() {
     preflight
     [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
-    log "Phase 4 — StorageClasses"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/storageClass/block-replicated.yaml"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/storageClass/block-ec-retain.yaml"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/storageClass/block-ec-delete.yaml"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/storageClass/filesystem/fs.yaml"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/storageClass/filesystem/storageclass.yaml"
-
-    # GATE 1 : Ceph block-replicated devient la SC default (1 seule).
-    set_default_sc rook-ceph-block-replicated
-
-    # PRÉ-CONDITION : la config CSI doit lister les monitors avant le PVC test
-    # (sinon « empty monitor list » au premier run from-scratch).
-    log "  Attente de la config CSI (monitors peuplés)"
-    # shellcheck disable=SC2329  # invoquée indirectement par `retry`
-    csi_monitors_ready() {
-        "${KUBECTL[@]}" -n rook-ceph get cm rook-ceph-csi-config \
-            -o jsonpath='{.data.csi-cluster-config-json}' 2> /dev/null \
-            | grep -q '"monitors":\["'
-    }
-    retry 180 5 csi_monitors_ready \
-        || die "config CSI sans monitors après 3 min (mons en quorum ?)"
-
-    # GATE 2 : PVC test (Bound) sur la SC Ceph par défaut.
+    [ -f "${INVENTORY}" ] || die "inventaire absent — lancer 'bootstrap' d'abord"
+    log "Phase 4 — StorageClasses Ceph via Ansible"
+    # PORTÉ EN RÔLE ANSIBLE (platform-ceph-storageclasses) : apply des SC bloc/fs,
+    # SC default (1 seule), pré-condition CSI monitors. Anti-double-source. Pas de
+    # surcharge banc (SC sans image ni device). gate_test_pvc reste un TEST.
+    run_ansible_phase bootstrap/ceph-storageclasses.yaml
     gate_test_pvc rook-ceph-block-replicated
 }
 
@@ -590,22 +624,12 @@ phase_sc() {
 phase_datalake() {
     preflight
     [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
-    log "Phase datalake — CephObjectStore RGW + storageClass datalake"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/storageClass/datalake/datalake-ec.yaml"
-    "${KUBECTL[@]}" apply -f "${REPO}/storage/ceph/storageClass/datalake/storage-class.yaml"
-
-    # GATE : le RGW datalake répond (Deployment du gateway Ready).
-    log "  Attente du RGW datalake Ready (max 5 min)"
-    # shellcheck disable=SC2329  # invoquée indirectement par `retry`
-    rgw_ready() {
-        # Le CephObjectStore a `instances: 3` → Deployment à 3 replicas (drift
-        # L33 : tester == 1 échouait alors que le RGW est sain). On exige >= 1.
-        local rr
-        rr=$("${KUBECTL[@]}" -n rook-ceph get deploy rook-ceph-rgw-datalake-a -o jsonpath='{.status.readyReplicas}' 2> /dev/null)
-        [ -n "${rr}" ] && [ "${rr}" -ge 1 ]
-    }
-    retry 300 10 rgw_ready \
-        || die "RGW datalake pas Ready : $("${KUBECTL[@]}" -n rook-ceph get pods -l app=rook-ceph-rgw 2>&1 | tail -5)"
+    [ -f "${INVENTORY}" ] || die "inventaire absent — lancer 'bootstrap' d'abord"
+    log "Phase datalake — CephObjectStore RGW via Ansible"
+    # PORTÉ EN RÔLE ANSIBLE (platform-ceph-datalake) : CephObjectStore (SSA +
+    # force_conflicts, CR muté par Rook) + SC bucket, gate RGW Ready. Anti-double-
+    # source. La phase_smoke_s3 qui suit reste un TEST (PUT/GET/DELETE réel).
+    run_ansible_phase bootstrap/ceph-datalake.yaml
     ok "RGW datalake Ready (cible S3 des backups Barman)"
 }
 
@@ -1247,6 +1271,7 @@ run_hardening_if_requested() {
 case "${1:-}" in
     up) time_phase up phase_up ;;
     bootstrap) time_phase bootstrap phase_bootstrap ;;
+    bootstrap-fault) time_phase bootstrap-fault phase_bootstrap_fault ;;
     storage-simple) time_phase storage-simple phase_storage_simple ;;
     metrics-server) time_phase metrics-server phase_metrics_server ;;
     platform-prereqs) time_phase platform-prereqs phase_platform_prereqs ;;
