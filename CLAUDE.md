@@ -59,7 +59,11 @@ Détail et justification :
   mort) ; jobs CI séparés non couverts par `pnpm lint` : **markdownlint** et
   **trivy** — les reproduire localement avant de pousser.
 - **Banc : corriger le CODE, pas l'état** (ADR
-  [0046](docs/decisions/0046-corriger-le-code-pas-l-etat.md)/[0034](docs/decisions/0034-validation-e2e-from-scratch.md)).
+  [0046](docs/decisions/0046-corriger-le-code-pas-l-etat.md)/[0034](docs/decisions/0034-validation-e2e-from-scratch.md))
+  — déclinaison du principe-chapeau **reproductibilité des résultats**
+  ([ADR 0052](docs/decisions/0052-reproductibilite-des-resultats.md) : un
+  résultat n'a de valeur que reproductible depuis le code seul ; état complété à
+  la main = preuve invalide ; idempotence prouvée par rejeu `changed=0`).
   `kubectl patch`/`apply` manuel = **diagnostic uniquement** ; tout correctif
   repart dans le code versionné (manifeste/rôle/harnais) puis est **re-prouvé
   par un run**. Le banc se monte par un **chemin nommé codé**

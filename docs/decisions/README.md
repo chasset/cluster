@@ -71,3 +71,4 @@ Format léger inspiré de Michael Nygard :
 | 0049 | [Doctrine du choix d'outil par action (pondérée)](0049-doctrine-choix-outil-par-action.md)                         | Accepted           |
 | 0050 | [Modèle de reprise / transactionnalité d'un rôle Ansible](0050-modele-reprise-role-ansible.md)                     | Accepted           |
 | 0051 | [Options natives Ansible (idempotence, check_mode, server-side, handlers)](0051-options-natives-ansible.md)        | Accepted           |
+| 0052 | [Reproductibilité des résultats (principe-chapeau)](0052-reproductibilite-des-resultats.md)                        | Accepted           |
