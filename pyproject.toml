@@ -10,7 +10,9 @@ name = "cluster-tooling"
 version = "0.0.0"
 description = "Scripts outillage du dépôt cluster (Python ; ADR 0017)"
 requires-python = ">=3.12"
-dependencies = []
+# pyyaml : parsing YAML multi-doc du garde-fou contrat→platform (check_contract.py,
+# ADR 0043). Seule dépendance runtime ; uv.lock épingle la version (esprit ADR 0006).
+dependencies = ["pyyaml>=6,<7"]
 
 [dependency-groups]
 dev = [

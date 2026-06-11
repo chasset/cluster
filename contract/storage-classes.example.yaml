@@ -63,7 +63,7 @@ profils:
     object_store:
       # S3 n'est PAS une StorageClass : on l'obtient via ObjectBucketClaim
       # (cf. contract/namespaces-secrets.example.yaml).
-      bucket_storage_class: rook-ceph-bucket
+      bucket_storage_class: rook-ceph-datalake
       provisioner: rook-ceph.ceph.rook.io/bucket
       endpoint: rook-ceph-rgw-datalake.rook-ceph.svc.cluster.local:80
       note: Déclarer un ObjectBucketClaim avec cette StorageClass pour un bucket S3.
