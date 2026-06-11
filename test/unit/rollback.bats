@@ -31,6 +31,35 @@ setup() {
     [ -z "$output" ]
 }
 
+@test "namespaces : datalake → vide (PARTAGE rook-ceph, ne le supprime PAS)" {
+    run rollback_phase_namespaces datalake
+    [ -z "$output" ]
+}
+
+# ─── rollback_phase_targeted_resources (phases sans ns propre) ──────────────
+
+@test "targeted : datalake → CephObjectStore + SC bucket (pas le ns rook-ceph)" {
+    run rollback_phase_targeted_resources datalake
+    [[ "$output" == *"cephobjectstore.ceph.rook.io datalake"* ]]
+    [[ "$output" == *"rook-ceph-datalake"* ]]
+    [[ "$output" != *"namespace"* ]]
+}
+
+@test "targeted : sc → StorageClasses bloc/fs ciblées" {
+    run rollback_phase_targeted_resources sc
+    [[ "$output" == *"rook-ceph-block-replicated"* ]]
+}
+
+@test "targeted : metrics-server → deploy kube-system" {
+    run rollback_phase_targeted_resources metrics-server
+    [[ "$output" == *"-n kube-system deployment.apps metrics-server"* ]]
+}
+
+@test "targeted : ceph → vide (ceph passe par ns + CRD, pas ciblé)" {
+    run rollback_phase_targeted_resources ceph
+    [ -z "$output" ]
+}
+
 # ─── rollback_phase_crd_groups ──────────────────────────────────────────────
 
 @test "crd : ceph → ceph.rook.io" {
@@ -45,6 +74,13 @@ setup() {
 
 @test "crd : metrics-server → vide" {
     run rollback_phase_crd_groups metrics-server
+    [ -z "$output" ]
+}
+
+@test "crd : sc/datalake → vide (ne PAS supprimer les CRD ceph.rook.io partagés)" {
+    run rollback_phase_crd_groups sc
+    [ -z "$output" ]
+    run rollback_phase_crd_groups datalake
     [ -z "$output" ]
 }
 

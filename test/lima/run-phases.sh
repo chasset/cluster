@@ -36,6 +36,7 @@
 #   WITH_HARDENING=1 test/lima/run-phases.sh atlas  # même chemin + secure.yml (audit,detection) après le socle
 #   test/lima/run-phases.sh kubeconfig     # (ré)exporte le kubeconfig banc
 #   test/lima/run-phases.sh status         # état du banc : VMs, nœuds, phases, UIs, dernier run (#149)
+#   BANC_JETABLE=1 test/lima/run-phases.sh rollback <phase>  # défait UNE phase (ns+CRD+node-side) pour la re-tester (ADR 0054) — DESTRUCTIF
 #   test/lima/run-phases.sh down           # détruit les VMs + disques nommés
 #
 # Pré-requis poste : limactl (Lima ≥ 2.0), ansible-playbook, kubectl, python3.
@@ -59,6 +60,9 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 # ADR 0053) puis classe. Testée par test/unit/health-classify.bats.
 # shellcheck source=bootstrap/lib/health-classify.sh
 . "${REPO}/bootstrap/lib/health-classify.sh"
+# Primitives + fonctions pures du ROLLBACK PAR PHASE (ADR 0054, #274).
+# shellcheck source=test/lima/rollback-lib.sh
+. "${HERE}/rollback-lib.sh"
 
 # ── Table des nœuds (noms génériques — ADR 0023) ─────────────────────────────
 # "nom:rôle". Topologie `multi-node-3` : 1 control-plane + 2 workers = quorum mon
@@ -1536,6 +1540,9 @@ case "${1:-}" in
         ;;
     status) phase_status ;;
     down) phase_down ;;
+    # Rollback d'UNE phase (ADR 0054, #274) : défait ce que `<phase>` a monté.
+    # BANC_JETABLE=1 requis (destructif total). Ex : BANC_JETABLE=1 ... rollback ceph
+    rollback) [ -n "${2:-}" ] || die "usage : rollback <phase> (ceph|sc|datalake|metrics-server|monitoring|dataops|gitops|gitops-seed)"; phase_rollback "$2" ;;
     *)
         grep -E '^#( |$)' "$0" | sed -E 's/^# ?//' | head -40
         exit 2
