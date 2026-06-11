@@ -73,3 +73,4 @@ Format léger inspiré de Michael Nygard :
 | 0051 | [Options natives Ansible (idempotence, check_mode, server-side, handlers)](0051-options-natives-ansible.md)        | Accepted           |
 | 0052 | [Reproductibilité des résultats (principe-chapeau)](0052-reproductibilite-des-resultats.md)                        | Accepted           |
 | 0053 | [Isolation multi-cible : banc Lima et prod sur le même poste](0053-isolation-multi-cible-banc-prod.md)             | Accepted           |
+| 0054 | [Rollback par phase sur le banc (désinstallation ciblée, jetable)](0054-rollback-par-phase-banc.md)                | Accepted           |
