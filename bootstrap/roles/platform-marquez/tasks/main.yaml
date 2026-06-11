@@ -78,3 +78,36 @@
       loop:
         - marquez
         - marquez-web
+
+  # Rescue DIAGNOSTIQUE (ADR 0050, #236) — calqué sur argocd/cnpg. Aucun delete.
+  rescue:
+    - name: Collect marquez pods state (diagnostic)
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: '{{ marquez_namespace }}'
+      register: marquez_pods_diag
+      run_once: true
+    - name: Report marquez convergence failure
+      ansible.builtin.debug:
+        msg: >-
+          Marquez non convergé. Pods non Running :
+          {{ marquez_pods_diag.resources
+             | rejectattr('status.phase', 'equalto', 'Running')
+             | map(attribute='metadata.name') | list }}.
+          Causes fréquentes : base CNPG pas prête (dépendance dataops), migration
+          Flyway en échec, image non pull. Diagnostic : kubectl -n
+          {{ marquez_namespace }} get pods,events --sort-by=.lastTimestamp.
+      run_once: true
+    - name: Fail with an actionable message
+      ansible.builtin.fail:
+        msg: >-
+          Déploiement Marquez échoué (voir diagnostic ci-dessus). Le re-run du
+          rôle est idempotent et reprend — corriger d'abord la cause signalée.
+
+  always:
+    - name: Marquez deployment outcome
+      ansible.builtin.debug:
+        msg: >-
+          platform-marquez terminé. Vérifier :
+          kubectl -n {{ marquez_namespace }} get deploy.
+      run_once: true
