@@ -18,59 +18,60 @@ Format léger inspiré de Michael Nygard :
 
 ## Index
 
-| #    | Titre                                                                                                              | Statut             |
-| ---- | ------------------------------------------------------------------------------------------------------------------ | ------------------ |
-| 0001 | [Réplication ×3 pour les workloads bloc (vs EC)](0001-replication-x3-pour-workloads-bloc.md)                       | Accepted           |
-| 0002 | [Control plane unique avec `--control-plane-endpoint`](0002-control-plane-unique-avec-endpoint.md)                 | Accepted           |
-| 0003 | [Pas de chiffrement Ceph — sécurité du réseau déléguée](0003-pas-de-chiffrement-ceph-tailscale.md)                 | Accepted           |
-| 0004 | [Erasure coding 2+1 réservé au datalake](0004-erasure-coding-2plus1-datalake.md)                                   | Accepted           |
-| 0005 | [CRI = `containerd.io` depuis le dépôt Docker](0005-cri-containerd-via-depot-docker.md)                            | Accepted           |
-| 0006 | [Matrice de versions et politique de bump](0006-matrice-de-versions-et-politique-de-bump.md)                       | Accepted           |
-| 0007 | [Hyperconvergence : control plane portant OSDs](0007-hyperconvergence-control-plane-osd.md)                        | Accepted           |
-| 0008 | [`metadataDevice` NVMe unique — SPOF par nœud assumé](0008-metadatadevice-nvme-spof-par-noeud.md)                  | Accepted           |
-| 0009 | [Pourquoi 4 nœuds ?](0009-pourquoi-4-noeuds.md)                                                                    | Accepted           |
-| 0010 | [Dashboard Kubernetes en `cluster-admin`](0010-dashboard-cluster-admin.md)                                         | Accepted           |
-| 0011 | [Registry interne HTTP sans authentification](0011-registry-http-sans-auth.md)                                     | Accepted           |
-| 0012 | [RStudio sans authentification (`DISABLE_AUTH=true`)](0012-rstudio-disable-auth.md)                                | Accepted           |
-| 0013 | [Sauvegarde des données applicatives (VolumeSnapshots CSI)](0013-sauvegarde-donnees-applicatives.md)               | Accepted           |
-| 0014 | [Durcissement du plan de contrôle (`kubeadm init` nu)](0014-durcissement-kubeadm-init.md)                          | Accepted           |
-| 0015 | [Stratégie d'upgrade Kubernetes (in-place vs rebuild)](0015-strategie-upgrade-kubernetes.md)                       | Accepted           |
-| 0016 | [Observabilité (metrics-server maintenant, Prometheus plus tard)](0016-observabilite.md)                           | Accepted           |
-| 0017 | [Langage des scripts (bash / jq / Python / bats)](0017-langage-des-scripts.md)                                     | Superseded by 0049 |
-| 0018 | [Rook-Ceph plutôt que Longhorn](0018-rook-ceph-vs-longhorn.md)                                                     | Accepted           |
-| 0019 | [Durcissement réseau Cilium (WireGuard + Hubble)](0019-durcissement-reseau-cilium.md)                              | Accepted           |
-| 0020 | [Exposition réseau tout-Cilium (LB-IPAM + L2 + Gateway API)](0020-exposition-reseau-tout-cilium.md)                | Accepted           |
-| 0021 | [cert-manager + CA interne (TLS de bordure)](0021-cert-manager-ca-interne.md)                                      | Accepted           |
-| 0022 | [Argo CD (GitOps applicatif)](0022-argocd-gitops-applicatif.md)                                                    | Accepted           |
-| 0023 | [Dépôt multi-topologies (plusieurs infra déclarées, une activée)](0023-plateforme-exemple-generique.md)            | Accepted           |
-| 0024 | [PostgreSQL managé via CloudNativePG (+ pgvector)](0024-postgres-manage-cloudnative-pg.md)                         | Accepted           |
-| 0025 | [Sécurité active : chaos + attaques contrôlées (D/A/R)](0025-securite-active-chaos-attaques-controlees.md)         | Accepted           |
-| 0026 | [Orchestration des pipelines via Dagster](0026-orchestration-dagster.md)                                           | Accepted           |
-| 0027 | [Bootstrap paramétré multi-cluster (Cilium Cluster Mesh)](0027-bootstrap-parametre-multi-cluster.md)               | Accepted           |
-| 0028 | [Store de lineage OpenLineage via Marquez](0028-orchestration-openlineage-marquez.md)                              | Accepted           |
-| 0029 | [Toute page Markdown est atteignable depuis la doc](0029-markdown-atteignable-doc.md)                              | Accepted           |
-| 0030 | [Nomenclature des bancs et topologies](0030-nomenclature-bancs-topologies.md)                                      | Accepted           |
-| 0031 | [Terrain d'exécution cloud ARM (cadrage)](0031-terrain-cloud-arm.md)                                               | Accepted           |
-| 0032 | [OpenTofu pour le provisioning des VM cloud](0032-opentofu-provisioning-cloud.md)                                  | Accepted           |
-| 0033 | [Orchestration Ansible des addons plateforme DataOps](0033-orchestration-ansible-platform-dataops.md)              | Accepted           |
-| 0034 | [La validation = un run e2e from-scratch (pas le lint)](0034-validation-e2e-from-scratch.md)                       | Accepted           |
-| 0035 | [Stratégie de bancs : fidélité vs vitesse](0035-strategie-bancs-fidelite-vitesse.md)                               | Accepted           |
-| 0036 | [Backing S3 par topologie : SeaweedFS (léger) / RGW (prod)](0036-backing-s3-unique-rgw.md)                         | Accepted           |
-| 0037 | [Stratégie de merge : merge commit (préserver les références)](0037-strategie-merge-commit.md)                     | Accepted           |
-| 0038 | [Lima seul banc local ; provisioning n'est plus un axe](0038-lima-seul-banc-local.md)                              | Accepted           |
-| 0039 | [Nomenclature des axes du catalogue (codes par valeur)](0039-nomenclature-axes-catalogue.md)                       | Accepted           |
-| 0040 | [Stratégie terrains × topologies (quel terrain monte quoi)](0040-terrains-x-topologies.md)                         | Accepted           |
-| 0041 | [Gouvernance & complétude DataOps (dbt, Airflow, catalogue) — cadrage](0041-gouvernance-completude-dataops.md)     | Accepted           |
-| 0042 | [Fraîcheur des preuves de banc (garde-fou CI)](0042-fraicheur-preuves-banc.md)                                     | Accepted           |
-| 0043 | [Contrat d'interface cluster → atlas (endpoints, SC, secrets)](0043-contrat-interface-cluster-atlas.md)            | Accepted           |
-| 0044 | [Topologie du banc atlas (socle consommé, Gitea intra-banc)](0044-topologie-deploiement-banc-atlas.md)             | Accepted           |
-| 0045 | [Chemins d'installation du banc : couches, dépendances, tests associés](0045-chemins-installation-banc-couches.md) | Accepted           |
-| 0046 | [Corriger le code d'installation, pas l'état du cluster](0046-corriger-le-code-pas-l-etat.md)                      | Accepted           |
-| 0047 | [Topologie `ha-3cp` : CP dédié, VIP kube-vip, etcd 2/3](0047-topologie-ha-3cp-control-plane-dedie.md)              | Accepted           |
-| 0048 | [Accès local développeur (URLs cliquables + secrets + `.env`)](0048-acces-local-developpeur.md)                    | Accepted           |
-| 0049 | [Doctrine du choix d'outil par action (pondérée)](0049-doctrine-choix-outil-par-action.md)                         | Accepted           |
-| 0050 | [Modèle de reprise / transactionnalité d'un rôle Ansible](0050-modele-reprise-role-ansible.md)                     | Accepted           |
-| 0051 | [Options natives Ansible (idempotence, check_mode, server-side, handlers)](0051-options-natives-ansible.md)        | Accepted           |
-| 0052 | [Reproductibilité des résultats (principe-chapeau)](0052-reproductibilite-des-resultats.md)                        | Accepted           |
-| 0053 | [Isolation multi-cible : banc Lima et prod sur le même poste](0053-isolation-multi-cible-banc-prod.md)             | Accepted           |
-| 0054 | [Rollback par phase sur le banc (désinstallation ciblée, jetable)](0054-rollback-par-phase-banc.md)                | Accepted           |
+| #    | Titre                                                                                                                        | Statut             |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| 0001 | [Réplication ×3 pour les workloads bloc (vs EC)](0001-replication-x3-pour-workloads-bloc.md)                                 | Accepted           |
+| 0002 | [Control plane unique avec `--control-plane-endpoint`](0002-control-plane-unique-avec-endpoint.md)                           | Accepted           |
+| 0003 | [Pas de chiffrement Ceph — sécurité du réseau déléguée](0003-pas-de-chiffrement-ceph-tailscale.md)                           | Accepted           |
+| 0004 | [Erasure coding 2+1 réservé au datalake](0004-erasure-coding-2plus1-datalake.md)                                             | Accepted           |
+| 0005 | [CRI = `containerd.io` depuis le dépôt Docker](0005-cri-containerd-via-depot-docker.md)                                      | Accepted           |
+| 0006 | [Matrice de versions et politique de bump](0006-matrice-de-versions-et-politique-de-bump.md)                                 | Accepted           |
+| 0007 | [Hyperconvergence : control plane portant OSDs](0007-hyperconvergence-control-plane-osd.md)                                  | Accepted           |
+| 0008 | [`metadataDevice` NVMe unique — SPOF par nœud assumé](0008-metadatadevice-nvme-spof-par-noeud.md)                            | Accepted           |
+| 0009 | [Pourquoi 4 nœuds ?](0009-pourquoi-4-noeuds.md)                                                                              | Accepted           |
+| 0010 | [Dashboard Kubernetes en `cluster-admin`](0010-dashboard-cluster-admin.md)                                                   | Accepted           |
+| 0011 | [Registry interne HTTP sans authentification](0011-registry-http-sans-auth.md)                                               | Accepted           |
+| 0012 | [RStudio sans authentification (`DISABLE_AUTH=true`)](0012-rstudio-disable-auth.md)                                          | Accepted           |
+| 0013 | [Sauvegarde des données applicatives (VolumeSnapshots CSI)](0013-sauvegarde-donnees-applicatives.md)                         | Accepted           |
+| 0014 | [Durcissement du plan de contrôle (`kubeadm init` nu)](0014-durcissement-kubeadm-init.md)                                    | Accepted           |
+| 0015 | [Stratégie d'upgrade Kubernetes (in-place vs rebuild)](0015-strategie-upgrade-kubernetes.md)                                 | Accepted           |
+| 0016 | [Observabilité (metrics-server maintenant, Prometheus plus tard)](0016-observabilite.md)                                     | Accepted           |
+| 0017 | [Langage des scripts (bash / jq / Python / bats)](0017-langage-des-scripts.md)                                               | Superseded by 0049 |
+| 0018 | [Rook-Ceph plutôt que Longhorn](0018-rook-ceph-vs-longhorn.md)                                                               | Accepted           |
+| 0019 | [Durcissement réseau Cilium (WireGuard + Hubble)](0019-durcissement-reseau-cilium.md)                                        | Accepted           |
+| 0020 | [Exposition réseau tout-Cilium (LB-IPAM + L2 + Gateway API)](0020-exposition-reseau-tout-cilium.md)                          | Accepted           |
+| 0021 | [cert-manager + CA interne (TLS de bordure)](0021-cert-manager-ca-interne.md)                                                | Accepted           |
+| 0022 | [Argo CD (GitOps applicatif)](0022-argocd-gitops-applicatif.md)                                                              | Accepted           |
+| 0023 | [Dépôt multi-topologies (plusieurs infra déclarées, une activée)](0023-plateforme-exemple-generique.md)                      | Accepted           |
+| 0024 | [PostgreSQL managé via CloudNativePG (+ pgvector)](0024-postgres-manage-cloudnative-pg.md)                                   | Accepted           |
+| 0025 | [Sécurité active : chaos + attaques contrôlées (D/A/R)](0025-securite-active-chaos-attaques-controlees.md)                   | Accepted           |
+| 0026 | [Orchestration des pipelines via Dagster](0026-orchestration-dagster.md)                                                     | Accepted           |
+| 0027 | [Bootstrap paramétré multi-cluster (Cilium Cluster Mesh)](0027-bootstrap-parametre-multi-cluster.md)                         | Accepted           |
+| 0028 | [Store de lineage OpenLineage via Marquez](0028-orchestration-openlineage-marquez.md)                                        | Accepted           |
+| 0029 | [Toute page Markdown est atteignable depuis la doc](0029-markdown-atteignable-doc.md)                                        | Accepted           |
+| 0030 | [Nomenclature des bancs et topologies](0030-nomenclature-bancs-topologies.md)                                                | Accepted           |
+| 0031 | [Terrain d'exécution cloud ARM (cadrage)](0031-terrain-cloud-arm.md)                                                         | Accepted           |
+| 0032 | [OpenTofu pour le provisioning des VM cloud](0032-opentofu-provisioning-cloud.md)                                            | Accepted           |
+| 0033 | [Orchestration Ansible des addons plateforme DataOps](0033-orchestration-ansible-platform-dataops.md)                        | Accepted           |
+| 0034 | [La validation = un run e2e from-scratch (pas le lint)](0034-validation-e2e-from-scratch.md)                                 | Accepted           |
+| 0035 | [Stratégie de bancs : fidélité vs vitesse](0035-strategie-bancs-fidelite-vitesse.md)                                         | Accepted           |
+| 0036 | [Backing S3 par topologie : SeaweedFS (léger) / RGW (prod)](0036-backing-s3-unique-rgw.md)                                   | Accepted           |
+| 0037 | [Stratégie de merge : merge commit (préserver les références)](0037-strategie-merge-commit.md)                               | Accepted           |
+| 0038 | [Lima seul banc local ; provisioning n'est plus un axe](0038-lima-seul-banc-local.md)                                        | Accepted           |
+| 0039 | [Nomenclature des axes du catalogue (codes par valeur)](0039-nomenclature-axes-catalogue.md)                                 | Accepted           |
+| 0040 | [Stratégie terrains × topologies (quel terrain monte quoi)](0040-terrains-x-topologies.md)                                   | Accepted           |
+| 0041 | [Gouvernance & complétude DataOps (dbt, Airflow, catalogue) — cadrage](0041-gouvernance-completude-dataops.md)               | Accepted           |
+| 0042 | [Fraîcheur des preuves de banc (garde-fou CI)](0042-fraicheur-preuves-banc.md)                                               | Accepted           |
+| 0043 | [Contrat d'interface cluster → atlas (endpoints, SC, secrets)](0043-contrat-interface-cluster-atlas.md)                      | Accepted           |
+| 0044 | [Topologie du banc atlas (socle consommé, Gitea intra-banc)](0044-topologie-deploiement-banc-atlas.md)                       | Accepted           |
+| 0045 | [Chemins d'installation du banc : couches, dépendances, tests associés](0045-chemins-installation-banc-couches.md)           | Accepted           |
+| 0046 | [Corriger le code d'installation, pas l'état du cluster](0046-corriger-le-code-pas-l-etat.md)                                | Accepted           |
+| 0047 | [Topologie `ha-3cp` : CP dédié, VIP kube-vip, etcd 2/3](0047-topologie-ha-3cp-control-plane-dedie.md)                        | Accepted           |
+| 0048 | [Accès local développeur (URLs cliquables + secrets + `.env`)](0048-acces-local-developpeur.md)                              | Accepted           |
+| 0049 | [Doctrine du choix d'outil par action (pondérée)](0049-doctrine-choix-outil-par-action.md)                                   | Accepted           |
+| 0050 | [Modèle de reprise / transactionnalité d'un rôle Ansible](0050-modele-reprise-role-ansible.md)                               | Accepted           |
+| 0051 | [Options natives Ansible (idempotence, check_mode, server-side, handlers)](0051-options-natives-ansible.md)                  | Accepted           |
+| 0052 | [Reproductibilité des résultats (principe-chapeau)](0052-reproductibilite-des-resultats.md)                                  | Accepted           |
+| 0053 | [Isolation multi-cible : banc Lima et prod sur le même poste](0053-isolation-multi-cible-banc-prod.md)                       | Accepted           |
+| 0054 | [Rollback par phase sur le banc (désinstallation ciblée, jetable)](0054-rollback-par-phase-banc.md)                          | Accepted           |
+| 0055 | [`ha-3cp` hyperconvergé : 3 control planes sur 4 nœuds, promotion in-place](0055-ha-3cp-hyperconverge-promotion-in-place.md) | Proposed           |

@@ -29,7 +29,27 @@ contre un endpoint partagé).
 
 ## Statut
 
-Accepted (2026-05-28).
+Accepted (2026-05-28). **Amendé le 2026-06-11** (voir _Amendement_ ci-dessous) :
+l'argument « garder 3 workers » est devenu caduc (taint control-plane retiré →
+un CP schedule déjà des charges) ; la cible HA hyperconvergée sur le parc 4
+nœuds réel est cadrée par
+[ADR 0055](0055-ha-3cp-hyperconverge-promotion-in-place.md). Le SPOF décrit ici
+reste l'**état courant en production** tant que l'outillage 3-CP (#250) n'est
+pas prouvé au banc.
+
+## Amendement (2026-06-11)
+
+La décision « 1 CP » reposait sur l'arbitrage « 3 CP = perdre 2 nœuds de calcul
+». Cet arbitrage **ne tient plus** : le taint
+`node-role.kubernetes.io/control-plane` est **retiré** sur le parc (les CP
+schedulent déjà des charges applicatives). Promouvoir 3 nœuds en control plane
+laisse donc **4 nœuds schedulables**, pas 1 — le coût en calcul est nul. La HA
+du control plane sur les 4 nœuds réels est décidée (différée) par
+[ADR 0055](0055-ha-3cp-hyperconverge-promotion-in-place.md) (3 CP
+hyperconvergés, VIP kube-vip, promotion in-place), à **prouver au banc avant la
+prod** ([ADR 0052](0052-reproductibilite-des-resultats.md)). Jusque-là, le
+présent ADR (1 CP, SPOF assumé + backup etcd) demeure la configuration de
+production.
 
 ## Conséquences
 
