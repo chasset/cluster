@@ -55,3 +55,38 @@
         and (gitea_deploy.resources[0].status.readyReplicas | default(0)) == 1
       retries: '{{ gitea_ready_retries }}'
       delay: '{{ gitea_ready_delay }}'
+
+  # Rescue DIAGNOSTIQUE (ADR 0050, #236) — calqué sur platform-argocd/cnpg. Un
+  # apply k8s est idempotent ; on n'efface RIEN (un re-run reprend). Le rescue
+  # transforme un timeout muet de la gate en message actionnable, en OBSERVANT.
+  rescue:
+    - name: Collect gitea pods state (diagnostic)
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: '{{ gitea_namespace }}'
+      register: gitea_pods_diag
+      run_once: true
+    - name: Report gitea convergence failure
+      ansible.builtin.debug:
+        msg: >-
+          Gitea non convergé. Pods non Running :
+          {{ gitea_pods_diag.resources
+             | rejectattr('status.phase', 'equalto', 'Running')
+             | map(attribute='metadata.name') | list }}.
+          Causes fréquentes : PVC gitea Pending (StorageClass), image non pull
+          (egress/registry). Diagnostic : kubectl -n {{ gitea_namespace }} get
+          pods,pvc,events --sort-by=.lastTimestamp.
+      run_once: true
+    - name: Fail with an actionable message
+      ansible.builtin.fail:
+        msg: >-
+          Déploiement Gitea échoué (voir diagnostic ci-dessus). Le re-run du rôle
+          est idempotent et reprend — corriger d'abord la cause signalée.
+
+  always:
+    - name: Gitea deployment outcome
+      ansible.builtin.debug:
+        msg: >-
+          platform-gitea terminé. Vérifier :
+          kubectl -n {{ gitea_namespace }} get deploy gitea.
+      run_once: true

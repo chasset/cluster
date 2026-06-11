@@ -12,6 +12,37 @@
 #     vars:
 #       audit_log_playbook: <nom du playbook>
 
+# ── Garde-fou de cible Ansible (ADR 0053 (c)) ──────────────────────────────
+# Banc et prod déclarent les MÊMES groupes/noms d'hôtes (cp1/node1…) ; seul
+# `target_kind` (porté par l'inventaire au niveau du groupe `cloud`) les
+# distingue. On vérifie ICI, en pre_tasks et AVANT toute tâche distante, que la
+# topologie ciblée correspond à l'intention de l'invocation : EXPECTED_TARGET_KIND
+# (défaut `prod` — une invocation nue du RUNBOOK exige un inventaire prod ; le
+# banc préfixe EXPECTED_TARGET_KIND=lima). Un mauvais `-i` échoue alors
+# immédiatement, zéro tâche mutante (au lieu d'un faux-résultat silencieux,
+# ADR 0052). delegate_to localhost + run_once : un seul check côté poste, pas de
+# SSH ; changed_when:false (lecture). Les playbooks `localhost` (plateforme :
+# pas de groupe cloud, donc target_kind absent) sont tolérés via le défaut ''.
+- name: Assert the inventory target matches the intended topology
+  run_once: true
+  delegate_to: localhost
+  become: false
+  ansible.builtin.assert:
+    that:
+      - >-
+        (target_kind | default('')) == ''
+        or (target_kind | default('')) == (lookup('env', 'EXPECTED_TARGET_KIND') | default('prod', true))
+    fail_msg: >-
+      Cible Ansible INCOHÉRENTE : l'inventaire déclare
+      target_kind={{ target_kind | default('(absent)') }} mais l'intention est
+      {{ lookup('env', 'EXPECTED_TARGET_KIND') | default('prod', true) }}.
+      Vérifier le `-i` : prod = bootstrap/hosts.yaml (target_kind: prod) ; banc =
+      test/lima/.work/inventory.yaml (target_kind: lima, EXPECTED_TARGET_KIND=lima).
+    success_msg: >-
+      Cible confirmée : target_kind={{ target_kind | default('(localhost)') }}.
+    quiet: true
+  changed_when: false
+
 - name: Append cluster-bootstrap audit-log entry
   become: true
   ansible.builtin.shell: |

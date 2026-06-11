@@ -1,0 +1,121 @@
+# code: language=ansible
+# Rôle platform-ceph-storageclasses (ADR 0033/0049) — porte phase_sc : pose les
+# StorageClasses bloc/CephFS sur un cluster Ceph SAIN, marque la SC bloc par
+# défaut (exactement une), attend la config CSI peuplée (mons en quorum). Le PVC
+# de test (gate_test_pvc) reste côté harnais (c'est un test, pas du provisioning).
+# Manifestes storageClass/* sans image ni device → AUCUNE surcharge banc.
+- name: Deploy Ceph StorageClasses
+  run_once: true
+  block:
+    # Les manifestes block-*/fs.yaml contiennent des CR Rook (CephBlockPool,
+    # CephFilesystem) que l'operator DENSIFIE après création (defaults du spec) →
+    # generation N→N+1 → faux « changed » au rejeu immédiat (run_ansible_phase),
+    # même mécanisme que le CephCluster. hidden_fields:[metadata.managedFields,
+    # status] retire ce bruit du diff (sans effet sur les SC/objets simples qui
+    # n'ont pas ces champs) ; force_conflicts car Rook co-possède le spec.
+    - name: Apply the Ceph StorageClasses (block + CephFS)
+      kubernetes.core.k8s:
+        state: present
+        src: '{{ ceph_sc_dir }}/{{ item }}'
+        server_side_apply:
+          field_manager: ansible-ceph-sc
+          force_conflicts: true
+        hidden_fields:
+          - metadata.managedFields
+          - status
+      loop:
+        - block-replicated.yaml
+        - block-ec-retain.yaml
+        - block-ec-delete.yaml
+        - filesystem/fs.yaml
+        - filesystem/storageclass.yaml
+
+    # Stabilisation des CR Rook (CephBlockPool/CephFilesystem) : on re-applique
+    # jusqu'à changed=0 (absorbe la densification résiduelle par l'operator AVANT
+    # de finir), comme pour le CephCluster. Seuls les CR Rook se densifient ; on
+    # cible donc les 3 block-* + fs.yaml (pas les SC/objets simples). changed_when
+    # false : convergence interne, pas un changement de la phase.
+    - name: Stabilise the Rook StorageClass CRs (absorb operator defaulting)
+      kubernetes.core.k8s:
+        state: present
+        src: '{{ ceph_sc_dir }}/{{ item }}'
+        server_side_apply:
+          field_manager: ansible-ceph-sc
+          force_conflicts: true
+        hidden_fields:
+          - metadata.managedFields
+          - status
+      register: ceph_sc_stabilise
+      until: not ceph_sc_stabilise.changed
+      retries: '{{ ceph_csi_ready_retries }}'
+      delay: '{{ ceph_csi_ready_delay }}'
+      changed_when: false
+      loop:
+        - block-replicated.yaml
+        - block-ec-retain.yaml
+        - block-ec-delete.yaml
+        - filesystem/fs.yaml
+
+    # ── StorageClass default : exactement une (réutilise le patron local-path) ──
+    - name: List all StorageClasses
+      kubernetes.core.k8s_info:
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+      register: all_storage_classes
+
+    - name: Mark the target StorageClass default, all others non-default
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: storage.k8s.io/v1
+          kind: StorageClass
+          metadata:
+            name: '{{ sc.metadata.name }}'
+            annotations:
+              storageclass.kubernetes.io/is-default-class: >-
+                {{ 'true' if sc.metadata.name == ceph_default_storage_class else 'false' }}
+      loop: '{{ all_storage_classes.resources }}'
+      loop_control:
+        loop_var: sc
+        label: '{{ sc.metadata.name }}'
+
+    - name: Re-read StorageClasses to count the default
+      kubernetes.core.k8s_info:
+        api_version: storage.k8s.io/v1
+        kind: StorageClass
+      register: storage_classes_after
+
+    # Clé d'annotation à points/slash → comptage via dict2items (cf. local-path).
+    - name: Count the default StorageClasses
+      ansible.builtin.set_fact:
+        default_sc_count: >-
+          {{ storage_classes_after.resources
+             | map(attribute='metadata.annotations', default={})
+             | map('default', {}, true)
+             | map('dict2items')
+             | map('selectattr', 'key', 'equalto', 'storageclass.kubernetes.io/is-default-class')
+             | map('selectattr', 'value', 'equalto', 'true')
+             | map('list') | map('length') | sum }}
+
+    - name: Assert exactly one default StorageClass
+      ansible.builtin.assert:
+        that: default_sc_count | int == 1
+        fail_msg: >-
+          Il faut exactement 1 StorageClass default, trouvé {{ default_sc_count }}.
+        success_msg: >-
+          StorageClass default = {{ ceph_default_storage_class }} (1 seule).
+
+    # ── Pré-condition CSI : la config doit porter des monitors (mons en quorum) ──
+    # Évite « empty monitor list » au 1er provisioning from-scratch. LECTURE pure
+    # (k8s_info) — pas de changed parasite.
+    - name: Wait for the Ceph CSI config to carry monitors
+      kubernetes.core.k8s_info:
+        kind: ConfigMap
+        name: rook-ceph-csi-config
+        namespace: rook-ceph
+      register: ceph_csi_config
+      until: >-
+        ceph_csi_config.resources | length > 0
+        and '"monitors":["' in (ceph_csi_config.resources[0].data['csi-cluster-config-json'] | default(''))
+      retries: '{{ ceph_csi_ready_retries }}'
+      delay: '{{ ceph_csi_ready_delay }}'

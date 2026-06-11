@@ -1,4 +1,13 @@
 # code: language=ansible
+# Reprise après incident (ADR 0050, cas (b) — étape à effet de bord NON
+# idempotent). `kubeadm init` écrit /etc/kubernetes + /var/lib/etcd + des static
+# pods : si l'init AVORTE en milieu de course, un re-run NU se heurte au demi-état
+# (« port in use », « manifests exist ») et boucle. Le rescue COMPENSE
+# (`kubeadm reset --force`) pour ramener le control-plane à un point repris-able,
+# puis re-fail avec un message actionnable. Le marqueur `creates:` admin.conf
+# (CHECKPOINT) garantit qu'un init déjà réussi ne re-rentre pas dans le block.
+# Frontière (ADR 0050) : le rescue ne fait JAMAIS de purge APT / modprobe -r —
+# c'est l'apanage du rollback global (bootstrap/rollback.yaml / k8s-rollback).
 - name: Install kubernetes on control plane nodes
   block:
     # ── Durcissement du plan de contrôle (ADR 0014) ────────────────────────
@@ -124,3 +133,40 @@
       args:
         chdir: '{{ ansible_facts.env.HOME }}'
         creates: lb-setup.log
+
+  # ── Reprise après incident (ADR 0050 cas (b)) ──────────────────────────────
+  rescue:
+    # 1. DIAGNOSTIC actionnable (ne défait rien) : dernières lignes du kubelet.
+    - name: Capture the kubelet state for diagnosis
+      become: true
+      ansible.builtin.command: journalctl -u kubelet --no-pager -n 30
+      register: init_kubelet_diag
+      changed_when: false
+      failed_when: false
+    - name: Show the kubelet diagnosis
+      ansible.builtin.debug:
+        var: init_kubelet_diag.stdout_lines
+    # 2. COMPENSATION : un init avorté laisse /etc/kubernetes + etcd partiels →
+    #    un re-run nu boucle. `kubeadm reset --force` ramène à un état repris-able.
+    #    NE touche PAS containerd/APT (frontière rollback global).
+    - name: Compensate the aborted init (kubeadm reset --force)
+      become: true
+      ansible.builtin.command: kubeadm reset --force
+      register: init_reset
+      changed_when: "'cleaned up' in init_reset.stdout or init_reset.rc == 0"
+      failed_when: false
+    # 3. RE-FAIL actionnable : le rôle échoue (l'incident n'est pas masqué), mais
+    #    le control-plane est propre → un re-run du MÊME chemin repart à neuf.
+    - name: Fail with an actionable message after compensation
+      ansible.builtin.fail:
+        msg: >-
+          `kubeadm init` a échoué et a été compensé (kubeadm reset --force). Le
+          control-plane est revenu à un état propre, repris-able : corriger la
+          cause (cf. diagnostic kubelet ci-dessus) puis RE-JOUER le même chemin.
+
+  always:
+    - name: Report the control-plane init outcome
+      ansible.builtin.debug:
+        msg: >-
+          k8s-initialization terminé (admin.conf présent = init acquis ;
+          sinon le rescue a compensé et fait échouer pour re-jeu).

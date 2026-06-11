@@ -3,7 +3,32 @@
 Installation, opération et désinstallation d'un cluster Ceph distribué via
 l'opérateur Rook 1.19 (Ceph Tentacle 20.2.1).
 
+> **Méthode nominale = Ansible** (ADR
+> [0049](../../docs/decisions/0049-doctrine-choix-outil-par-action.md) :
+> déployer Ceph est une _convergence d'état durable_ → Ansible, comme tout le
+> reste du socle). Les rôles `platform-ceph-cluster` / `-storageclasses` /
+> `-datalake` appliquent les manifestes figés de ce dossier (SSA +
+> `force_conflicts` sur les CR mutés par Rook), patchent les surcharges de
+> topologie et **gâtent sur la santé réelle** (HEALTH_OK + le bon nombre d'OSD
+> up) :
+>
+> ```bash
+> ansible-playbook -i ./hosts.yaml ../../bootstrap/ceph-checks.yaml        # pré-vol (lvm2, disques)
+> ansible-playbook -i ./hosts.yaml ../../bootstrap/ceph-cluster.yaml       # operator + CephCluster + toolbox
+> ansible-playbook -i ./hosts.yaml ../../bootstrap/ceph-storageclasses.yaml # SC bloc/CephFS + default
+> ansible-playbook -i ./hosts.yaml ../../bootstrap/ceph-datalake.yaml      # CephObjectStore RGW (S3)
+> ```
+>
+> Sur le banc, c'est `test/lima/run-phases.sh ceph|sc|datalake` qui les joue (et
+> **prouve leur idempotence** par rejeu, ADR 0052). Les `kubectl` ci-dessous
+> restent la **référence manuelle** : compréhension de la séquence, opération
+> (capacité, clefs), dépannage (finalizers) et **désinstallation** — actes de
+> diagnostic/opération qui ne relèvent pas de la convergence (ADR 0049).
+
 ## Installation de l'opérateur
+
+> Équivalent manuel de `platform-ceph-cluster` (séquence + gates). Préférer le
+> playbook `bootstrap/ceph-cluster.yaml` pour un déploiement reproductible.
 
 ```bash
 kubectl create -f crds.yaml -f common.yaml -f operator.yaml

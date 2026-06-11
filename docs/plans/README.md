@@ -41,3 +41,4 @@ Ce dépôt est un **catalogue de topologies d'infrastructure** générique. Donc
 | [2026-06-04-etape-1.7-dagster.md](2026-06-04-etape-1.7-dagster.md)                             | Plan  | Étape 1.7 — orchestrateur Dagster (event log dans CNPG)   |
 | [2026-06-05-etape-1.8-marquez.md](2026-06-05-etape-1.8-marquez.md)                             | Plan  | Étape 1.8 — Marquez (lineage OpenLineage) + harnais E2E   |
 | [2026-06-04-audit-realignement-main-dagster.md](2026-06-04-audit-realignement-main-dagster.md) | Audit | Réalignement `feat/dagster` ↔ `main` (renumérotation ADR) |
+| [2026-06-11-rollback-par-phase.md](2026-06-11-rollback-par-phase.md)                           | Plan  | Rollback par phase sur le banc (mise en œuvre ADR 0054)   |

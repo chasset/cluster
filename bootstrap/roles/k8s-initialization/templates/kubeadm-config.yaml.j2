@@ -25,6 +25,13 @@ localAPIEndpoint:
 ---
 apiVersion: kubeadm.k8s.io/v1beta4
 kind: ClusterConfiguration
+# Nom du cluster (ADR 0053 (b)) : kubeadm dérive le contexte kubeconfig
+# `kubernetes-admin@{{ cluster_name | default('cluster-prod') }}` au lieu de
+# l'homonyme `kubernetes-admin@kubernetes`. Évite qu'un kubeconfig prod écrase un
+# kubeconfig banc dans une fusion `KUBECONFIG=banc:prod`. Défaut générique
+# surchargeable (ADR 0023) ; le banc Lima renomme déjà son contexte au fetch
+# (cluster-banc), il n'a donc pas besoin de surcharger cette valeur.
+clusterName: {{ cluster_name | default('cluster-prod') }}
 controlPlaneEndpoint: {{ control_plane_endpoint }}:{{ control_plane_port }}
 {% if pod_subnet | default('') | length > 0 or service_subnet | default('') | length > 0 %}
 # CIDR pods/services explicites. PROD : non posés (kubeadm garde ses défauts,

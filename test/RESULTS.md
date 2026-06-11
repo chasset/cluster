@@ -957,3 +957,97 @@ cours d'instruction ; **repli fiable** documenté :
 > **Bilan exposition** : la chaîne d'infrastructure (eBPF → LB-IPAM → L2 →
 > Gateway → TLS de bordure) est validée de bout en bout, et l'**UI Argo CD est
 > pleinement accessible en HTTPS**. Seul le **CLI gRPC-Web** reste à finaliser.
+
+## Run #14 (2026-06-11) — portage Ceph en rôles Ansible, from-scratch (banc Lima, commit `e8b0a60`)
+
+Première validation du **portage Ceph shell → Ansible** (rôle
+`platform-ceph-cluster`, `phase_ceph` recâblée sur `run_ansible_phase`). Chemin
+`storage-real` `NO_CACHE=1 WITH_CEPH=1`, donc `down` → disques vierges →
+bootstrap K8s → **Ceph from-scratch**. Banc Lima arm64, profil atlas-ceph (3
+nœuds, OSD sur `vde`, 512Mi).
+
+| Étape                               | Gate                                                                                                          | Résultat |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------- |
+| `down` + `up` (disques bruts)       | VMs détruites puis recréées, disques `vd[b-e]` vierges présents                                               | ✅       |
+| Bootstrap K8s (init + join, rescue) | 3 nœuds `Ready` (rôles k8s-initialization/k8s-join-cluster avec rescue ADR 0050)                              | ✅       |
+| Ceph from-scratch (rôle Ansible)    | operator → CephCluster (apply fusionné) → toolbox ; **9 OSD formés sur disques vierges**, CephCluster `Ready` | ✅       |
+| Santé Ceph                          | `HEALTH_OK` atteint (9/9 OSD up)                                                                              | 🟠 aidé  |
+| Idempotence (rejeu)                 | `changed=0` confirmé **2×** sur cluster stabilisé                                                             | 🟠 voir  |
+
+### Réserves d'honnêteté (ADR 0052)
+
+- **🟠 Santé aidée à la main** : au démarrage, le module mgr `prometheus` crashe
+  (race connue, bénin) → `HEALTH_WARN` dont le **seul** motif est
+  `RECENT_MGR_MODULE_CRASH`. L'ancienne gate exigeait `HEALTH_OK` strict et
+  épuisait ses retries ; débloquée par un `ceph crash archive-all` manuel
+  (diagnostic ADR 0046). **Code corrigé** (commit `e8b0a60` : la gate `k8s_info`
+  tolère ce WARN bénin via `.status.ceph.details`, vérifié en isolation) **mais
+  pas encore re-prouvé sans intervention** → à re-jouer from-scratch.
+- **🟠 Idempotence transitoire** : le rejeu du run, joué juste après l'archivage
+  (cluster en cours de restabilisation), a vu 1 tâche `changed`. Deux rejeux
+  ultérieurs sur cluster stable donnent `changed=0`. L'idempotence du rôle est
+  donc établie sur cluster stable ; le « 1 changed » était un état transitoire.
+- **Chemin incomplet** : `datalake` / smoke S3 / WordPress non atteints (le run
+  a stoppé sur la gate idempotence avant correction). À couvrir au prochain run.
+
+> **Bilan** : le **déploiement Ceph from-scratch fonctionne** (OSD formés sur
+> disques vierges, cluster `Ready`) et le rôle est **idempotent sur cluster
+> stable** (`changed=0`). Restent à re-prouver SANS intervention, en un seul run
+> `down → storage-real` avec le code corrigé : la tolérance WARN bénin et la
+> chaîne datalake/S3/WordPress.
+
+## Run #15 (2026-06-11) — atlas-ceph from-scratch SANS intervention + rollback de phase (commit `4edc599`)
+
+Reprise du portage Ceph après 5 corrections d'idempotence successives (la cause
+réelle, **la densification du spec des CR par l'operator Rook**, n'a été
+certaine qu'après capture du `--diff` du rejeu). Chemin `atlas-ceph`
+`NO_CACHE=1` :
+`down → up → bootstrap → ceph → sc → datalake → monitoring → gitops → dataops`.
+Banc Lima arm64, 3 nœuds, OSD sur `vde`.
+
+| Phase                                                                             | Gate                                                   | Résultat                            |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------- |
+| Bootstrap K8s (rescue init/join, fix keyring, target_kind, contexte cluster-banc) | 3 nœuds `Ready`                                        | ✅                                  |
+| Ceph cluster (rôle Ansible)                                                       | HEALTH_OK + 9 OSD ; **rejeu `changed=0`**              | ✅ idempotent                       |
+| StorageClasses (CR Rook block/fs)                                                 | SC default + CSI ; **rejeu `changed=0`**               | ✅ idempotent                       |
+| Datalake / RGW (CephObjectStore)                                                  | RGW Ready ; **rejeu `changed=0`**                      | ✅ idempotent                       |
+| Monitoring (Prometheus/Grafana/Loki)                                              | Ready                                                  | ✅                                  |
+| GitOps (Gitea + Argo CD)                                                          | Ready                                                  | ✅                                  |
+| DataOps (CNPG + Dagster + Marquez)                                                | CNPG `Cluster in healthy state`, Dagster/Marquez Ready | ✅ déployés                         |
+| Smoke-test lineage (sensor OpenLineage → API Marquez)                             | compteur de jobs lu                                    | ❌ finding (smoke, pas déploiement) |
+
+### Idempotence Ceph — cause racine et parade (prouvées)
+
+Le rejeu d'idempotence (`run_ansible_phase`) échouait sur « 1 tâche changed »
+**transitoire** : un CR Rook appliqué au spec minimal est **densifié** par
+l'operator (defaults : `cephVersion.allowUnsupported`, `healthCheck.*.disabled`,
+`interval 1m0s→60s`…) → `metadata.generation` N→N+1. Comme le rejeu est
+immédiat, il re-densifie → vrai `changed`. Parade :
+`hidden_fields:[metadata.managedFields, status]` + une tâche de
+**stabilisation** (`until: not changed`) qui absorbe la densification avant de
+finir. **Fidélité préservée** : un vrai changement de spec (prouvé
+`512Mi→600Mi`) reste `changed=1`. Appliquée aux 3 rôles Ceph (cluster, SC,
+datalake).
+
+### Rollback de phase (ADR 0054 / #274) — prouvé sur ce banc
+
+Cycle prouvé **sans détruire le banc** :
+`BANC_JETABLE=1 run-phases.sh rollback datalake` → CephObjectStore + SC bucket
+supprimés, **Ceph SURVIT** (cluster `Ready`, 9 OSD), → `run-phases.sh datalake`
+re-monte → RGW Ready + rejeu `changed=0`. Le rollback ciblé (sc/datalake
+partagent `rook-ceph`) ne touche ni le namespace ni les CRD Ceph.
+
+### Réserves d'honnêteté (ADR 0052)
+
+- **Smoke-test Marquez** (sensor OpenLineage) en échec — n'affecte ni le
+  déploiement ni l'idempotence ; finding applicatif à instruire.
+- **Preuves d'arrêt injecté plateforme** (`cnpg-sc`, `argocd-netpol`, #236) :
+  codées et corrigées, mais **non rejouées e2e** (rejeu de `dataops`/`gitops`
+  entiers ~15 min, faible ROI). Le mécanisme de reprise classe (a) est déjà
+  prouvé par `cri-keyring` (idempotence réparatrice) et les fonctions pures
+  `classify_redeploy_recovery` (bats). E2e plateforme différé.
+
+> **Bilan** : **premier run from-scratch complet de bout en bout** (socle Ceph
+> idempotent + toute la plateforme déployée), sans intervention manuelle sur les
+> gates. Le rollback de phase rend l'itération rapide (défaire/refaire une
+> brique en minutes au lieu d'un from-scratch de ~60 min).

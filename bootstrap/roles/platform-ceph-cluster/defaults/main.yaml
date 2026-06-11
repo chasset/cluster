@@ -1,0 +1,33 @@
+---
+# Valeurs par défaut du rôle platform-ceph-cluster (ADR 0033/0049/0008/0009).
+# Operator Rook + CephCluster + toolbox. Manifestes VENDORED figés (storage/ceph/)
+# appliqués via kubernetes.core.k8s (jamais de .j2 du rendu, ADR 0049) ; les
+# surcharges banc/topologie sont des PATCHs strategic-merge ciblés post-apply.
+# Les DÉFAUTS ci-dessous sont les valeurs PROD (ADR 0023) ; le banc surcharge en
+# group_vars/-e.
+
+platform_repo_dir: '{{ playbook_dir }}/..'
+ceph_manifests_dir: '{{ platform_repo_dir }}/storage/ceph'
+
+# Source du CephCluster. DÉFAUT = manifeste vendored intact (digests prod ADR
+# 0006). Le HARNAIS banc surcharge par une copie DÉ-ÉPINGLÉE (arm64, undigest)
+# écrite hors dépôt — le rôle ne fait JAMAIS l'undigest (transformation banc).
+ceph_cluster_src: '{{ ceph_manifests_dir }}/cluster.yaml'
+
+# Surcharges de TOPOLOGIE (defaults = PROD ; banc surcharge en -e/group_vars).
+#  - device block.db BlueStore : prod = NVMe nvme1n1 ; banc Lima = virtio-blk vde.
+ceph_metadata_device: nvme1n1
+#  - requête mémoire d'un OSD : prod = 2Gi ; banc (VM 5-8 GiB) = 512Mi pour que
+#    plusieurs OSD/hôte soient schedulables (sinon Pending).
+ceph_osd_memory_request: 2Gi
+
+# Nombre d'OSD attendus up = nœuds de stockage × disques data (prod 4×12 ; banc
+# 3×3=9). Gate de santé : HEALTH_OK ET ce nombre up (sinon « vert à 0 OSD »,
+# drift L7). Surchargé par le harnais selon la topologie.
+ceph_osd_expected: 48
+
+# Attentes de convergence (constantes d'attente, pas de déploiement — inline OK).
+ceph_operator_ready_retries: 36
+ceph_operator_ready_delay: 5
+ceph_health_retries: 80 # ~20 min (montée des OSD + rééquilibrage)
+ceph_health_delay: 15

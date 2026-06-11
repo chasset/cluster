@@ -142,6 +142,8 @@ jobs:
         run: uv run python -m unittest discover -s tests
       - name: garde-fou Markdown atteignable (ADR 0029)
         run: uv run python scripts/check_md_orphans.py
+      - name: garde-fou contrat cluster→atlas aligné sur platform/ (ADR 0043)
+        run: uv run python scripts/check_contract.py
 
   # Tests unitaires des fonctions pures de state.sh (bats — audit P9 #12).
   bats:

@@ -1,0 +1,14 @@
+---
+# Valeurs par défaut du rôle platform-ceph-storageclasses (ADR 0033/0049).
+# StorageClasses bloc/CephFS sur le cluster Ceph sain. Manifestes storageClass/*
+# (NON vendored) sans image ni device → identiques prod/banc, AUCUNE surcharge.
+
+platform_repo_dir: '{{ playbook_dir }}/..'
+ceph_sc_dir: '{{ platform_repo_dir }}/storage/ceph/storageClass'
+
+# StorageClass à marquer « default » du cluster (valeur prod ET banc).
+ceph_default_storage_class: rook-ceph-block-replicated
+
+# Attente de la config CSI peuplée (mons en quorum) avant de prouver un PVC.
+ceph_csi_ready_retries: 36
+ceph_csi_ready_delay: 5
