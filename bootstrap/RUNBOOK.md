@@ -429,16 +429,31 @@ ansible-playbook -i ./hosts.yaml ./join-workers.yaml
 
 ### Installation de la connexion en local
 
-Récupérer le kubeconfig depuis le control plane :
+Récupérer le kubeconfig depuis le control plane. Le cluster est nommé
+`cluster-prod` (champ `clusterName`, ADR 0053) → son contexte est
+`kubernetes-admin@cluster-prod`, **distinct** de l'homonyme kubeadm par défaut.
+**Ne pas écraser** `~/.kube/config` : le **fusionner** pour cohabiter avec
+d'autres clusters (un banc Lima `cluster-banc`, par ex.) sans collision.
 
 ```bash
 mkdir -p ~/.kube
-scp control1:/home/debian/.kube/config ~/.kube/config
+scp control1:/home/debian/.kube/config /tmp/cluster-prod.config
+# Fusion (--flatten) puis sélection EXPLICITE du contexte voulu — jamais d'écrasement.
+KUBECONFIG=~/.kube/config:/tmp/cluster-prod.config \
+  kubectl config view --flatten > ~/.kube/config.merged && mv ~/.kube/config.merged ~/.kube/config
+kubectl config use-context kubernetes-admin@cluster-prod
+rm -f /tmp/cluster-prod.config
 ```
 
-Modifiez le fichier `~/.kube/config` pour y indiquer l’adresse IP du control
-plane (control1). Ensuite, vous pouvez vérifier que tout fonctionne correctement
-en exécutant les commandes suivantes :
+> Cluster prod **déjà installé** sans `clusterName` (contexte homonyme
+> `kubernetes-admin@kubernetes`) ? Rejouer `bootstrap/initialisation.yaml` n'est
+> pas nécessaire : renommer le contexte en place
+> (`kubectl config rename-context kubernetes-admin@kubernetes kubernetes-admin@cluster-prod`)
+> avant la fusion.
+
+Indiquez dans le contexte l’adresse IP du control plane (control1). Ensuite,
+vous pouvez vérifier que tout fonctionne correctement en exécutant les commandes
+suivantes :
 
 ```bash
 k get nodes

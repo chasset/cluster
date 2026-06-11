@@ -43,6 +43,11 @@
 # Pourquoi Lima (vs kind figé en 1.31 / Vagrant lourd) : ADR 0006.
 set -euo pipefail
 
+# Intention de cible (ADR 0053 (c)) : ce script ne pilote QUE le banc Lima. On
+# déclare l'intention `lima` pour TOUS les ansible-playbook lancés d'ici → le
+# garde-fou du rôle audit-log refuse un inventaire prod passé par erreur.
+export EXPECTED_TARGET_KIND=lima
+
 HERE=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=test/lima/lib.sh
 . "${HERE}/lib.sh"
@@ -382,7 +387,11 @@ phase_bootstrap() {
         "LB_IPAM_RANGE_START=${lb_prefix}.240" \
         "LB_IPAM_RANGE_STOP=${lb_prefix}.250" \
         "L2_INTERFACE=${l2_if}"
-    fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}"
+    # Contexte nommé `cluster-banc` (ADR 0053 (b)) : tue l'homonymie kubeadm
+    # (`kubernetes-admin@kubernetes`) qui ferait s'écraser banc et prod dans une
+    # fusion KUBECONFIG=banc:prod. Étiquette générique (ADR 0023), pas une valeur
+    # de déploiement. La prod reçoit son `cluster-prod` côté kubeadm (k8s-init).
+    fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}" cluster-banc
 
     # GATE : tous les nœuds attendus (${#NODES[@]}) Ready.
     log "Attente des ${#NODES[@]} nœud(s) Ready (max 5 min)"
@@ -1323,7 +1332,7 @@ case "${1:-}" in
     access) phase_access "${@:2}" ;;
     ceph) time_phase ceph phase_ceph ;;
     sc) time_phase sc phase_sc ;;
-    kubeconfig) preflight; fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}" ;;
+    kubeconfig) preflight; fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}" cluster-banc ;;
     # ── socle : up → bootstrap → stockage. Smoke-test rapide (ADR 0045). ──────
     socle)
         TARGET=socle
