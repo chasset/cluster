@@ -328,28 +328,17 @@ le socle). Frontière constante : **décrire/vérifier/mesurer** vs **converger*
   », aucun `meta/main.yml`) devient une **déclaration explicite** que l'outil
   lit pour ordonner et suggérer la prochaine action.
 
-### 9. Paliers de réalisation (du socle à la vision)
+### 9. Mise en œuvre (déléguée à un plan dédié)
 
-La vision (§8) **n'est pas le socle**. Réalisation incrémentale, chaque palier
-prouvé par un run
-([ADR 0034](0034-validation-e2e-from-scratch.md)/[0052](0052-reproductibilite-des-resultats.md))
-:
-
-| Palier | Contenu                                                                                                         | Exigences §8 |
-| ------ | --------------------------------------------------------------------------------------------------------------- | ------------ |
-| **P0** | Modéliser sans générer : `topology.example.yaml` des topologies décrites — révèle les deltas (VIP/LB manquant…) | 1-5 (schéma) |
-| **P1** | Générateur read-only Lima → inventaire + NODES + profils, **byte-identique** (§3)                               | 1-3          |
-| **P2** | Profil + défauts/variantes + graphe de dépendances                                                              | 3, 13        |
-| **P3** | Façade CLI/CI (`generate`/`validate`/`status`/`diff`)                                                           | —            |
-| **P4** | Épreuves filtrées + historique lu + consignation (objectif + fail)                                              | 6, 10-12     |
-| **P5** | Façade TUI « que faire ensuite » (diff → suggère → lance via `ansible-runner`)                                  | (boucle)     |
-| **P6** | Métriques exposées + smoke-test réversibilité                                                                   | 7-8          |
-| **P7** | Étendre aux topologies cibles (`multi-node-4`, `ha-3cp` + VIP/LB + kube-vip — #250)                             | 4            |
-| **P8** | Optimiseur (propose des ajustements depuis les métriques)                                                       | 9            |
-
-P0-P3 sont le **socle** (générateur de config) ; P4-P6 font la **plateforme
-d'épreuve/mesure** ; P7 débloque la HA (#250) ; P8 (optimiseur) est le plus
-lointain. Aucun palier ne casse le précédent (invariant byte-identique, §3).
+La vision (§8) **n'est pas le socle** : elle se réalise de façon
+**incrémentale**, chaque palier prouvé par un run
+([ADR 0034](0034-validation-e2e-from-scratch.md)/[0052](0052-reproductibilite-des-resultats.md)).
+Le **déroulé évolutif** (paliers P0-P8, ordre, état d'avancement, issues créées)
+vit dans un **plan dédié**, pas dans cet ADR immuable
+([ADR 0057](0057-gouvernance-documentaire-adr-plan-issue.md)) :
+**[`docs/plans/plan-modele-declaratif.md`](../plans/plan-modele-declaratif.md)**.
+Repère : P0-P3 = socle (générateur), P4-P6 = plateforme d'épreuve/mesure, P7 =
+HA (#250), P8 = optimiseur — détail et suivi dans le plan.
 
 ### 10. Doctrine de la convergence différée (les 3 états d'une gate k8s)
 
