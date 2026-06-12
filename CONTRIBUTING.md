@@ -40,28 +40,45 @@ déploiement (qui vivent dans une config locale non versionnée).
 
 ## Traçabilité : ADR, audits, plans
 
-Trois natures d'écrits, trois dossiers — chacun a son rôle ; aucun ne remplace
-un autre :
+Quatre natures d'écrits, quatre rôles non chevauchants — **un ADR DÉCIDE, un
+plan MET EN ŒUVRE, une issue EXÉCUTE, une PR LIVRE**
+([ADR 0057](docs/decisions/0057-gouvernance-documentaire-adr-plan-issue.md)) :
 
-| Trace                         | Dossier           | Nature                                                                                                                                          |
-| ----------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Décisions**                 | `docs/decisions/` | ADR (Nygard) — **la décision** structurante, numérotée, immuable.                                                                               |
-| **Audit du dépôt**            | `docs/audit/`     | État des lieux qualité daté, vérifié de façon adversariale.                                                                                     |
-| **Plans & audits de session** | `docs/plans/`     | **Comment** on met en œuvre une décision (plan d'étape) et **ce qui s'est passé** en route (audit de session : réalignement de branche, dette). |
+| Trace     | Où                | Rôle                                                                                                                                       |
+| --------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **ADR**   | `docs/decisions/` | **Décide** (le _pourquoi_) — structurante, numérotée, **immuable**.                                                                        |
+| **Plan**  | `docs/plans/`     | **Met en œuvre** une décision (paliers + suivi) — thématique, **vivant**.                                                                  |
+| **Issue** | GitHub            | **Exécute** — unité de travail fermable.                                                                                                   |
+| **PR**    | GitHub            | **Livre** un changement + sa preuve, ferme une issue / coche un palier.                                                                    |
+| **Audit** | `docs/audit/`     | **Mesure** l'écart à un standard — grille permanente + passages datés ([ADR 0058](docs/decisions/0058-doctrine-audit-grille-passages.md)). |
+
+**Le test de découpe (par temporalité,
+[ADR 0057](docs/decisions/0057-gouvernance-documentaire-adr-plan-issue.md))** :
+un contenu **immuable** va dans l'ADR (« vrai dans 2 ans, sauf superseded ? ») ;
+un **ordre de marche évolutif** dans un plan (« vais-je réordonner / cocher ça ?
+») ; une **unité fermable** dans une issue.
 
 Règles :
 
-- Un **plan met en œuvre une décision**, il ne la remplace pas : tout plan
-  d'étape référence en en-tête l'**ADR qui le fonde**. Les décisions
-  structurantes vont dans un **ADR**, jamais en bullets d'un TODO ou enfouies
-  dans un plan.
+- **Un ADR avec mise en œuvre échelonnée ⇒ un plan dédié OBLIGATOIRE.** Jamais
+  de tableau de paliers, checklist ou « TODO » **dans** un ADR (un ADR est
+  immuable, un déroulé évolue). Un ADR purement conceptuel peut n'avoir aucun
+  plan. Le plan **référence l'ADR qui le fonde** en en-tête.
+- **Plans THÉMATIQUES et vivants** : `plan-<thème>.md` (pas daté). Chaque plan
+  porte une section **« Suivi »** : paliers (cases à cocher), **issues créées**
+  (liens `#NNN`), **état d'achèvement** global, renvoi aux runs de preuve
+  (`RESULTS.md`). Le plan est le **tableau de bord** d'une décision.
+- **Audit = grille permanente + passages datés**
+  ([ADR 0058](docs/decisions/0058-doctrine-audit-grille-passages.md)) : la
+  grille (dimensions/critères/méthode) ne périme pas ; un passage est daté
+  (`AAAA-MM-JJ`), append-only, **renvoie aux ADR** pour les _pourquoi_, et ses
+  manques deviennent des **issues**.
+- **Audit de session** (figé : journal d'un moment — réalignement de branche,
+  dette) reste daté : `AAAA-MM-JJ-audit-<sujet>.md`. À distinguer d'un **plan
+  vivant**.
 - **Frontière ADR 0023** : `docs/plans/` ne versionne que des **plans d'INFRA**
-  (socle générique). Un plan **métier / applicatif** (cas d'usage d'un projet,
-  pipelines de données spécifiques) vit dans le dépôt applicatif (`atlas`),
-  **pas ici** — même s'il a été rédigé pendant le travail sur ce dépôt.
-- **Nommage** : plan d'étape `AAAA-MM-JJ-<sujet>.md` ; audit de session
-  `AAAA-MM-JJ-audit-<sujet>.md`. Chaque plan porte une section « Journal
-  d'exécution » renvoyant aux audits de session liés.
+  (socle générique). Un plan **métier / applicatif** vit dans le dépôt
+  applicatif (`atlas`), **pas ici**.
 - **Numéro d'ADR = ressource partagée** entre branches parallèles : en cas de
   collision (deux features réservant le même numéro), renuméroter au rebase et
   corriger l'index + toutes les références.
