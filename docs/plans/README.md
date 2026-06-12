@@ -4,13 +4,15 @@ Ce dossier conserve la **trace des feuilles de route d'implémentation** (plans
 d'étape du socle) et des **audits de session** (analyses d'impact ponctuelles :
 réalignements de branche, décisions de réintégration, dettes constatées).
 
-Il complète les deux autres traces du dépôt, sans s'y substituer :
+Il complète les autres traces du dépôt, sans s'y substituer — **un ADR DÉCIDE,
+un plan MET EN ŒUVRE, une issue EXÉCUTE, une PR LIVRE**
+([ADR 0057](../decisions/0057-gouvernance-documentaire-adr-plan-issue.md)) :
 
-| Trace                         | Dossier                      | Nature                                                                                                         |
-| ----------------------------- | ---------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| **Décisions**                 | `docs/decisions/`            | ADR (format Nygard) — **décision** structurante, immuable.                                                     |
-| **Audit du dépôt**            | `docs/audit/`                | État des lieux qualité daté, vérifié de façon adversariale.                                                    |
-| **Plans & audits de session** | `docs/plans/` _(ce dossier)_ | **Comment** on met en œuvre une décision (plan d'étape) et **ce qui s'est passé** en route (audit de session). |
+| Trace                         | Dossier                      | Rôle                                                                              |
+| ----------------------------- | ---------------------------- | --------------------------------------------------------------------------------- |
+| **Décisions**                 | `docs/decisions/`            | ADR (Nygard) — **décide** (le _pourquoi_), structurante, **immuable**.            |
+| **Audit du dépôt**            | `docs/audit/`                | **Mesure** l'écart à un standard — grille permanente + passages datés (ADR 0058). |
+| **Plans & audits de session** | `docs/plans/` _(ce dossier)_ | **Met en œuvre** une décision (plan vivant) ; trace une session (audit daté).     |
 
 ## Frontière (ADR 0023) — ce qui vit ICI vs ailleurs
 
@@ -24,15 +26,22 @@ Ce dépôt est un **catalogue de topologies d'infrastructure** générique. Donc
   l'infra ET le métier reste côté applicatif (sa Phase « socle » référence ce
   dépôt).
 
-## Convention de nommage
+## Deux natures, deux conventions ([ADR 0057](../decisions/0057-gouvernance-documentaire-adr-plan-issue.md))
 
-- **Plan d'étape** : `AAAA-MM-JJ-<sujet>.md` (date de rédaction du plan).
-  Référence en en-tête l'ADR qui le **fonde** (un plan met en œuvre une décision
-  ; il ne la remplace pas).
-- **Audit de session** : `AAAA-MM-JJ-audit-<sujet>.md`. Consigne une analyse
-  d'impact ponctuelle (collision de branches, réintégration, dette).
-- Chaque plan d'étape porte une section **« Journal d'exécution »** renvoyant
-  aux audits de session liés.
+- **Plan (thématique, VIVANT)** : `plan-<thème>.md` — **pas daté**. Met en œuvre
+  une décision tant qu'elle se réalise. **Référence l'ADR qui le fonde** en
+  en-tête, et porte une section **« Suivi » obligatoire** : paliers (cases à
+  cocher), **issues créées** (liens `#NNN`), **état d'achèvement** global,
+  renvoi aux runs de preuve ([`RESULTS.md`](../../test/lima/RESULTS.md)). Le
+  plan est le **tableau de bord** de la décision. **Jamais de paliers/checklist
+  dans l'ADR** — ils vivent ici (l'ADR est immuable, le déroulé évolue). Exemple
+  : [`plan-modele-declaratif.md`](plan-modele-declaratif.md).
+- **Audit de session (FIGÉ)** : `AAAA-MM-JJ-audit-<sujet>.md` — **daté**. Le
+  journal d'un moment (collision de branches, réintégration, dette constatée).
+  Reste daté car c'est une **photo assumée**, pas un tableau de bord.
+
+> Les **plans datés** (`AAAA-MM-JJ-<sujet>.md`) historiques restent valides
+> comme trace ; la convention thématique s'applique aux **nouveaux** plans.
 
 ## Index
 
