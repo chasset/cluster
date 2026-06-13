@@ -26,12 +26,17 @@ Usage :
   uv run python scripts/topology.py epreuves [--all] [--type unit|intég|chaos]   (P4)
   uv run python scripts/topology.py runs [--target atlas|storage-real|…]          (P4)
   uv run python scripts/topology.py next [--target …] [--apply]                   (P5)
+  uv run python scripts/topology.py metrics [--last]                               (P6)
+  uv run python scripts/topology.py smoke [--namespace …]                          (P6)
 
 P4 ajoute deux commandes READ-ONLY : `epreuves` (liste filtrée par la topologie,
 exig. 6 — ne lance rien) et `runs` (lit l'historique + fraîcheur, exig. 10-12 —
 ne réécrit rien). P5 ajoute `next` : suggère la prochaine phase (diff voulu−réel) ;
 `--apply` la LANCE via ansible-runner — décision humaine explicite, jamais
-d'auto-apply (ADR 0063). Sans --apply, `next` est informatif (code 0).
+d'auto-apply (ADR 0063). Sans --apply, `next` est informatif (code 0). P6 ajoute
+`metrics` (expose les métriques DÉJÀ consignées, exig. 8 — ne mesure rien de neuf)
+et `smoke` (test de réversibilité créer→vérifier→détruire sur un cluster vivant,
+exig. 7 — couche kubernetes isolée, code 1 si non réversible).
 
 Codes de sortie (contrat CI) : 0 = succès / invariant tenu / lecture ; 1 = erreur
 métier (topology invalide ou introuvable, dérive byte-identique détectée) ; 2 =
@@ -61,14 +66,17 @@ from cluster_topology import (  # noqa: E402
     TopologyError,
     derive_run_params,
     filter_epreuves,
+    format_metrics,
     load_runs,
     load_topology,
+    metrics_of,
     render_lima_inventory,
     render_prod_inventory,
     suggest_next,
     verdict_for_run,
 )
 from cluster_topology import runner as _runner  # noqa: E402
+from cluster_topology import smoke as _smoke  # noqa: E402
 from cluster_topology.history import last_run_for_target, latest_run  # noqa: E402
 
 _ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -366,6 +374,43 @@ def cmd_next(args: argparse.Namespace) -> int:
     return 0 if result.rc == 0 else 1
 
 
+def cmd_metrics(args: argparse.Namespace) -> int:
+    """Expose les métriques DÉJÀ consignées dans runs-history.yaml (P6, exig. 8).
+
+    LIT et met en forme (durées + cpu_core_s/ram_*) — ne mesure rien de neuf
+    (mesurer = le banc via metrology.sh). Read-only, code 0 toujours (informatif).
+    """
+    runs = load_runs(args.history or _RUNS_HISTORY)
+    if not runs:
+        print("aucun run consigné — pas de métriques à exposer.")
+        return 0
+    selected = [latest_run(runs)] if args.last else runs
+    blocs = [format_metrics(metrics_of(r)) for r in selected if r is not None]
+    print("\n\n".join(blocs))
+    return 0
+
+
+def cmd_smoke(args: argparse.Namespace) -> int:
+    """Smoke-test de réversibilité (P6, exig. 7) : crée un ns → vérifie → détruit
+    → vérifie détruit. Éprouve l'apply ET le rollback (ADR 0054).
+
+    Touche un cluster VIVANT via la couche isolée `smoke.py` (stubable). Code 0 si
+    réversible (toutes les étapes OK), 1 si une étape échoue, 2 si le cluster est
+    injoignable / client absent (usage).
+    """
+    try:
+        result = _smoke.run_smoke(args.namespace)
+    except _smoke.SmokeUnavailable as exc:
+        raise _UsageError(str(exc)) from exc
+    print(f"Smoke-test de réversibilité (namespace {result.namespace}) :")
+    for step in result.steps:
+        marque = "✓" if step.ok else "✗"
+        print(f"  {marque} {step.nom} — {step.detail}")
+    verdict = "réversible" if result.reversible else "NON réversible (voir ci-dessus)"
+    print(f"→ {verdict}")
+    return 0 if result.reversible else 1
+
+
 _DISPATCH = {
     "validate": cmd_validate,
     "generate": cmd_generate,
@@ -374,6 +419,8 @@ _DISPATCH = {
     "epreuves": cmd_epreuves,
     "runs": cmd_runs,
     "next": cmd_next,
+    "metrics": cmd_metrics,
+    "smoke": cmd_smoke,
 }
 
 
@@ -488,6 +535,19 @@ def _build_parser() -> argparse.ArgumentParser:
         "--apply",
         action="store_true",
         help="LANCER la phase suggérée via ansible-runner (décision humaine, ADR 0063)",
+    )
+
+    p_met = sub.add_parser("metrics", help="expose les métriques consignées (durées, cpu/ram)")
+    p_met.add_argument("--no-input", action="store_true", help="mode non interactif (CI)")
+    p_met.add_argument("--last", action="store_true", help="seulement le dernier run")
+    p_met.add_argument(
+        "--history", default=None, help="chemin du runs-history.yaml (défaut : test/lima/)"
+    )
+
+    p_smk = sub.add_parser("smoke", help="smoke-test de réversibilité (créer→vérifier→détruire)")
+    p_smk.add_argument("--no-input", action="store_true", help="mode non interactif (CI)")
+    p_smk.add_argument(
+        "--namespace", default=None, help="nom du namespace jetable (défaut : topology-smoke)"
     )
     return ap
 

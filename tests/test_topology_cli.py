@@ -376,6 +376,71 @@ runs:
         self.assertIn("usage", err)
 
 
+class Metrics(unittest.TestCase):
+    _HIST = """\
+runs:
+  - id: r1
+    date: 2026-06-01T00:00:00Z
+    profil: ceph
+    topologie: multi-node-3
+    total_s: 759
+    phases: {up: 165, bootstrap: 399}
+    metriques: {cpu_core_s: 272, ram_peak_mib: 7606, ram_mean_mib: 7489}
+"""
+
+    def test_exposes_consigned_metrics(self):
+        hist = _tmp(self._HIST)
+        self.addCleanup(os.unlink, hist)
+        code, out, _ = _capture(["metrics", "--history", hist])
+        self.assertEqual(code, 0)
+        self.assertIn("cpu_core_s=272", out)
+        self.assertIn("12m39s", out)  # 759 s
+
+    def test_empty_history(self):
+        hist = _tmp("runs: []\n")
+        self.addCleanup(os.unlink, hist)
+        code, out, _ = _capture(["metrics", "--history", hist])
+        self.assertEqual(code, 0)
+        self.assertIn("aucun run", out)
+
+
+class Smoke(unittest.TestCase):
+    def test_reversible_is_zero(self):
+        from cluster_topology.smoke import SmokeResult, SmokeStep
+
+        res = SmokeResult(
+            namespace="topo-smoke",
+            steps=[SmokeStep("créer", True), SmokeStep("vérifier détruit", True)],
+        )
+        orig = cli._smoke.run_smoke
+        cli._smoke.run_smoke = lambda ns: res
+        self.addCleanup(setattr, cli._smoke, "run_smoke", orig)
+        code, out, _ = _capture(["smoke"])
+        self.assertEqual(code, 0)
+        self.assertIn("réversible", out)
+
+    def test_not_reversible_is_one(self):
+        from cluster_topology.smoke import SmokeResult, SmokeStep
+
+        res = SmokeResult(namespace="x", steps=[SmokeStep("créer", False, "échec")])
+        orig = cli._smoke.run_smoke
+        cli._smoke.run_smoke = lambda ns: res
+        self.addCleanup(setattr, cli._smoke, "run_smoke", orig)
+        code, _, _ = _capture(["smoke"])
+        self.assertEqual(code, 1)
+
+    def test_cluster_unavailable_is_usage_error(self):
+        def boom(ns):
+            raise cli._smoke.SmokeUnavailable("cluster injoignable")
+
+        orig = cli._smoke.run_smoke
+        cli._smoke.run_smoke = boom
+        self.addCleanup(setattr, cli._smoke, "run_smoke", orig)
+        code, _, err = _capture(["smoke"])
+        self.assertEqual(code, 2)
+        self.assertIn("usage", err)
+
+
 class Dispatch(unittest.TestCase):
     def test_unknown_command_is_usage(self):
         with self.assertRaises(SystemExit) as ctx:
