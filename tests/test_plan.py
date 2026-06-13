@@ -122,6 +122,50 @@ class TargetValidation(unittest.TestCase):
     def test_default_target_base_is_socle(self):
         self.assertEqual(default_target(_topo(profile="base", backend="local-path")), "socle")
 
+    def _ha_topo(self):
+        # Topologie HA déclarée : 3 control-planes hyperconvergés + VIP (la
+        # déclaration de #333). Le modèle exige control_plane_lb dès > 1 CP.
+        return topology_from_dict(
+            {
+                "catalog": {"topology": "ha-3cp", "profile": "base"},
+                "nodes": [
+                    {"name": "cp1", "roles": ["control", "worker"]},
+                    {"name": "cp2", "roles": ["control", "worker"]},
+                    {"name": "cp3", "roles": ["control", "worker"]},
+                ],
+                "network": {"control_plane_lb": {"mode": "kube-vip-arp"}},
+                "storage": {"backend": "local-path"},
+                "target_kind": "lima",
+            }
+        )
+
+    def test_ha_topology_derives_ha_3cp(self):
+        # > 1 CP DÉCLARÉ → default_target dérive ha-3cp (sélection par topologie,
+        # pas commande à flags — ADR 0056). HA prime sur le profil applicatif.
+        self.assertEqual(default_target(self._ha_topo()), "ha-3cp")
+
+    def test_ha_3cp_sequence(self):
+        seq = expected_phase_sequence(self._ha_topo())
+        self.assertEqual(seq, ["up", "bootstrap-ha", "join-cp", "storage-simple"])
+
+    def test_ha_3cp_rejects_ceph_backend(self):
+        # ha-3cp = local-path (HA ⊥ stockage). Un backend ceph déclaré est refusé.
+        ceph_ha = topology_from_dict(
+            {
+                "catalog": {"topology": "ha-3cp", "profile": "base"},
+                "nodes": [
+                    {"name": "cp1", "roles": ["control"]},
+                    {"name": "cp2", "roles": ["control"]},
+                    {"name": "cp3", "roles": ["control"]},
+                ],
+                "network": {"control_plane_lb": {"mode": "kube-vip-arp"}},
+                "storage": {"backend": "ceph"},
+                "target_kind": "lima",
+            }
+        )
+        with self.assertRaises(PlanError):
+            expected_phase_sequence(ceph_ha, "ha-3cp")
+
 
 class DiffPhases(unittest.TestCase):
     SEQ = ["up", "bootstrap", "ceph", "sc", "datalake"]

@@ -73,7 +73,15 @@ _PATH_TAIL: dict[str, list[str]] = {
 # Chemins qui exigent le backend Ceph (WITH_CEPH=1 dans run-phases.sh).
 _CEPH_PATHS = {"storage-real", "cluster-dataops", "atlas-ceph"}
 
-KNOWN_TARGETS = frozenset(_PATH_TAIL)
+# ha-3cp : control-plane HA hyperconvergé (ADR 0047/0055). Séquence À PART : le
+# « socle » n'est PAS up→bootstrap→storage mais l'amorçage HA (bootstrap du CP
+# primaire derrière la VIP + promotion des CP additionnels), porté par le chemin
+# nommé run-phases.sh ha-3cp qui DÉLÈGUE l'orchestration Ansible à Python
+# (cluster_topology/ha.py). On l'expose comme chemin connu (sélection via
+# default_target) avec sa séquence propre — pas un socle+tail.
+_HA_3CP_SEQUENCE = ["up", "bootstrap-ha", "join-cp", "storage-simple"]
+
+KNOWN_TARGETS = frozenset(_PATH_TAIL) | {"ha-3cp"}
 
 
 class PlanError(ValueError):
@@ -95,12 +103,18 @@ def _hardening_requested(topo: Topology) -> bool:
 
 
 def default_target(topo: Topology) -> str:
-    """Chemin nommé déduit du profil + backend si l'appelant n'en fournit pas.
+    """Chemin nommé DÉDUIT de la topologie déclarée (ADR 0056 : une topologie se
+    déclare dans topology.yaml et l'outil en dérive le chemin — pas une commande
+    impérative à flags).
 
-    `dataops` + ceph → `atlas-ceph` (chaîne complète Ceph) ; `dataops` + local-path
-    → `atlas` ; un profil non-dataops → `socle` (on ne présume pas d'un chemin
-    applicatif). Heuristique de confort : l'opérateur peut toujours forcer `--target`.
+    HA D'ABORD : plus d'un control-plane (`is_ha_control_plane`) → `ha-3cp`, quel
+    que soit le profil applicatif (la HA est une propriété du CONTROL-PLANE,
+    orthogonale aux apps ; le banc ha-3cp prouve la mécanique en local-path).
+    Sinon : `dataops`+ceph → `atlas-ceph` ; `dataops`+local-path → `atlas` ; un
+    profil non-dataops → `socle`. L'opérateur peut toujours forcer `--target`.
     """
+    if topo.is_ha_control_plane:
+        return "ha-3cp"
     profile = topo.catalog.get("profile", "base")
     backend = _backend_of(topo)
     if profile == "dataops":
@@ -119,6 +133,17 @@ def expected_phase_sequence(topo: Topology, target: str | None = None) -> list[s
     target = target or default_target(topo)
     if target not in KNOWN_TARGETS:
         raise PlanError(f"chemin `{target}` inconnu (connus : {sorted(KNOWN_TARGETS)})")
+    if target == "ha-3cp":
+        # Chemin HA à séquence propre (amorçage VIP + joins), backend local-path
+        # imposé (HA ⊥ stockage, #250). Le durcissement reste appliquable en amont.
+        if _backend_of(topo) == "ceph":
+            raise PlanError(
+                "chemin `ha-3cp` = local-path (HA ⊥ stockage, #250) ; pas de backend ceph"
+            )
+        seq = list(_HA_3CP_SEQUENCE)
+        if _hardening_requested(topo):
+            seq.insert(2, "hardening")  # après bootstrap-ha, avant les joins
+        return seq
     backend = _backend_of(topo)
     if target in _CEPH_PATHS and backend != "ceph":
         raise PlanError(f"chemin `{target}` exige le backend ceph (déclaré : `{backend}`)")
