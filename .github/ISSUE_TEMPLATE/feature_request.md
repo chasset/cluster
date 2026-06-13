@@ -12,8 +12,8 @@ assignees: ''
 
 ## Proposition
 
-<!-- Solution envisagée. Lier l'item d'audit (docs/audit/2026-05-29/12-plan-action.md) ou
-     le STATUS.md si applicable. -->
+<!-- Solution envisagée. Lier le plan de mise en œuvre (docs/plans/) ou le passage
+     d'audit concerné (docs/audit/) si applicable. -->
 
 ## Alternatives envisagées
 

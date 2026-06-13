@@ -3,9 +3,6 @@ kind: Service
 metadata:
   name: rstudio-service
   namespace: rstudio
-  annotations:
-    tailscale.com/expose: 'true'
-    tailscale.com/hostname: rstudio
 spec:
   selector:
     app: rstudio

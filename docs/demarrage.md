@@ -59,9 +59,10 @@ pas. Les sections avancées sont signalées.
 
 - **Tout se valide d'abord sur le banc** Lima ([`test/`](../test/)) — voir
   [SAFEGUARDS.md](../SAFEGUARDS.md) pour les garde-fous (hooks, CI, banc).
-- **L'état d'avancement** du durcissement (par rapport à l'audit) est suivi dans
-  [`STATUS.md`](../STATUS.md) ; l'audit complet est dans
-  [`docs/audit/`](audit/).
+- **L'état d'avancement** se lit dans les plans de mise en œuvre
+  ([`docs/plans/`](plans/), ADR 0057) et les passages d'audit datés
+  ([`docs/audit/`](audit/), ADR 0058) ; l'état **live** du cluster vient de
+  `just state` (ou [`bootstrap/state.sh`](../bootstrap/state.sh)).
 
 ## Si quelque chose ne va pas
 

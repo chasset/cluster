@@ -105,13 +105,6 @@ communication entre eux. Kubernetes ne fait pas le réseau lui-même : il délè
 Le plugin CNI choisi ici : il fournit le réseau entre pods, la sécurité réseau
 et l'observabilité, en s'appuyant sur eBPF (une technologie du noyau Linux).
 
-### Tailscale
-
-Un VPN « maillé » (basé sur WireGuard) qui crée un réseau privé chiffré entre
-machines, où qu'elles soient. Ici, c'est la compensation de sécurité qui permet
-d'exposer certains services en HTTP sans authentification (réseau supposé
-privé). Voir [ADR 0003](decisions/0003-pas-de-chiffrement-ceph-tailscale.md).
-
 ## Exposition réseau (comment on atteint un service depuis l'extérieur du cluster)
 
 > Ces termes décrivent la chaîne qui rend une application **joignable depuis le

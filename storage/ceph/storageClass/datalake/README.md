@@ -23,18 +23,9 @@ kubectl apply -f datalake-ec.yaml
 kubectl apply -f storage-class.yaml
 ```
 
-Pour exposer le service via Tailscale (**si le Tailscale operator est
-déployé**), annoter le service `rook-ceph-rgw-datalake` créé automatiquement :
-
-```yaml
-metadata:
-  annotations:
-    tailscale.com/expose: 'true'
-    tailscale.com/hostname: datalake
-```
-
-Sans Tailscale, le service reste accessible depuis l'intérieur du cluster
-(`rook-ceph-rgw-datalake.rook-ceph:80`) ou via
+Le service `rook-ceph-rgw-datalake` créé automatiquement reste accessible depuis
+l'intérieur du cluster (`rook-ceph-rgw-datalake.rook-ceph:80`). Pour y accéder
+depuis un poste autorisé à parler à l'API K8s :
 `kubectl -n rook-ceph port-forward svc/rook-ceph-rgw-datalake 8080:80`.
 
 ## Créer une bucket
@@ -79,7 +70,7 @@ referme en sortie. Aucun terminal séparé ni `ENDPOINT` à fournir :
 bash storage/ceph/storageClass/datalake/smoke-test.sh
 ```
 
-Pour pointer un endpoint externe (Tailscale, NodePort…), surcharger
+Pour pointer un endpoint externe (NodePort…), surcharger
 `ENDPOINT=http://… bash …smoke-test.sh` (court-circuite le port-forward).
 
 ### Depuis un pod du cluster (sans port-forward)

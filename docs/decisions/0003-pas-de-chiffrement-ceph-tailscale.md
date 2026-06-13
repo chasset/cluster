@@ -15,8 +15,8 @@ Le cluster :
 
 - est confiné au **réseau privé `10.0.0.0/22`** (port 10 GbE inter-nœuds, pas de
   routage Internet) ;
-- a un seul administrateur, le tailnet Tailscale opérationnel pour l'accès
-  distant est optionnel ;
+- a un seul administrateur ; l'accès distant à l'API passe par
+  `kubectl port-forward` depuis un poste autorisé à parler à l'API K8s ;
 - héberge des données de recherche (article public, observation géoclimatique,
   etc.) — pas de données personnelles, pas de classifié.
 
@@ -41,13 +41,18 @@ La sécurité du transport est **déléguée au contrôle d'accès au réseau** 
 
 - intra-cluster : les flux restent confinés au `10.0.0.0/22` et au CIDR pods
   Cilium `10.244.0.0/16` ;
-- accès distant **optionnel** : tunnel Tailscale (chiffré bout-en-bout côté
-  réseau) **si** l'operator est déployé ; sinon, `kubectl port-forward` depuis
-  un poste autorisé à parler à l'API K8s.
+- accès distant : `kubectl port-forward` depuis un poste autorisé à parler à
+  l'API K8s. Pour le trafic pod↔pod, Cilium chiffre déjà en WireGuard
+  ([ADR 0019](0019-durcissement-reseau-cilium.md)) — couche réseau générique,
+  indépendante de tout VPN d'accès.
 
 ## Statut
 
-Accepted (2026-05-28).
+Accepted (2026-05-28). **Amendé (2026-06-13)** : abandon de Tailscale comme
+tunnel d'accès distant (et de son repli Headscale) ; l'accès distant repose
+désormais uniquement sur `kubectl port-forward`. Le titre/slug du fichier
+conserve « tailscale » pour ne pas casser les liens entrants (identifiant ADR
+stable) — la décision, elle, ne dépend plus de Tailscale.
 
 ## Conséquences
 
@@ -72,12 +77,9 @@ Accepted (2026-05-28).
   classifiées).
 - Le réseau cluster cesse d'être isolé (point d'entrée externe direct).
 
-**Repli OSS si dépendance Tailscale problématique.** Si la dépendance au service
-hébergé Tailscale (control plane SaaS) devient un souci (souveraineté, coût,
-disponibilité), **[Headscale](https://github.com/juanfont/headscale)** — une
-réimplémentation open-source auto-hébergeable du control plane Tailscale —
-permet de garder le même modèle (clients `tailscale`, ACL) sans le SaaS. Non
-déployé aujourd'hui ; noté comme porte de sortie.
+**Si un accès distant durable devient nécessaire** (au-delà du `port-forward`
+ponctuel), il sera tranché par un ADR dédié au moment voulu — sans présupposer
+de solution (l'ancienne piste Tailscale/Headscale est abandonnée).
 
 Cf. également [ADR 0011](0011-registry-http-sans-auth.md),
 [ADR 0012](0012-rstudio-disable-auth.md) qui s'appuient sur la même hypothèse de
