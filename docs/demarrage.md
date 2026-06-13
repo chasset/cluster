@@ -13,11 +13,18 @@ Cette page est le **point d'entrée** du dépôt pour un nouvel arrivant. Elle d
 
 - **Administrateur / exploitant** d'un cluster Kubernetes de recherche
   hyperconvergé (calcul + stockage sur les mêmes machines).
+- **Développeur data** qui veut _consommer_ la plateforme depuis son code (sans
+  l'opérer) : commencez par [Se brancher sur la plateforme](se-brancher.md) ou,
+  pour développer en local, le tutoriel [Monter le banc local](banc-local.md).
 - **Contributeur** au dépôt (manifestes, playbooks, documentation).
 
-Ce dépôt n'est **pas** une distribution clé en main : c'est l'Infrastructure-as-
-Code d'**un** cluster précis (4 serveurs HPE, Debian 13, Cilium, Rook-Ceph). Les
-valeurs (IP, disques, hostnames) sont celles de ce cluster.
+Ce dépôt n'est **pas** une distribution clé en main, ni l'infrastructure d'un
+déploiement particulier : c'est un **catalogue de topologies** réutilisables
+(mono-nœud, multi-nœuds, bare-metal hyperconvergé…), **une activée** par
+déploiement, en **valeurs d'exemple génériques**
+([ADR 0023](decisions/0023-plateforme-exemple-generique.md)). Les valeurs
+réelles (IP, disques, hostnames) vivent dans une config locale non versionnée.
+Le [manifeste](manifeste.md) raconte le pourquoi de bout en bout.
 
 ## Prérequis de connaissances
 

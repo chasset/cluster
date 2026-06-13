@@ -20,14 +20,17 @@ qui tourne.
 
 ### Cluster
 
-Un ensemble de machines (ici 4 serveurs) qui travaillent ensemble comme une
-seule ressource. On y déploie des applications sans se soucier de _quelle_
-machine les exécute — le cluster décide.
+Un ensemble de machines (`node1`, `node2`… selon la topologie) qui travaillent
+ensemble comme une seule ressource. On y déploie des applications sans se
+soucier de _quelle_ machine les exécute — le cluster décide.
 
 ### Nœud (node)
 
-Une machine du cluster (physique ici : un serveur HPE). Chaque nœud exécute des
-conteneurs et participe au stockage.
+Une machine du cluster (un serveur, ou une VM sur le banc). Chaque nœud exécute
+des conteneurs et, en topologie hyperconvergée, participe au stockage. Le nombre
+de nœuds est un axe du catalogue
+([ADR 0023](decisions/0023-plateforme-exemple-generique.md)), pas une valeur
+figée.
 
 ### Hyperconvergence
 
@@ -196,8 +199,8 @@ maintient.
 
 ### OSD (Object Storage Daemon)
 
-Le processus Ceph qui gère **un disque** de données. Un disque = un OSD. Avec 12
-disques par serveur × 4 serveurs, le cluster a beaucoup d'OSD. La perte d'un OSD
+Le processus Ceph qui gère **un disque** de données. Un disque = un OSD. Plus il
+y a de disques par nœud et de nœuds, plus le cluster a d'OSD ; la perte d'un OSD
 est rattrapée par la réplication.
 
 ### MON (Monitor)
@@ -289,14 +292,78 @@ L'équivalent d'un PVC mais pour le stockage objet : une **demande** de bucket
 S3. Quand l'OBC converge, Rook crée le bucket et un `Secret` avec les
 identifiants d'accès.
 
+## Chaîne DataOps
+
+### PostgreSQL / CloudNativePG (CNPG)
+
+**PostgreSQL** est la base de données relationnelle du socle. Elle n'est pas
+posée à la main mais gérée par **CloudNativePG** (« CNPG »), un _opérateur_
+Kubernetes qui prend en charge tout son cycle de vie : haute disponibilité,
+bascule, et sauvegardes vers S3. On écrit sur le service `pg-rw` (primary), on
+lit sur `pg-ro` (replica). Voir
+[ADR 0024](decisions/0024-postgres-manage-cloudnative-pg.md).
+
+### pgvector
+
+Une **extension** de PostgreSQL pour la **recherche sémantique** : elle ajoute
+un type de colonne `vector(n)` et les opérateurs pour comparer des vecteurs
+(trouver les plus « proches »). Utile pour ranger des _embeddings_
+(représentations numériques de textes/images) et retrouver les plus similaires.
+L'extension SQL s'installe par `CREATE EXTENSION vector` (déjà fait par
+l'opérateur) ; « pgvector » est le nom du projet.
+
+### Flyway
+
+Un outil de **migration de base de données** : il applique, dans l'ordre et une
+seule fois, une suite de scripts SQL versionnés pour amener le schéma à l'état
+voulu. Ici, c'est lui qui crée les tables du store de lineage (Marquez) au
+démarrage.
+
+### Code-location
+
+Dans Dagster, une **code-location** est le paquet de code métier (assets, jobs)
+qu'on **branche** sur l'orchestrateur. Le socle est livré **sans** code-location
+(orchestrateur vide) ; votre code s'y branche depuis le dépôt applicatif, servi
+par un serveur gRPC déclaré dans le _workspace_. Voir
+[ADR 0026](decisions/0026-orchestration-dagster.md).
+
+### K8sRunLauncher
+
+Le mode d'exécution de Dagster choisi ici : **chaque run devient un Job
+Kubernetes** isolé (au lieu de tourner dans le processus de l'orchestrateur).
+L'isolation et l'élasticité sont ainsi déléguées au cluster.
+
+### Promtail
+
+L'agent qui **collecte les logs** sur chaque nœud (un DaemonSet) et les pousse
+vers **Loki** (l'agrégateur de logs). Côté application, il n'y a rien à faire :
+écrire sur la sortie standard suffit, Promtail s'occupe du reste.
+
 ## Opérations & qualité
+
+### ConfigMap
+
+Un objet Kubernetes qui stocke de la **configuration** (paires clé/valeur ou
+petits fichiers) séparément du code, pour l'injecter dans des pods sans
+reconstruire l'image. Le pendant pour les données sensibles est le **Secret**
+(chiffré au repos, manipulé à part).
+
+### Justfile
+
+Le fichier lu par l'outil [`just`](https://github.com/casey/just) : un **carnet
+de raccourcis** de commandes courantes (`just lint`, `just state`,
+`just bench ceph`). Il **nomme l'existant** pour le rendre découvrable — ce
+**n'est pas** un orchestrateur : l'ordre d'installation canonique reste décrit
+dans le RUNBOOK.
 
 ### Drift (dérive)
 
-Un écart entre ce que la documentation/le code prétend et ce que la réalité
-fait. Le banc de test trace ses drifts dans
-[`test/RESULTS.md`](../test/RESULTS.md) — par honnêteté et pour ne pas répéter
-les mêmes erreurs.
+Un écart entre ce que la documentation/le code prétend et ce que la réalité fait
+— typiquement révélé par un run de bout en bout, pas par le lint. Chaque drift
+est indexé (symptôme, cause, correctif, statut) dans le **registre**
+[`registre-drifts.yaml`](architecture/registre-drifts.yaml), et distillé en
+invariants dans les [leçons des runs](architecture/lecons-des-runs.md) — par
+honnêteté et pour ne pas répéter les mêmes erreurs.
 
 ### ADR (Architecture Decision Record)
 
