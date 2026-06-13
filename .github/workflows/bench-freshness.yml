@@ -52,22 +52,38 @@ jobs:
 
       # Ouvre (ou met à jour) une issue de rappel quand la preuve est périmée
       # ou absente (rc != 0). ADR 0042 §1 : signaler, ne pas bloquer.
+      #
+      # Anti-doublon : l'unicité repose sur le LABEL `bench-freshness`, PAS sur une
+      # recherche par titre. Le titre contient emoji + tirets cadratins +
+      # parenthèses, que la recherche plein-texte de GitHub tokenise mal
+      # (`--search "<titre> in:title"` renvoyait 0 même quand l'issue existe) →
+      # une nouvelle issue était créée à chaque run (doublons #273/#288). Le
+      # filtre `--label` est un match EXACT et fiable : au plus une issue ouverte.
       - name: Ouvrir/mettre à jour l'issue de rappel
         if: ${{ steps.check.outputs.rc != '0' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SUMMARY: ${{ steps.check.outputs.summary }}
         run: |
+          LABEL="bench-freshness"
           TITLE="⏰ Preuve de banc périmée — relancer le(s) chemin(s) concerné(s)"
           NOTE="— Détecté par bench-freshness.yml (ADR 0042 / ADR 0045 §6). Le détail"
           NOTE="${NOTE} ci-dessus nomme le(s) chemin(s) périmé(s) ; relancer ce(s) chemin(s)"
           NOTE="${NOTE} (test/lima/run-phases.sh <chemin>) et committer le run. Refermer ensuite."
           BODY=$(printf '%s\n\n%s' "$SUMMARY" "$NOTE")
-          EXISTING=$(gh issue list --state open --search "$TITLE in:title" --json number --jq '.[0].number' --repo "$GITHUB_REPOSITORY")
+          # Filet de sécurité : crée le label s'il manque (idempotent), sinon le
+          # premier run sur un dépôt neuf échouerait au --label.
+          gh label create "$LABEL" --color FBCA04 \
+            --description "Rappel auto de fraîcheur des preuves de banc — une seule à la fois" \
+            --repo "$GITHUB_REPOSITORY" 2>/dev/null || true
+          # Recherche EXACTE par label (pas par titre) → au plus une issue ouverte.
+          EXISTING=$(gh issue list --state open --label "$LABEL" --json number --jq '.[0].number // empty' --repo "$GITHUB_REPOSITORY")
           if [ -n "$EXISTING" ]; then
+            echo "Issue de rappel #$EXISTING déjà ouverte → commentaire (pas de doublon)."
             gh issue comment "$EXISTING" --body "$BODY" --repo "$GITHUB_REPOSITORY"
           else
-            gh issue create --title "$TITLE" --body "$BODY" --repo "$GITHUB_REPOSITORY"
+            echo "Aucune issue de rappel ouverte → création."
+            gh issue create --title "$TITLE" --body "$BODY" --label "$LABEL" --repo "$GITHUB_REPOSITORY"
           fi
 
       - name: Matérialiser le verdict (visible, non bloquant pour les PR)
