@@ -726,3 +726,35 @@ pas un Job synthétique. Frontière ADR 0022/0045 respectée.
 
 Le harnais a aussi attrapé un runConfig invalide (`RunConfigValidationInvalid`
 remonté) avant correction — preuve qu'il valide bien le schéma du job.
+
+## Outil déclaratif `cluster_topology` — validation partielle sur banc vivant (P6, 2026-06-13)
+
+Première confrontation de l'outil déclaratif
+([ADR 0056](../../docs/decisions/0056-modele-declaratif-topologies.md), paliers
+P0-P6) à un **banc Lima vivant** (3 nœuds `lima-cp1/node1/node2` Ready, k8s
+v1.34.8, API `127.0.0.1:6443` — kubeconfig `test/lima/.work/kubeconfig`,
+**jamais le contexte prod**). Décrit une topologie `multi-node-3` / `dataops` /
+`ceph` du banc et lance les commandes :
+
+- **read-only** (`validate`, `status`, `generate --kind lima`, `epreuves`,
+  `runs`, `metrics`, `next`) : toutes correctes. `epreuves` filtre 29/29
+  jouables sur ce banc (lima ⇒ offensifs autorisés ; ceph ⇒ scénarios stockage ;
+  dataops ⇒ toute la chaîne) ; `metrics --last` ré-expose les agrégats du run
+  consigné (cpu_core_s=664, ram_peak=9340 MiB) ; `next` suggère la 1ʳᵉ phase
+  manquante.
+- **`smoke` (réversibilité, exig. 7)** — cycle réel sur le cluster :
+
+```text
+✓ créer (namespace topology-smoke-live) → ✓ vérifier présent → ✓ détruire → ✓ vérifier détruit (6,4 s) → réversible
+```
+
+Le namespace est **confirmé disparu** (`kubectl get ns` → NotFound) ; aucun
+résidu sur le banc. La revue avait signalé que vérifier l'absence _juste après_
+le `delete` donnerait un faux négatif (un namespace passe en `Terminating`
+quelques secondes) : le **run réel l'a confirmé** — l'attente du 404 réel
+(`_wait_gone`) prend ~6 s ici. Garde-fou de sûreté vérifié aussi : `smoke`
+contre un cluster **injoignable** échoue en 5 s (`cluster injoignable`, code 2),
+jamais de blocage ni de faux « non réversible ».
+
+Reste non éprouvé sur banc : `next --apply` (lancement d'une phase via
+`ansible-runner`) et `status --real` (SSH) — à consigner lors d'un run dédié.
