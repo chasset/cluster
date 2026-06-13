@@ -1,0 +1,32 @@
+# code: language=ansible
+# Rôle kube-vip (ADR 0047/0055, #250) — pose la VIP de l'API devant les
+# control-planes (topologie ha-3cp) via un POD STATIQUE en mode ARP.
+#
+# Le manifeste est templatisé dans /etc/kubernetes/manifests/ : le kubelet le
+# surveille et démarre/recharge le pod automatiquement — pas de handler. kube-vip
+# monte admin.conf (creds cluster-admin du CP) → AUCUN objet RBAC requis (le RBAC
+# ne sert qu'au mode DaemonSet). Idempotent : `template` ne réécrit que si le
+# contenu rendu change (rejeu → changed=0).
+#
+# AMORÇAGE (k8s ≥ 1.29) : le chemin nommé `ha-3cp` (run-phases.sh, à venir)
+# pilotera kube_vip_kubeconfig_path = super-admin.conf le temps du premier
+# `kubeadm init`, puis rebascule sur admin.conf — cf. README. Ce rôle ne fait que
+# RENDRE le manifeste ; l'orchestration init/join vit dans le chemin codé.
+- name: Déployer kube-vip (pod statique VIP, mode ARP)
+  become: true
+  block:
+    - name: Garantir le répertoire des pods statiques
+      ansible.builtin.file:
+        path: '{{ kube_vip_manifests_dir }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Rendre le manifeste du pod statique kube-vip
+      ansible.builtin.template:
+        src: kube-vip.yaml.j2
+        dest: '{{ kube_vip_manifests_dir }}/kube-vip.yaml'
+        owner: root
+        group: root
+        mode: '0600'

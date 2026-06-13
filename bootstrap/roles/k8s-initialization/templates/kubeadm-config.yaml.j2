@@ -91,6 +91,14 @@ apiServer:
       mountPath: {{ k8s_audit_log_dir }}
       readOnly: false
       pathType: DirectoryOrCreate
+{% if control_plane_vip | default('') | length > 0 %}
+  # SAN supplémentaires du certificat de l'API server. EN HA (ha-3cp), la VIP
+  # kube-vip (ADR 0047/0055) est un point d'entrée du même API : sans elle dans
+  # les certSANs, le TLS casse dès qu'un client tape la VIP au lieu de l'endpoint.
+  # VIDE en mono-CP (ADR 0002) → bloc absent, kubeadm garde ses SAN par défaut.
+  certSANs:
+    - {{ control_plane_vip }}
+{% endif %}
 ---
 # Le kubelet doit AUSSI activer ImageVolume pour monter les volumes d'image
 # (le feature gate apiServer seul ne suffit pas — c'est le kubelet qui monte).
