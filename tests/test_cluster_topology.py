@@ -122,6 +122,62 @@ class Validation(unittest.TestCase):
         self.assertTrue(t.is_ha_control_plane)
         self.assertEqual(t.control_nodes, ["cp1", "cp2", "cp3"])
 
+    def _ha_base(self, lb):
+        # 3 CP hyperconvergés + un control_plane_lb donné — pour tester son `mode`.
+        return _base(
+            nodes=[
+                {"name": "cp1", "roles": ["control", "worker"]},
+                {"name": "cp2", "roles": ["control", "worker"]},
+                {"name": "cp3", "roles": ["control", "worker"]},
+            ],
+            network={"control_plane_lb": lb},
+            target_kind="lima",
+        )
+
+    def test_lb_unknown_mode_rejected(self):
+        # Le `mode` du control_plane_lb doit être connu (sinon le delta d'outillage
+        # kube-vip vs external n'est pas dérivable — ADR 0047/0055).
+        with self.assertRaises(TopologyError):
+            topology_from_dict(self._ha_base({"mode": "frobnicate"}))
+
+    def test_lb_without_mode_rejected(self):
+        with self.assertRaises(TopologyError):
+            topology_from_dict(self._ha_base({"ip": "10.0.0.9"}))
+
+    def test_lb_valid_modes_accepted(self):
+        for mode in ("kube-vip-arp", "kube-vip-lb", "external"):
+            t = topology_from_dict(self._ha_base({"mode": mode}))
+            self.assertEqual(t.network["control_plane_lb"]["mode"], mode)
+
+
+class HaThreeCpExample(unittest.TestCase):
+    """La topologie ha-3cp déclarée (hyperconvergé, local-path) est valide et
+    expose la mécanique HA attendue (#250, ADR 0055/0056)."""
+
+    def setUp(self):
+        self.topo = load_topology(os.path.join(_ROOT, "topology-ha-3cp.example.yaml"))
+
+    def test_three_hyperconverged_control_planes(self):
+        # 3 CP hyperconvergés → 3 control, 0 worker pur (ils schedulent, ADR 0007).
+        self.assertEqual(self.topo.control_nodes, ["cp1", "cp2", "cp3"])
+        self.assertEqual(self.topo.worker_nodes, [])
+        self.assertTrue(self.topo.is_ha_control_plane)
+
+    def test_vip_declared_kube_vip_arp(self):
+        lb = self.topo.network.get("control_plane_lb")
+        self.assertEqual(lb.get("mode"), "kube-vip-arp")
+
+    def test_local_path_storage_ha_orthogonal(self):
+        # HA ⊥ stockage (#250) : la topologie HA se prouve en local-path, pas Ceph.
+        self.assertEqual(self.topo.storage.get("backend"), "local-path")
+
+    def test_status_is_target_not_built(self):
+        # Honnêteté (ADR 0052/0030) : `cible` tant qu'aucun run banc ne l'a prouvé.
+        self.assertEqual(self.topo.catalog.get("status"), "cible")
+
+    def test_lima_target(self):
+        self.assertEqual(self.topo.target_kind, "lima")
+
 
 class ByteExactInvariant(unittest.TestCase):
     """P1 : le profil prod générique régénère hosts.example.yaml à l'octet."""
