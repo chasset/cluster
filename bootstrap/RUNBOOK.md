@@ -484,17 +484,23 @@ k get nodes
 k get pods --all-namespaces
 ```
 
-### Virtual private network
+### Accès distant aux services du cluster
 
-Installer tailscale sur tous les nœuds.
+L'accès distant aux services internes (dashboards, consoles, API d'opérateurs)
+passe par `kubectl port-forward` depuis un poste autorisé à joindre l'API
+Kubernetes — il n'y a **pas** de réseau d'overlay ni de VPN dédié
+([ADR 0003](../docs/decisions/0003-pas-de-chiffrement-ceph-tailscale.md)). Le
+poste de contrôle dispose déjà du kubeconfig fusionné (section précédente) ; le
+tunnel est local au poste et ne traverse que l'API server.
 
 ```bash
-curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list | sudo tee /etc/apt/sources.list.d/tailscale.list
-sudo apt-get update
-sudo apt-get install tailscale
-sudo tailscale up --ssh
+# Exposer localement un service ClusterIP (ex. un dashboard) :
+kubectl -n <namespace> port-forward svc/<service> <port-local>:<port-service>
+# puis ouvrir http://localhost:<port-local>
 ```
+
+Le tunnel reste actif tant que la commande tourne ; le couper (`Ctrl+C`) ferme
+l'accès. Aucun port supplémentaire n'est ouvert sur les nœuds.
 
 ### Installation de Ceph
 

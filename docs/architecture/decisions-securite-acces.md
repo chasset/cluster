@@ -23,11 +23,9 @@ Dans ce cadre,
 [ADR 0003](../decisions/0003-pas-de-chiffrement-ceph-tailscale.md) pose le
 principe directeur : **la sécurité du transport est déléguée au contrôle d'accès
 au réseau**. Le rempart, c'est le périmètre du réseau privé ; le reste des
-décisions en découle. Tailscale (tunnel chiffré pour l'accès distant) reste
-**optionnel** : aucun composant ne s'appuie en dur dessus, c'est un moyen
-d'accès possible et non le pivot de la sécurité. Une porte de sortie OSS est
-notée ([Headscale](https://github.com/juanfont/headscale)) si la dépendance au
-SaaS Tailscale devenait un souci.
+décisions en découle. L'accès distant ne repose sur aucun tunnel ni service
+tiers : il passe par **`kubectl port-forward`** depuis un poste autorisé à
+parler à l'API K8s, et c'est le contrôle d'accès à cette API qui fait foi.
 
 Pour tout ce qui touche à l'exposition des services, au TLS et à l'accès
 distant, voir la vue dédiée
@@ -151,11 +149,11 @@ au contrôle d'accès au Service, dans le modèle mono-tenant de 0003.
 [ADR 0011](../decisions/0011-registry-http-sans-auth.md) : le registry
 (distribution v3) expose le port **80 en HTTP clair, sans module
 `REGISTRY_AUTH`**. Périmètre : pulls intra-cluster par `kubelet` depuis le
-réseau pods `10.244.0.0/16` ; accès distant **optionnel** via Tailscale, sinon
-`kubectl port-forward` ou saut SSH. Coûts assumés : tout client autorisé à
-atteindre le Service peut **pusher** des images arbitraires (y compris écraser
-des tags), et **tout pod du cluster peut tirer** (pas d'`imagePullSecret`).
-Acceptable en mono-tenant ; inacceptable dès qu'on introduit du multi-tenancy.
+réseau pods `10.244.0.0/16` ; accès distant par `kubectl port-forward` ou saut
+SSH. Coûts assumés : tout client autorisé à atteindre le Service peut **pusher**
+des images arbitraires (y compris écraser des tags), et **tout pod du cluster
+peut tirer** (pas d'`imagePullSecret`). Acceptable en mono-tenant ; inacceptable
+dès qu'on introduit du multi-tenancy.
 
 ### RStudio — `DISABLE_AUTH=true`
 
@@ -169,8 +167,9 @@ lui-même des **coûts plus importants que 0010/0011** : shell + filesystem
 accessibles (exécution de code R/python avec réseau sortant, lecture/écriture de
 la PVC, `system()` shell), et **pas d'audit utilisateur** (`auditd` voit
 `uid=1000` mais pas quel humain est derrière). Garde-fous : ne **pas** exposer
-via Ingress public ni LoadBalancer ; restreindre `tag:rstudio-user` si Tailscale
-est utilisé ; sauvegarder régulièrement la PVC.
+via Ingress public ni LoadBalancer ; n'atteindre le port 8787 que par
+`kubectl port-forward` depuis un poste autorisé ; sauvegarder régulièrement la
+PVC.
 
 ### Kubernetes Dashboard — `cluster-admin`
 
@@ -309,6 +308,6 @@ chiffrement Ceph msgr2, chiffrement des snapshots).
 ## Voir aussi
 
 - [Exposition & réseau](../architecture/exposition-reseau.md) — exposition des
-  services, TLS, accès distant Tailscale.
+  services, TLS, accès distant par `kubectl port-forward`.
 - [Validation sur banc](../architecture/validation-banc.md) — scénarios de test
   (WireGuard/Hubble, chiffrement etcd/audit).

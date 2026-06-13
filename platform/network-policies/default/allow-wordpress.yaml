@@ -14,7 +14,7 @@ spec:
     - Ingress
     - Egress
   ingress:
-    # HTTP public (LoadBalancer / Tailscale) — le frontend est fait pour être joint.
+    # HTTP public (LoadBalancer) — le frontend est fait pour être joint.
     - ports:
         - protocol: TCP
           port: 80

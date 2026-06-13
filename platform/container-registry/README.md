@@ -8,8 +8,7 @@ par défaut (`rook-ceph-block-replicated`, réplicat ×3).
 ## Décisions assumées
 
 - **HTTP sans TLS et sans authentification** : la sécurité de l'accès est
-  déléguée au contrôle d'accès au Service (réseau cluster, port-forward, ou
-  tunnel Tailscale si l'operator est déployé). Voir
+  déléguée au contrôle d'accès au Service (réseau cluster, port-forward). Voir
   [`docs/decisions/0011-registry-http-sans-auth.md`](../../docs/decisions/0011-registry-http-sans-auth.md)
   (cohérent avec
   [`0003-pas-de-chiffrement-ceph-tailscale.md`](../../docs/decisions/0003-pas-de-chiffrement-ceph-tailscale.md)).
@@ -22,12 +21,6 @@ par défaut (`rook-ceph-block-replicated`, réplicat ×3).
 ## Pré-requis
 
 - Cluster bootstrap (CNI + Rook-Ceph + StorageClass par défaut) en place.
-- **Tailscale operator (optionnel)** : si déployé (cf.
-  [`storage/ceph/RUNBOOK.md`](../../storage/ceph/RUNBOOK.md)), les annotations
-  `tailscale.com/expose` et `tailscale.com/hostname` du Service exposent le
-  registry comme `registry:80` sur le tailnet. **Sans Tailscale**, ces
-  annotations sont des no-ops sans erreur ; le registry reste accessible via
-  `kubectl port-forward` ou depuis l'intérieur du cluster.
 
 ## Installation
 
@@ -47,35 +40,22 @@ kubectl -n registry get pods,svc,pvc,cronjob
 
 ## Utilisation
 
-### Depuis un pair Tailscale (si l'operator est déployé)
+### Depuis un poste distant
 
-Le registry est joignable à `registry:80` depuis tout pair Tailscale ayant le
-bon tag. Côté daemon Docker (poste de dev) :
-
-```json
-{
-  "insecure-registries": ["registry:80"]
-}
-```
-
-```bash
-docker pull alpine:3.20
-docker tag alpine:3.20 registry:80/alpine:3.20
-docker push registry:80/alpine:3.20
-docker pull registry:80/alpine:3.20
-```
-
-### Sans Tailscale (fallback)
-
-Depuis un poste autorisé à parler à l'API K8s :
+Depuis un poste autorisé à parler à l'API K8s, le registry est joignable via
+`kubectl port-forward` :
 
 ```bash
 kubectl -n registry port-forward svc/registry 8080:80
 # puis sur le poste local :
 #   "insecure-registries": ["localhost:8080"]
+docker pull alpine:3.20
 docker tag alpine:3.20 localhost:8080/alpine:3.20
 docker push localhost:8080/alpine:3.20
+docker pull localhost:8080/alpine:3.20
 ```
+
+### Depuis le cluster
 
 Depuis un nœud du cluster, le registry est directement résolvable comme
 `registry.registry.svc.cluster.local:80`.

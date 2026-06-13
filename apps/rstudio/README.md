@@ -8,7 +8,8 @@ persistant 1 Ti pour le workspace utilisateur, sur la StorageClass par défaut
 
 **Pas d'authentification** (`DISABLE_AUTH=true`). Quiconque atteint `rstudio:80`
 ouvre directement une session — shell + filesystem. La sécurité repose sur le
-contrôle d'accès au Service (ACL Tailscale, réseau interne).
+contrôle d'accès au Service (réseau interne, accès à l'API Kubernetes restreint
+aux postes autorisés).
 
 Voir
 [`docs/decisions/0012-rstudio-disable-auth.md`](../../docs/decisions/0012-rstudio-disable-auth.md)
@@ -42,11 +43,9 @@ kubectl -n rstudio get pods,pvc,svc                  # tout Ready, PVC Bound
 
 ## Accès
 
-- **Via Tailscale** _(si le Tailscale operator est déployé)_ : ouvrir
-  `http://rstudio` depuis un pair Tailscale ayant le bon tag.
-- **Sans Tailscale (fallback)** :
-  `kubectl -n rstudio port-forward svc/rstudio-service 8787:80` puis ouvrir
-  `http://localhost:8787`.
+Depuis un poste autorisé à parler à l'API Kubernetes :
+`kubectl -n rstudio port-forward svc/rstudio-service 8787:80`, puis ouvrir
+`http://localhost:8787`.
 
 Pas d'écran de login : vous arrivez directement sur l'IDE en tant qu'utilisateur
 `rstudio`.

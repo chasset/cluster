@@ -1,4 +1,4 @@
-# RStudio : Service ClusterIP :80 → conteneur :8787, exposé aussi via Tailscale.
+# RStudio : Service ClusterIP :80 → conteneur :8787.
 # Ingress ouvert sur 8787 (le port réel du pod ; le Service fait le mapping
 # 80→8787, mais une NetworkPolicy cible le port du POD). Egress : API server.
 # (DNS couvert par allow-dns-egress.)

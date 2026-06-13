@@ -11,7 +11,8 @@ Le cluster est :
 
 - mono-tenant (laboratoire de recherche universitaire) ;
 - mono-administrateur (l'opérateur du cluster) ;
-- accédé exclusivement via Tailscale par cet opérateur unique ;
+- accédé exclusivement par cet opérateur unique en `kubectl port-forward` local
+  (pas d'Ingress public) ;
 - non multi-tenants (pas de cloisonnement par équipe / projet / labo).
 
 ## Décision
@@ -51,7 +52,7 @@ Accepted (2026-05-28).
 
 - **Compromission du token = compromission complète du cluster** pendant la
   durée de validité (≤ 8 h). Mitigation : tokens courts, accès dashboard
-  uniquement via Tailscale, port-forward local (pas d'Ingress public).
+  uniquement en `kubectl port-forward` local (pas d'Ingress public).
 - Si le périmètre évolue vers multi-utilisateurs (plusieurs chercheurs,
   équipes), cette ADR devient obsolète : il faudra introduire des rôles scopés
   (un `Role` par namespace par utilisateur) et plusieurs comptes dashboard. À ce

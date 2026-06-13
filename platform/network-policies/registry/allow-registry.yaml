@@ -1,4 +1,4 @@
-# Registry : Service ClusterIP :80 → conteneur :5000, exposé aussi via Tailscale.
+# Registry : Service ClusterIP :80 → conteneur :5000.
 # Ingress ouvert sur 5000 depuis n'importe où — TOUT le cluster (et le kubelet)
 # pull/push des images ici, donc on ne restreint pas la source. Egress : API
 # server. (DNS couvert par allow-dns-egress.)

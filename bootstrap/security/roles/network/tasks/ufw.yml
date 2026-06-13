@@ -40,7 +40,8 @@
         network_ufw_cluster_cidr: "{{ lookup('ansible.builtin.env', 'CLUSTER_CIDR') | default('10.0.0.0/22', true) }}"
 
     # Source autorisée pour SSH. Défaut = réseau cluster (pas d'Internet,
-    # cf. ADR 0003). Surchargeable via SSH_ADMIN_CIDR (ex. Tailscale 100.64.0.0/10).
+    # cf. ADR 0003). Surchargeable via SSH_ADMIN_CIDR (ex. plage d'un poste
+    # d'administration autorisé, 10.0.4.0/24).
     - name: Définir la plage d'administration SSH
       ansible.builtin.set_fact:
         network_ufw_ssh_admin_cidr: "{{ lookup('ansible.builtin.env', 'SSH_ADMIN_CIDR') | default(network_ufw_cluster_cidr, true) }}"
