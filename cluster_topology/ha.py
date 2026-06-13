@@ -96,15 +96,27 @@ def join_extravars(vip: str, vip_iface: str) -> dict[str, str]:
 # ── Couche d'exécution ISOLÉE (I/O, injectable) ──────────────────────────────
 
 
+# TIMEOUT des commandes dans une VM : un `limactl shell` (SSH) peut PENDRE
+# indéfiniment (VM lente, lien KO) ; sans borne, une gate (vip/etcd) bloquerait le
+# run entier en attente d'un sous-process qui ne rend jamais la main (constaté au
+# banc). On borne ; un dépassement = commande échouée (rc≠0), la gate retentera.
+_VM_EXEC_TIMEOUT_S = 30
+
+
 def _vm_exec(vm: str, command: list[str]) -> subprocess.CompletedProcess:
     """Exécute une commande DANS une VM Lima (`limactl shell`). Patron lib.sh:vm_sh.
-    Isolé → stubbable en test. Ne lève pas : l'appelant lit rc/stdout."""
-    return subprocess.run(  # noqa: S603 — vm/command contrôlés par le chemin codé
-        ["limactl", "shell", vm, *command],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    Isolé → stubbable en test. Ne lève PAS (l'appelant lit rc/stdout) : un timeout
+    se mappe en CompletedProcess(rc=124, stdout='') — la gate appelante retentera."""
+    try:
+        return subprocess.run(  # noqa: S603 — vm/command contrôlés par le chemin codé
+            ["limactl", "shell", vm, *command],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_VM_EXEC_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(command, returncode=124, stdout="", stderr="timeout")
 
 
 def vip_healthz(vip: str, from_vm: str, *, vm_exec=_vm_exec) -> bool:
