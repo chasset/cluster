@@ -176,6 +176,42 @@ setup() {
     [[ "$output" == *"ordre inverse"* ]]
 }
 
+# ─── classify_hardening_signal (ADR 0065 §2 : durcissement = état détecté) ───
+
+@test "hardening : auditd+fail2ban actifs → ok hardened (+hardening)" {
+    run classify_hardening_signal active active
+    [ "$status" -eq 0 ]
+    [[ "$output" == ok\|* ]]
+    [[ "$output" == *"hardened"* ]]
+}
+
+@test "hardening : auditd+fail2ban inactifs → ok plain (pas de suffixe)" {
+    run classify_hardening_signal inactive inactive
+    [ "$status" -eq 0 ]
+    [[ "$output" == ok\|* ]]
+    [[ "$output" == *"plain"* ]]
+}
+
+@test "hardening : un signal unknown → skip (injoignable → l'appelant die)" {
+    run classify_hardening_signal active unknown
+    [[ "$output" == skip\|* ]]
+    run classify_hardening_signal unknown inactive
+    [[ "$output" == skip\|* ]]
+}
+
+@test "hardening : état PARTIEL (un seul actif) → fail (couche incohérente)" {
+    run classify_hardening_signal active inactive
+    [[ "$output" == fail\|* ]]
+    [[ "$output" == *"PARTIEL"* ]]
+    run classify_hardening_signal inactive active
+    [[ "$output" == fail\|* ]]
+}
+
+@test "hardening : défauts absents → skip (rien collecté = unknown)" {
+    run classify_hardening_signal
+    [[ "$output" == skip\|* ]]
+}
+
 # ═══ GRAPHE ATOMIQUE (ADR 0066, Lot 0) — invariants prouvés sans banc ════════
 # Périmètres vérifiés contre le code (workflow consigné 2026-06-13). Ces tests
 # sont la garantie que les oublis du modèle par phase (cnpg-system…) deviennent

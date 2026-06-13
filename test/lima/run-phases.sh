@@ -280,6 +280,46 @@ detect_storage_profile() {
     log "  profil détecté : storageClass=${STORAGE_SC}, backing S3=${STORAGE_BACKING} (${STORAGE_ENDPOINT})"
 }
 
+# detect_hardening_state : DÉRIVE l'état de DURCISSEMENT de l'ÉTAT RÉEL de l'hôte
+# (ADR 0065 §2 : le durcissement est un état CONSTATABLE, pas un flag à re-saisir).
+# Constate via SSH (comme state.sh) les couches que phase_hardening pose sur le
+# banc (tags `audit,detection` → auditd + fail2ban) et pose HARDENING_STATE :
+#   - les deux actifs            → HARDENING_STATE=hardened (durci → +hardening) ;
+#   - les deux inactifs/absents  → HARDENING_STATE=plain ;
+#   - hôte INJOIGNABLE (SSH KO)  → die (« détection fiable ou refus franc », L44) ;
+#   - état PARTIEL (un seul actif) → die (durcissement incohérent à corriger).
+# WITH_HARDENING=1 reste l'INTENTION d'APPLIQUER sur un build neuf (run_hardening_
+# if_requested) ; cette détection sert à dériver le suffixe TARGET de la RÉALITÉ.
+detect_hardening_state() {
+    local node="${CP}" auditd fail2ban verdict
+    # 1. Sonder la JOIGNABILITÉ d'abord, séparément de l'état des unités : seul un
+    # hôte injoignable doit `die` (illisible). Un paquet de durcissement ABSENT
+    # (auditd/fail2ban non installé) est légitimement « inactif » → plain, pas
+    # `unknown` (sinon un hôte plain ferait échouer la détection selon la version
+    # de systemd qui rend ''/'unknown' pour une unité inconnue).
+    if ! vm_sh "${node}" true > /dev/null 2>&1; then
+        auditd=unknown
+        fail2ban=unknown
+    else
+        # SSH OK : `is-active` rend active/inactive/failed/unknown sur stdout. Tout
+        # ce qui n'est pas `active` (inactif, échoué, absent) compte comme inactif.
+        auditd=$(vm_sh "${node}" systemctl is-active auditd 2> /dev/null || true)
+        fail2ban=$(vm_sh "${node}" systemctl is-active fail2ban 2> /dev/null || true)
+        [ "${auditd}" = active ] || auditd=inactive
+        [ "${fail2ban}" = active ] || fail2ban=inactive
+    fi
+    verdict=$(classify_hardening_signal "${auditd}" "${fail2ban}")
+    case "${verdict%%|*}" in
+        ok)
+            case "${verdict#*|}" in
+                hardened*) HARDENING_STATE=hardened ;;
+                *)         HARDENING_STATE=plain ;;
+            esac
+            log "  durcissement détecté : ${HARDENING_STATE} (auditd=${auditd}, fail2ban=${fail2ban})" ;;
+        *) die "détection du durcissement : ${verdict#*|}" ;;
+    esac
+}
+
 # Gate commun : crée un PVC test sur la SC $1 (défaut si vide) et vérifie Bound.
 gate_test_pvc() {
     local sc="${1:-}"
@@ -1422,15 +1462,22 @@ chemin_prelude() {
     : > "${PHASE_DURATIONS}" # repart d'un relevé propre pour CE run
 }
 
-# Axe ORTHOGONAL durcissement (#240, ADR 0045 §3) : applique le hardening hôte si
-# WITH_HARDENING=1, sur N'IMPORTE QUEL chemin, juste après le socle (hôte prêt).
-# No-op sinon. Le verdict (durci/non) est reflété dans le suffixe de TARGET pour
-# que le run consigné distingue les deux variantes (preuve par chemin, ADR 0042).
+# Axe ORTHOGONAL durcissement (#240, ADR 0045 §3) : WITH_HARDENING=1 est l'INTENTION
+# d'APPLIQUER le hardening hôte (secure.yml) sur N'IMPORTE QUEL chemin, juste après
+# le socle. Le suffixe `+hardening` de TARGET, lui, DÉRIVE de l'ÉTAT RÉEL de l'hôte
+# (ADR 0065 §2 : un état se détecte, pas se re-saisit) — pas du flag : ainsi un
+# re-jeu/roundtrip contre un hôte DÉJÀ durci retrouve `+hardening` sans repasser le
+# flag, et le run consigné distingue les deux variantes par la réalité (ADR 0042).
 run_hardening_if_requested() {
+    # Intention : appliquer le durcissement sur un build neuf (no-op si déjà fait —
+    # phase_hardening est idempotente via Ansible).
     if [ "${WITH_HARDENING:-0}" = 1 ]; then
         time_phase hardening phase_hardening
-        TARGET="${TARGET}+hardening"
     fi
+    # État : le suffixe reflète ce que l'hôte EST, détecté via SSH (refus franc si
+    # injoignable/incohérent). Couvre aussi un hôte durci hors de CE run.
+    detect_hardening_state
+    [ "${HARDENING_STATE:-plain}" = hardened ] && TARGET="${TARGET}+hardening"
 }
 
 # ── Dispatch ─────────────────────────────────────────────────────────────────
