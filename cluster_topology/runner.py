@@ -58,6 +58,7 @@ def launch_phase(
     ansible_config: str | None = None,
     kubeconfig: str | None = None,
     target_kind: str = "lima",
+    limit: str | None = None,
 ) -> RunResult:
     """Lance UN playbook via ansible-runner ; renvoie (rc, status).
 
@@ -66,17 +67,24 @@ def launch_phase(
     et `private_data_dir` sont fournis par l'appelant (jamais ambiants — ADR 0063
     G3). On pose `ANSIBLE_CONFIG`/`KUBECONFIG`/`EXPECTED_TARGET_KIND` comme `lib.sh`
     (sinon roles_path / interpréteur / garde-fou de cible non chargés).
+
+    `limit` : restreint le play à un sous-ensemble d'hôtes (ha-3cp promeut UN CP à
+    la fois). Passé via le kwarg `limit` d'ansible-runner — PAS via `cmdline`, qui
+    persisterait dans `env/cmdline` et fausserait les runs suivants.
     """
     envvars: dict[str, str] = {"EXPECTED_TARGET_KIND": target_kind}
     if ansible_config:
         envvars["ANSIBLE_CONFIG"] = ansible_config
     if kubeconfig:
         envvars["KUBECONFIG"] = kubeconfig
-    result = _runner_run(
+    kwargs = dict(
         private_data_dir=private_data_dir,
         playbook=playbook,
         inventory=inventory,
         extravars=extravars,
         envvars=envvars,
     )
+    if limit:
+        kwargs["limit"] = limit
+    result = _runner_run(**kwargs)
     return RunResult(rc=getattr(result, "rc", 1), status=getattr(result, "status", "unknown"))

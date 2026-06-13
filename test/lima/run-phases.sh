@@ -1704,6 +1704,10 @@ case "${1:-}" in
     # ha-cni : rappel interne de la sous-commande Python ha-3cp (la CNI reste bash,
     # ADR 0049). Args : <vip_iface> <lb_prefix>.
     ha-cni) [ -n "${3:-}" ] || die "usage : ha-cni <vip_iface> <lb_prefix>"; CP=cp1; phase_ha_cni "$2" "$3" ;;
+    # ha-inventory <cp1,cp2,…> — réécrit l'inventaire avec ces CP en `control`
+    # (rappel de la sous-commande Python ha-3cp avant chaque join ; l'écriture
+    # d'inventaire reste du bash, write_inventory). Workers vide (HA hyperconvergé).
+    ha-inventory) [ -n "${2:-}" ] || die "usage : ha-inventory <cp1,cp2,…>"; mkdir -p "${WORKDIR}"; write_inventory "${INVENTORY}" "$(echo "$2" | tr ',' ' ')" "" ;;
     status) phase_status ;;
     down) phase_down ;;
     # Rollback d'UNE phase (ADR 0054, #274) : défait ce que `<phase>` a monté.

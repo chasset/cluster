@@ -214,10 +214,11 @@ def gate_nodes_ready(expected: int, *, ready_count, retries: int = 30, sleep) ->
     raise HaError(f"moins de {expected} nœud(s) Ready (timeout)")
 
 
-def _check(launch, playbook: str, extravars: dict[str, str], label: str) -> None:
-    """Lance un playbook via `launch` (signature runner.launch_phase) et lève
-    HaError si le run échoue. `launch` renvoie un objet exposant `rc`/`status`."""
-    res = launch(playbook, extravars)
+def _check(launch, playbook: str, extravars: dict[str, str], label: str, limit=None) -> None:
+    """Lance un playbook via `launch(playbook, extravars, limit=…)` et lève HaError
+    si le run échoue. `launch` renvoie un objet exposant `rc`/`status`. `limit`
+    restreint le play à un hôte (promotion d'UN CP à la fois)."""
+    res = launch(playbook, extravars, limit=limit)
     if getattr(res, "rc", 1) != 0 or getattr(res, "status", "") != "successful":
         raise HaError(
             f"{label} : playbook {playbook} en échec "
@@ -281,24 +282,31 @@ def bootstrap_primary(
 def promote_control_plane(
     cp: str,
     member_index: int,
+    control_hosts: list[str],
     vip: str,
     vip_iface: str,
     *,
     launch,
+    set_inventory,
     ready_count,
     sleep,
 ) -> HaStep:
-    """Promeut UN CP additionnel : kube-vip (admin.conf) puis join --control-plane.
-    `member_index` = nombre de CP membres APRÈS cette promotion (gate Ready). La
-    gate etcd AVANT la promotion est portée par run_ha_3cp."""
+    """Promeut UN CP additionnel : ajoute `cp` au groupe control de l'inventaire,
+    pose kube-vip (admin.conf) sur lui, puis join --control-plane — les deux
+    `--limit cp` (le bootstrap ne mettait que le primaire dans control). Le rôle
+    de join lit le PRIMAIRE via groups['control'][0] → il doit rester en tête.
+    `member_index` = nombre de CP membres APRÈS cette promotion (gate Ready)."""
+    # control = primaire + déjà promus + ce cp (primaire en tête, ADR du rôle).
+    set_inventory(control_hosts)
     ev = join_extravars(vip, vip_iface)
     _check(
         launch,
         "kube-vip.yaml",
         {**ev, "kube_vip_kubeconfig_path": "/etc/kubernetes/admin.conf"},
         f"kube-vip {cp}",
+        limit=cp,
     )
-    _check(launch, "join-control-plane.yaml", ev, f"join {cp}")
+    _check(launch, "join-control-plane.yaml", ev, f"join {cp}", limit=cp)
     gate_nodes_ready(member_index, ready_count=ready_count, sleep=sleep)
     return HaStep(f"promotion {cp}", True, f"{member_index} CP membres")
 
@@ -311,14 +319,16 @@ def run_ha_3cp(
     *,
     launch,
     run_cni,
+    set_inventory,
     vip_responds=vip_healthz,
     ready_count,
     etcd_output=etcd_health_output,
     sleep,
 ) -> HaResult:
     """Monte la topologie ha-3cp : bootstrap du primaire + promotion des CP
-    additionnels un à un (gate etcd entre chaque). Toutes les I/O sont injectées
-    → testable sans banc. La PREUVE (survie à 1 panne) est un run consigné."""
+    additionnels un à un (gate etcd entre chaque). `set_inventory(control_hosts)`
+    réécrit l'inventaire (le primaire reste en tête — le rôle de join lit
+    groups['control'][0]). Toutes les I/O sont injectées → testable sans banc."""
     result = HaResult(vip=vip)
     primary = nodes[0]
     try:
@@ -336,16 +346,20 @@ def run_ha_3cp(
         )
         # Promotion des CP additionnels, un à un, gate etcd avant chaque.
         members = 1  # le primaire
+        control_hosts = [primary]
         for cp in cp_join_order(nodes):
             gate_etcd(primary, members, etcd_output=etcd_output, sleep=sleep)
             members += 1
+            control_hosts.append(cp)
             result.steps.append(
                 promote_control_plane(
                     cp,
                     members,
+                    list(control_hosts),
                     vip,
                     vip_iface,
                     launch=launch,
+                    set_inventory=set_inventory,
                     ready_count=ready_count,
                     sleep=sleep,
                 )

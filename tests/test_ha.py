@@ -88,8 +88,8 @@ class EtcdHealthWiring(unittest.TestCase):
 
 
 class _Launch:
-    """Stub de launch_phase : enregistre les (playbook, kubeconfig_path) lancés ;
-    renvoie un succès, ou un échec ciblé sur un playbook donné."""
+    """Stub de launch_phase : enregistre les (playbook, kubeconfig_path, limit)
+    lancés ; renvoie un succès, ou un échec ciblé sur un playbook donné."""
 
     class _Res:
         def __init__(self, rc, status):
@@ -100,8 +100,8 @@ class _Launch:
         self.calls = []
         self.fail_on = fail_on
 
-    def __call__(self, playbook, extravars):
-        self.calls.append((playbook, extravars.get("kube_vip_kubeconfig_path")))
+    def __call__(self, playbook, extravars, limit=None):
+        self.calls.append((playbook, extravars.get("kube_vip_kubeconfig_path"), limit))
         if self.fail_on and playbook == self.fail_on:
             return self._Res(1, "failed")
         return self._Res(0, "successful")
@@ -126,7 +126,7 @@ class BootstrapPrimary(unittest.TestCase):
     def test_sequence_order_and_kube_vip_pivot(self):
         launch = _Launch()
         self._run(launch)
-        playbooks = [p for p, _ in launch.calls]
+        playbooks = [p for p, _, _ in launch.calls]
         # Ordre prouvé : pré-init → kube-vip(super-admin) → init → kube-vip(admin).
         self.assertEqual(
             playbooks,
@@ -141,7 +141,7 @@ class BootstrapPrimary(unittest.TestCase):
             ],
         )
         # La bascule super-admin → admin (le piège k8s ≥ 1.29).
-        kube_vip_confs = [c for p, c in launch.calls if p == "kube-vip.yaml"]
+        kube_vip_confs = [c for p, c, _ in launch.calls if p == "kube-vip.yaml"]
         self.assertEqual(
             kube_vip_confs,
             ["/etc/kubernetes/super-admin.conf", "/etc/kubernetes/admin.conf"],
@@ -170,6 +170,7 @@ class RunHa3cp(unittest.TestCase):
             "eth0",
             launch=launch,
             run_cni=_noop,
+            set_inventory=_noop,
             vip_responds=lambda *_a, **_k: True,
             ready_count=lambda: 3,
             etcd_output=self._etcd_healthy(3),
@@ -177,8 +178,11 @@ class RunHa3cp(unittest.TestCase):
         )
         self.assertTrue(res.built, [s.detail for s in res.steps if not s.ok])
         # Les deux CP additionnels sont promus (join-control-plane lancé 2×).
-        joins = [p for p, _ in launch.calls if p == "join-control-plane.yaml"]
+        joins = [(p, limit) for p, _, limit in launch.calls if p == "join-control-plane.yaml"]
         self.assertEqual(len(joins), 2)
+        # Chaque join cible UN CP via --limit (le bug : sans limit, ça reciblait le
+        # primaire et rebootstrappait au lieu de promouvoir cp2/cp3).
+        self.assertEqual([limit for _, limit in joins], ["cp2", "cp3"])
         # Étape quorum final présente.
         self.assertTrue(any(s.name == "quorum final" for s in res.steps))
 
@@ -191,6 +195,7 @@ class RunHa3cp(unittest.TestCase):
             "eth0",
             launch=launch,
             run_cni=_noop,
+            set_inventory=_noop,
             vip_responds=lambda *_a, **_k: True,
             ready_count=lambda: 1,
             etcd_output=lambda _cp: "a is healthy\nb is unhealthy",  # quorum dégradé
@@ -198,7 +203,7 @@ class RunHa3cp(unittest.TestCase):
         )
         self.assertFalse(res.built)
         # Aucune promotion lancée (la gate etcd a coupé avant).
-        joins = [p for p, _ in launch.calls if p == "join-control-plane.yaml"]
+        joins = [p for p, _, _ in launch.calls if p == "join-control-plane.yaml"]
         self.assertEqual(joins, [])
         self.assertEqual(res.steps[-1].name, "échec")
 

@@ -407,7 +407,7 @@ def cmd_ha_3cp(args: argparse.Namespace) -> int:
         )
     kubeconfig = os.environ.get("KUBECONFIG")
 
-    def launch(playbook: str, extravars: dict):
+    def launch(playbook: str, extravars: dict, limit: str | None = None):
         # playbook = 'kube-vip.yaml' → relatif à private_data_dir/<project> ;
         # bootstrap/*.yaml sont à la racine du private_data_dir.
         return _runner.launch_phase(
@@ -418,21 +418,28 @@ def cmd_ha_3cp(args: argparse.Namespace) -> int:
             ansible_config=ansible_cfg,
             kubeconfig=kubeconfig,
             target_kind="lima",
+            limit=limit,
         )
 
-    # run_cni : la CNI reste portée par run-phases.sh (bash). On la rappelle via le
-    # sous-commande dédiée `run-cni <cp> <vip-iface> <lb-prefix>` (cf. dispatch).
-    def run_cni():
-        rc = subprocess.run(  # noqa: S603 — chemin codé, arguments contrôlés
-            [
-                "bash",
-                os.path.join(_ROOT, "test", "lima", "run-phases.sh"),
-                "ha-cni",
-                args.vip_iface,
-                args.cp_ip.rsplit(".", 1)[0],
-            ],
+    def _runphases(*cmd: str) -> int:
+        """Rappel d'un sous-commande de run-phases.sh (bash garde VM/CNI/inventaire,
+        ADR 0049). Renvoie le code de sortie."""
+        return subprocess.run(  # noqa: S603 — chemin codé, arguments contrôlés
+            ["bash", os.path.join(_ROOT, "test", "lima", "run-phases.sh"), *cmd],
             check=False,
         ).returncode
+
+    def set_inventory(control_hosts: list[str]) -> None:
+        # L'écriture d'inventaire reste du bash (write_inventory, format byte-stable).
+        # On réécrit l'inventaire avec les CP membres (primaire en tête) avant un join.
+        rc = _runphases("ha-inventory", ",".join(control_hosts))
+        if rc != 0:
+            raise _ha.HaError(f"réécriture de l'inventaire (control={control_hosts}) en échec")
+
+    # run_cni : la CNI reste portée par run-phases.sh (bash). On la rappelle via le
+    # sous-commande dédiée `ha-cni <vip-iface> <lb-prefix>` (cf. dispatch).
+    def run_cni():
+        rc = _runphases("ha-cni", args.vip_iface, args.cp_ip.rsplit(".", 1)[0])
         if rc != 0:
             raise _ha.HaError(f"CNI (run-phases.sh ha-cni) en échec (rc={rc})")
 
@@ -456,6 +463,7 @@ def cmd_ha_3cp(args: argparse.Namespace) -> int:
             args.vip_iface,
             launch=launch,
             run_cni=run_cni,
+            set_inventory=set_inventory,
             ready_count=ready_count,
             sleep=time.sleep,
         )
