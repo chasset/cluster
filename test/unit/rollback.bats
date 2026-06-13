@@ -387,3 +387,75 @@ setup() {
     run component_known n-importe-quoi
     [ "$status" -ne 0 ]
 }
+
+# ═══ CLÔTURE PAR PHASE (ADR 0066 Lot 1) — remplace roundtrip.py:_DEPENDENTS ═══
+# Garde-fou : la clôture DÉRIVÉE du graphe atomique doit reproduire EXACTEMENT
+# l'ancien _DEPENDENTS validé à la main, sinon roundtrip.py régresse. Les arêtes
+# « → sc » (PVC bloc) sont load-bearing pour gitops/gitops-seed (workflow consigné
+# 2026-06-13, 2ᵉ trace).
+
+@test "phase/closure : ceph dérive TOUTE la pile (== ancien _DEPENDENTS)" {
+    run phase_closure ceph
+    [ "$(printf '%s' "$output" | tr '\n' ' ')" = "ceph sc datalake monitoring gitops dataops gitops-seed" ]
+}
+
+@test "phase/closure : sc tire gitops/gitops-seed (arête gitea→sc load-bearing)" {
+    local cl; cl=$(phase_closure sc | tr '\n' ' ')
+    [ "$cl" = "sc datalake monitoring gitops dataops gitops-seed " ]
+    # Sans l'arête gitea→sc, gitops serait absent — c'est le cœur du fix Lot 1.
+    [[ "$cl" == *"gitops"* ]]
+}
+
+@test "phase/closure : datalake tire monitoring + dataops, PAS gitops" {
+    run phase_closure datalake
+    [ "$(printf '%s' "$output" | tr '\n' ' ')" = "datalake monitoring dataops" ]
+}
+
+@test "phase/closure : gitops tire gitops-seed" {
+    run phase_closure gitops
+    [ "$(printf '%s' "$output" | tr '\n' ' ')" = "gitops gitops-seed" ]
+}
+
+@test "phase/closure : feuilles ne tirent qu'elles-mêmes" {
+    run phase_closure monitoring
+    [ "$output" = "monitoring" ]
+    run phase_closure dataops
+    [ "$output" = "dataops" ]
+    run phase_closure metrics-server
+    [ "$output" = "metrics-server" ]
+}
+
+@test "phase/closure : ordre de MONTAGE (amont→aval, première occurrence)" {
+    # Chaque phase de la clôture sort après celles dont elle dépend.
+    local cl; cl=$(phase_closure ceph | tr '\n' ' ')
+    # ceph avant sc avant datalake avant le reste.
+    [[ "$cl" == "ceph sc datalake "* ]]
+}
+
+@test "phase/closure : phase inconnue → échec (code ≠0)" {
+    run phase_closure frobnicate
+    [ "$status" -ne 0 ]
+}
+
+@test "phase/involves_storage : ceph/sc/datalake → oui (opt-in --full)" {
+    for p in ceph sc datalake; do
+        run phase_involves_storage "$p"
+        [ "$status" -eq 0 ] || { echo "$p devrait toucher le stockage"; false; }
+    done
+}
+
+@test "phase/involves_storage : couches app → non" {
+    for p in metrics-server monitoring dataops gitops gitops-seed; do
+        run phase_involves_storage "$p"
+        [ "$status" -ne 0 ] || { echo "$p ne devrait PAS toucher le stockage"; false; }
+    done
+}
+
+@test "phase/of_component : composant socle → vide ; applicatif → sa phase" {
+    run phase_of_component cert-manager   # socle, aucune phase roundtrip seule
+    [ -z "$output" ]
+    run phase_of_component prometheus-stack
+    [ "$output" = "monitoring" ]
+    run phase_of_component gitea
+    [ "$output" = "gitops" ]
+}

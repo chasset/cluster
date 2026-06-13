@@ -310,18 +310,24 @@ component_deps() {
         sc)               printf 'ceph\n' ;;
         datalake)         printf 'ceph sc\n' ;;
         seaweedfs)        printf '\n' ;;
-        registry)         printf 'gateway-api\n' ;;
+        # Arêtes « → sc » = consommation de stockage BLOC : le composant monte un
+        # PVC sur la StorageClass rook-ceph-block-replicated (produite par `sc`).
+        # Vérifiées contre le code (workflow consigné 2026-06-13, 2ᵉ trace) :
+        # détruire `sc` orphelinerait ces PVC → ils dépendent de `sc`. (`gitea → sc`
+        # est load-bearing : seule arête qui fait entrer gitops/gitops-seed dans
+        # la clôture de `sc`/`ceph`.)
+        registry)         printf 'gateway-api sc\n' ;;
         s3-backing-loki)  printf 'datalake\n' ;;
-        prometheus-stack) printf 'cert-manager\n' ;;
-        loki)             printf 'prometheus-stack s3-backing-loki\n' ;;
+        prometheus-stack) printf 'cert-manager sc\n' ;;
+        loki)             printf 'prometheus-stack s3-backing-loki sc\n' ;;
         cnpg-operator)    printf 'cert-manager\n' ;;
         barman-plugin)    printf 'cnpg-operator cert-manager\n' ;;
         cnpg-secrets)     printf '\n' ;;
         s3-backing-cnpg)  printf 'datalake\n' ;;
-        cnpg-cluster-pg)  printf 'cnpg-operator barman-plugin cnpg-secrets s3-backing-cnpg\n' ;;
+        cnpg-cluster-pg)  printf 'cnpg-operator barman-plugin cnpg-secrets s3-backing-cnpg sc\n' ;;
         dagster)          printf 'cnpg-cluster-pg registry build-images\n' ;;
         marquez)          printf 'cnpg-cluster-pg registry build-images\n' ;;
-        gitea)            printf 'cert-manager gateway-api\n' ;;
+        gitea)            printf 'cert-manager gateway-api sc\n' ;;
         argocd)           printf 'cert-manager gateway-api gitea\n' ;;
         gitops-seed)      printf 'argocd gitea build-images\n' ;;
         *)                printf '\n' ;;
@@ -471,6 +477,84 @@ topo_sort() {
         return 1
     }
     printf '%s\n' "${order[@]}"
+}
+
+# ─── CLÔTURE PAR PHASE (dérivée du graphe — remplace roundtrip.py:_DEPENDENTS) ─
+#
+# roundtrip.py raisonne au grain PHASE (ceph/sc/monitoring…), pas composant. Ces
+# fonctions PROJETTENT le graphe atomique sur les phases : fin de la 2ᵉ source de
+# vérité (_DEPENDENTS/_MOUNT_ORDER en dur dans roundtrip.py — ADR 0066 §invariant 3).
+
+# Les phases (alias) que roundtrip éprouve. metrics-server inclus (couche à part).
+_ROUNDTRIP_PHASES="ceph sc datalake metrics-server monitoring dataops gitops gitops-seed"
+
+# phase_of_component COMP — la phase (alias) qui contient COMP, ou vide si COMP est
+# un composant SOCLE (bootstrap/cert-manager/gateway-api/build-images) qu'aucune
+# phase roundtrip ne monte seul. Première phase de _ROUNDTRIP_PHASES qui le contient.
+phase_of_component() {
+    local target=${1:-} ph c
+    for ph in ${_ROUNDTRIP_PHASES}; do
+        for c in $(component_expand_alias "${ph}"); do
+            [ "${c}" = "${target}" ] && { printf '%s\n' "${ph}"; return 0; }
+        done
+    done
+    printf '\n'
+}
+
+# phase_closure PHASE
+#   Clôture DESCENDANTE de PHASE, en ordre de MONTAGE (amont→aval) : PHASE + toute
+#   phase qui en dépend (un de ses composants a une dépendance transitive sur un
+#   composant de PHASE). C'est ce qu'un rollback de PHASE oblige à défaire pour
+#   rester cohérent. Dérivée du graphe atomique → reproduit l'ancien _DEPENDENTS.
+phase_closure() {
+    local X=${1:-}
+    case " ${_ROUNDTRIP_PHASES} " in *" ${X} "*) : ;; *) return 1 ;; esac
+    local compsX
+    compsX=" $(component_expand_alias "${X}" | tr '\n' ' ') "
+    # 1. Phases Y dont un composant dépend transitivement d'un composant de X.
+    local in_closure=" ${X} " Y cy seen stack c d cd
+    for Y in ${_ROUNDTRIP_PHASES}; do
+        [ "${Y}" = "${X}" ] && continue
+        for cy in $(component_expand_alias "${Y}"); do
+            # Clôture des dépendances de cy (transitive).
+            seen=""; stack="${cy}"
+            while [ -n "${stack}" ]; do
+                c="${stack%% *}"; stack="${stack#"${c}"}"; stack="${stack# }"
+                case " ${seen} " in *" ${c} "*) continue ;; esac
+                seen="${seen} ${c}"
+                for d in $(component_deps "${c}"); do stack="${stack} ${d}"; done
+            done
+            for cd in ${seen}; do
+                case "${compsX}" in
+                    *" ${cd} "*) in_closure="${in_closure}${Y} "; break 2 ;;
+                esac
+            done
+        done
+    done
+    # 2. Ordonner par ordre de MONTAGE : topo_sort des composants de la clôture,
+    #    projeté sur les phases (première apparition).
+    local allcomps="" emitted="" ph
+    for Y in ${in_closure}; do
+        allcomps="${allcomps} $(component_expand_alias "${Y}" | tr '\n' ' ')"
+    done
+    # shellcheck disable=SC2086 # découpage voulu de la liste de composants
+    for c in $(topo_sort ${allcomps}); do
+        ph=$(phase_of_component "${c}")
+        [ -n "${ph}" ] || continue
+        case " ${in_closure} " in *" ${ph} "*) : ;; *) continue ;; esac
+        case " ${emitted} " in *" ${ph} "*) : ;; *) emitted="${emitted} ${ph}"; printf '%s\n' "${ph}" ;; esac
+    done
+}
+
+# phase_involves_storage PHASE
+#   0 (vrai) si la clôture de PHASE touche une couche de STOCKAGE (ceph/sc/datalake)
+#   → clôture large (≈ rebuild du socle), réservée à l'opt-in `--full` du roundtrip.
+phase_involves_storage() {
+    local p
+    for p in $(phase_closure "${1:-}"); do
+        case "${p}" in ceph | sc | datalake) return 0 ;; esac
+    done
+    return 1
 }
 
 # component_stuck_cr_kinds COMP…
