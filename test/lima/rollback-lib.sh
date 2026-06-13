@@ -156,6 +156,28 @@ classify_downstream_block() {
     fi
 }
 
+# classify_hardening_signal AUDITD FAIL2BAN
+#   Verdict de l'ÉTAT de durcissement de l'hôte (ADR 0065 §2 : le durcissement est
+#   un état CONSTATABLE, pas un flag à re-saisir). Le durcissement du banc = les
+#   tags `audit,detection` de secure.yml → auditd + fail2ban ACTIFS (les seules
+#   couches que phase_hardening pose ; le sshd drop-in vient de first-access et est
+#   toujours là, donc NON discriminant). AUDITD/FAIL2BAN ∈ {active, inactive,
+#   unknown} (collectés par l'appelant via `systemctl is-active`).
+#   - les deux active            → ok|hardened (l'hôte EST durci → suffixe +hardening)
+#   - les deux inactive          → ok|plain    (l'hôte n'est PAS durci → pas de suffixe)
+#   - un signal `unknown`        → skip        (injoignable/illisible → l'appelant die,
+#                                               « détection fiable ou refus franc »)
+#   - état PARTIEL (un seul actif) → fail       (durcissement incohérent à corriger)
+classify_hardening_signal() {
+    local auditd=${1:-unknown} fail2ban=${2:-unknown}
+    case "${auditd}/${fail2ban}" in
+        active/active)     printf 'ok|hardened : auditd+fail2ban actifs (hôte durci, +hardening)\n' ;;
+        inactive/inactive) printf 'ok|plain : auditd+fail2ban inactifs (hôte non durci)\n' ;;
+        *unknown*)         printf 'skip|état de durcissement illisible (auditd=%s fail2ban=%s) — hôte injoignable ?\n' "${auditd}" "${fail2ban}" ;;
+        *)                 printf 'fail|durcissement PARTIEL (auditd=%s fail2ban=%s) — couche incohérente à corriger\n' "${auditd}" "${fail2ban}" ;;
+    esac
+}
+
 # ─── GRAPHE ATOMIQUE (ADR 0066, Lot 0 : à CÔTÉ des rollback_phase_*) ─────────
 #
 # L'unité du périmètre descend de la PHASE (composite, fragile) vers le COMPOSANT
