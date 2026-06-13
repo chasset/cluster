@@ -229,6 +229,31 @@ containerd côté nœuds pour le tirer en HTTP. On le référence en
 `registry:80/<repo>:<tag>` dans les manifestes. Manifestes :
 [`platform/container-registry/`](../platform/container-registry/).
 
+### La boucle GitOps de bout en bout
+
+Les briques ci-dessus (Argo CD, Gitea, registry) s'articulent en une **boucle**
+unique, qui est la façon canonique de déployer un workflow — on ne fait
+**jamais** de `kubectl apply` de l'applicatif (frontière
+[ADR 0022](decisions/0022-argocd-gitops-applicatif.md)/[0045](decisions/0045-chemins-installation-banc-couches.md))
+:
+
+1. **Build + push** de votre image (code-location/job) dans le **registry
+   interne** (`registry:80/...`).
+2. **Commit + push** du manifeste qui la référence (`Application` Argo CD, ou
+   patch de workspace) dans le **dépôt Gitea intra-cluster** — pas un GitHub
+   externe : le cluster est isolé.
+3. Un **webhook** Gitea → Argo CD déclenche la **réconciliation** : Argo CD
+   applique votre manifeste (`Synced/Healthy`).
+4. Le run s'exécute (`K8sRunLauncher`) et **émet du lineage** ingéré par
+   Marquez.
+
+Argo CD déploie **vos workflows**, **jamais l'infra** : le socle (CNPG, Dagster,
+Marquez, Argo CD lui-même) est monté par Ansible. Vous poussez le _contenu_, le
+socle fournit le _contenant vide_. C'est cette boucle qu'un développeur rejoue
+en local (tutoriel [Monter le banc local](banc-local.md#pousser-sur-gitea)) et
+qu'invoque le
+[mode d'emploi de branchement](se-brancher.md#déployer-la-boucle-gitops).
+
 ## Chaîne DataOps
 
 ### PostgreSQL via CloudNativePG

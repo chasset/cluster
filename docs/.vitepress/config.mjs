@@ -52,25 +52,35 @@ export default defineConfig({
     nav: [
       { text: 'Accueil', link: '/' },
       { text: 'Manifeste', link: '/docs/manifeste' },
+      { text: 'Preuves', link: '/docs/preuves' },
       { text: 'Par où commencer', link: '/docs/demarrage' },
+      { text: 'Se brancher', link: '/docs/se-brancher' },
       { text: 'Boîte à outils', link: '/docs/outils' },
-      { text: 'Guide dev data', link: '/docs/guide-dev-data' },
-      { text: 'Dev atlas', link: '/docs/dev-atlas' },
       { text: 'Glossaire', link: '/docs/glossaire' },
-      { text: "Plan d'action", link: '/docs/audit/2026-05-29/12-plan-action' },
+      { text: 'Décisions (ADR)', link: '/docs/decisions/' },
+      { text: 'Audit', link: '/docs/audit/' },
       { text: 'Banc de test', link: '/test/' },
     ],
     sidebar: [
       {
-        text: 'Pour démarrer',
+        text: 'Comprendre',
         items: [
           { text: 'Accueil', link: '/' },
           { text: 'Manifeste (le récit)', link: '/docs/manifeste' },
-          { text: 'Par où commencer', link: '/docs/demarrage' },
-          { text: 'Boîte à outils (scripts)', link: '/docs/outils' },
-          { text: 'Guide du développeur data', link: '/docs/guide-dev-data' },
-          { text: 'Développeur atlas (point d’entrée)', link: '/docs/dev-atlas' },
+          { text: 'Preuves de qualité', link: '/docs/preuves' },
+          { text: 'Composants (la pile)', link: '/docs/composants' },
           { text: 'Glossaire', link: '/docs/glossaire' },
+        ],
+      },
+      {
+        text: 'Faire',
+        items: [
+          { text: 'Par où commencer', link: '/docs/demarrage' },
+          { text: 'Se brancher sur la plateforme', link: '/docs/se-brancher' },
+          { text: 'Monter le banc local', link: '/docs/banc-local' },
+          { text: 'Boîte à outils (scripts)', link: '/docs/outils' },
+          { text: 'Référence dev data (endpoints)', link: '/docs/guide-dev-data' },
+          { text: 'Développeur atlas (point d’entrée)', link: '/docs/dev-atlas' },
           { text: 'Garde-fous', link: '/SAFEGUARDS' },
           { text: 'Contribuer', link: '/CONTRIBUTING' },
           { text: 'Inventaire matériel', link: '/platform/hardware' },
@@ -121,81 +131,39 @@ export default defineConfig({
         items: [
           { text: "Vue d'ensemble", link: '/test/' },
           { text: 'Banc Lima (multi-nœuds)', link: '/test/lima/' },
-          { text: 'Résultats du dernier banc', link: '/test/RESULTS' },
+          { text: 'Journal des runs Lima (courant)', link: '/test/lima/RESULTS' },
+          { text: 'Historique Vagrant (déprécié)', link: '/test/RESULTS' },
           { text: 'Scénarios reproductibles', link: '/test/scenarios/' },
+        ],
+      },
+      {
+        text: 'Architecture & preuves',
+        collapsed: true,
+        items: [
+          { text: 'Preuves de qualité', link: '/docs/preuves' },
+          { text: "Vues d'architecture (index)", link: '/docs/architecture/' },
+          { text: 'Matrice du catalogue', link: '/docs/architecture/matrice-catalogue' },
+          { text: 'Validation sur banc', link: '/docs/architecture/validation-banc' },
+          { text: 'Leçons des runs', link: '/docs/architecture/lecons-des-runs' },
+          { text: 'Plan de tests', link: '/docs/architecture/plan-de-tests' },
+          { text: 'Bonnes pratiques', link: '/docs/architecture/bonnes-pratiques' },
+          { text: 'Chaîne DataOps', link: '/docs/architecture/chaine-dataops' },
+          { text: 'Exposition réseau', link: '/docs/architecture/exposition-reseau' },
         ],
       },
       {
         text: 'Décisions (ADR)',
         collapsed: true,
         items: [
-          { text: 'Index', link: '/docs/decisions/' },
+          { text: 'Index des 62 ADR', link: '/docs/decisions/' },
+          { text: '— par thème —', link: '/docs/architecture/' },
+          { text: 'Stockage & données', link: '/docs/architecture/decisions-stockage' },
+          { text: 'Plan de contrôle', link: '/docs/architecture/decisions-plan-de-controle' },
+          { text: 'Sécurité & accès', link: '/docs/architecture/decisions-securite-acces' },
+          { text: 'Plateforme & GitOps', link: '/docs/architecture/decisions-plateforme-gitops' },
           {
-            text: '0001 — Réplication ×3 (bloc)',
-            link: '/docs/decisions/0001-replication-x3-pour-workloads-bloc',
-          },
-          {
-            text: '0002 — Control plane unique',
-            link: '/docs/decisions/0002-control-plane-unique-avec-endpoint',
-          },
-          {
-            text: '0003 — Pas de chiffrement Ceph',
-            link: '/docs/decisions/0003-pas-de-chiffrement-ceph-tailscale',
-          },
-          {
-            text: '0004 — Erasure coding 2+1 datalake',
-            link: '/docs/decisions/0004-erasure-coding-2plus1-datalake',
-          },
-          {
-            text: '0005 — containerd dépôt Docker',
-            link: '/docs/decisions/0005-cri-containerd-via-depot-docker',
-          },
-          {
-            text: '0006 — Matrice de versions',
-            link: '/docs/decisions/0006-matrice-de-versions-et-politique-de-bump',
-          },
-          {
-            text: '0007 — Hyperconvergence',
-            link: '/docs/decisions/0007-hyperconvergence-control-plane-osd',
-          },
-          {
-            text: '0008 — NVMe block.db SPOF',
-            link: '/docs/decisions/0008-metadatadevice-nvme-spof-par-noeud',
-          },
-          { text: '0009 — Pourquoi 4 nœuds', link: '/docs/decisions/0009-pourquoi-4-noeuds' },
-          {
-            text: '0010 — Dashboard cluster-admin',
-            link: '/docs/decisions/0010-dashboard-cluster-admin',
-          },
-          {
-            text: '0011 — Registry HTTP sans auth',
-            link: '/docs/decisions/0011-registry-http-sans-auth',
-          },
-          { text: '0012 — RStudio sans auth', link: '/docs/decisions/0012-rstudio-disable-auth' },
-          {
-            text: '0013 — Sauvegarde données applicatives',
-            link: '/docs/decisions/0013-sauvegarde-donnees-applicatives',
-          },
-          {
-            text: '0014 — Durcissement kubeadm',
-            link: '/docs/decisions/0014-durcissement-kubeadm-init',
-          },
-          {
-            text: "0015 — Stratégie d'upgrade K8s",
-            link: '/docs/decisions/0015-strategie-upgrade-kubernetes',
-          },
-          { text: '0016 — Observabilité', link: '/docs/decisions/0016-observabilite' },
-          {
-            text: '0017 — Langage des scripts',
-            link: '/docs/decisions/0017-langage-des-scripts',
-          },
-          {
-            text: '0018 — Rook-Ceph vs Longhorn',
-            link: '/docs/decisions/0018-rook-ceph-vs-longhorn',
-          },
-          {
-            text: '0019 — Durcissement réseau Cilium',
-            link: '/docs/decisions/0019-durcissement-reseau-cilium',
+            text: 'Conventions & outillage',
+            link: '/docs/architecture/decisions-conventions-outillage',
           },
         ],
       },
@@ -223,10 +191,12 @@ export default defineConfig({
         collapsed: true,
         items: [
           { text: 'Index & convention', link: '/docs/plans/' },
-          {
-            text: 'Étape 1.7 — Dagster',
-            link: '/docs/plans/2026-06-04-etape-1.7-dagster',
-          },
+          { text: 'Modèle déclaratif des topologies', link: '/docs/plans/plan-modele-declaratif' },
+          { text: 'Dagster (orchestration)', link: '/docs/plans/plan-dagster' },
+          { text: 'Marquez (lineage)', link: '/docs/plans/plan-marquez' },
+          { text: 'Rollback par phase', link: '/docs/plans/plan-rollback-par-phase' },
+          { text: 'Audit des conventions', link: '/docs/plans/plan-audit-conventions' },
+          { text: 'Refonte documentaire', link: '/docs/plans/plan-refonte-doc' },
           {
             text: 'Audit — réalignement Dagster ↔ main',
             link: '/docs/plans/2026-06-04-audit-realignement-main-dagster',

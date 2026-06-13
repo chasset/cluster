@@ -33,9 +33,11 @@ features:
       Pourquoi chaque choix de conception, au format Nygard, daté et immuable.
     link: /docs/decisions/
   - icon: 🔬
-    title: Audit & qualité
-    details: État des lieux vérifié, plan d'action, garde-fous en place.
-    link: /docs/audit/
+    title: Preuves de qualité
+    details:
+      La vitrine consolidée — gouvernance tracée, reproductibilité prouvée,
+      drifts indexés, couverture E2E.
+    link: /docs/preuves
   - icon: 🧪
     title: Banc de test
     details: Topologies reproductibles sur Lima, preuves opérationnelles.
@@ -96,8 +98,9 @@ la prod :
 - **Avant le push** : tout le dépôt revalidé (`kubeconform`, `ansible-lint`,
   `shellcheck` complet, prettier complet) + interdiction de push direct sur
   `main`.
-- **En CI GitHub Actions** : 8 jobs en parallèle (formats, lint, `jscpd` ≤ 5 %
-  duplication, build VitePress).
+- **En CI GitHub Actions** : 13 checks requis avant merge (formats, lint,
+  `kubeconform`, `ansible-lint`, `trivy`, `jscpd` ≤ 5 % duplication, build
+  VitePress, `lychee`…).
 - **Sur les serveurs** : [`bootstrap/state.sh`](bootstrap/state.sh) (7 couches
   de drift detection) +
   [`bootstrap/security/report.sh`](bootstrap/security/report.sh) (visibilité
@@ -112,21 +115,17 @@ contribuer / outillage local : [CONTRIBUTING.md](CONTRIBUTING.md).
 
 La gouvernance est **mesurée**, pas seulement déclarée. Chaque décision est
 tracée (ADR), chaque écart de run est indexé (drift), chaque convention est
-auto-vérifiée ([ADR 0060](docs/decisions/0060-audit-conventions-gouvernance.md))
-:
+auto-vérifiée
+([ADR 0060](docs/decisions/0060-audit-conventions-gouvernance.md)), et la
+duplication shell est tenue à **0 %** (seuil `jscpd` ≤ 5 %). La vitrine
+consolidée, pour juger en 5 min : [docs/preuves.md](docs/preuves.md).
 
 <!-- STATS:DEBUT — bloc régénéré par `pnpm check:gouvernance --stats` (ADR 0060) -->
 
-- **60 ADR** (56 Accepted, 4 Proposed) — chaque choix de conception, daté et
-  immuable
-- **6 plans** vivants — la mise en œuvre des décisions, avec leur état
-  d'avancement
-- **57 drifts** indexés — chaque écart révélé par un run e2e, avec cause et
-  correctif
-- **29 scénarios** E2E reproductibles — les preuves opérationnelles sur banc
-  Lima
-- **0 % de duplication** shell (seuil `jscpd` ≤ 5 %) — primitives factorisées en
-  libs
+- **62 ADR** (61 Accepted, 1 Superseded)
+- **6 plans** vivants (3 Achevé, 3 Actif)
+- **57 drifts** indexés (3 caduc, 51 corrige, 1 en-cours, 2 ouvert)
+- **29 scénarios** E2E reproductibles
 
 <!-- STATS:FIN -->
 
