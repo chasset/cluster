@@ -93,6 +93,9 @@ API_PORT=6443
 # → 40 GiB en mode Ceph (qcow2 thin-provisionné : n'occupe le disque hôte qu'à
 # l'usage réel). Surchargeable via VM_DISK.
 VM_CPUS=2
+# Mémorise si VM_MEMORY a été FOURNI par l'opérateur (vs défaut dérivé) : un chemin
+# peut alors imposer son propre plancher SANS écraser un choix explicite (ha-3cp).
+VM_MEMORY_SET=${VM_MEMORY:+1}
 VM_MEMORY_DEFAULT=$([ "${WITH_CEPH:-0}" = 1 ] && echo 12GiB || echo 8GiB)
 VM_MEMORY=${VM_MEMORY:-${VM_MEMORY_DEFAULT}}
 VM_DISK_DEFAULT=$([ "${WITH_CEPH:-0}" = 1 ] && echo 40GiB || echo 20GiB)
@@ -219,6 +222,10 @@ node_disks() {
 # ── Prédicats pour retry (repris de multi-node) ──────────────────────────────
 # Gate générique : tous les nœuds attendus (${#NODES[@]}) sont Ready.
 nodes_ready_all() { [ "$("${KUBECTL[@]}" get nodes --no-headers 2> /dev/null | grep -cw Ready)" -eq "${#NODES[@]}" ]; }
+# nodes_ready_count N — au MOINS N nœuds Ready. Utile en HA (ha-3cp) où les CP
+# rejoignent un à un : le gate de chaque étape attend le compte attendu à ce
+# stade (1 après l'init du primaire, 2 après cp2…), pas les ${#NODES[@]} finaux.
+nodes_ready_count() { [ "$("${KUBECTL[@]}" get nodes --no-headers 2> /dev/null | grep -cw Ready)" -ge "${1:-1}" ]; }
 # (operator_ready : SUPPRIMÉ — le gate operator Ready est porté dans le rôle
 #  platform-ceph-cluster, ADR 0049. Le diagnostic status garde osds_up/toolbox_ceph.)
 # Nombre d'OSD attendus = nœuds × disques data (3 × 3 = 9).
@@ -469,109 +476,6 @@ phase_bootstrap() {
         || die "moins de ${#NODES[@]} nœud(s) Ready : $("${KUBECTL[@]}" get nodes 2>&1)"
     ok "${#NODES[@]} nœud(s) Ready"
     "${KUBECTL[@]}" get nodes -o wide
-}
-
-# ── Phase bootstrap-ha — CP PRIMAIRE derrière la VIP (ha-3cp, #250) ──────────
-# Variante HA de phase_bootstrap : le CP primaire s'initialise avec la VIP comme
-# controlPlaneEndpoint, kube-vip posé AVANT l'init. Args : CP_IP VIP VIP_IFACE.
-# Amorçage k8s ≥ 1.29 (cf. en-tête run_ha_3cp) : kube-vip monte super-admin.conf
-# le temps de l'init (admin.conf inutilisable avant que l'API tourne), puis on
-# rebascule sur admin.conf. Au bootstrap, SEUL le primaire est dans `control` ;
-# cp2/cp3 rejoignent ensuite (phase_join_control_plane).
-phase_bootstrap_ha() {
-    local cp_ip=$1 vip=$2 vip_iface=$3
-    preflight
-    log "Phase bootstrap-ha — CP primaire ${CP} derrière la VIP ${vip}"
-    mkdir -p "${WORKDIR}"
-
-    # Inventaire : SEUL le primaire en control (les autres CP joignent après).
-    write_inventory "${INVENTORY}" "${CP}" ""
-
-    # Variables communes : la VIP est le control_plane_endpoint (certSANs + hosts),
-    # kube-vip paramétré (VIP + interface). control_plane_ip = advertise du primaire.
-    local -a ha_vars=(
-        -e "control_plane_ip=${cp_ip}"
-        -e "control_plane_endpoint=${vip}"
-        -e "kube_vip_address=${vip}"
-        -e "kube_vip_interface=${vip_iface}"
-        -e "control_plane_vip=${vip}"
-    )
-
-    # 1. Pré-init : checks → cri → kubeadm → control-planes (PAS encore init).
-    local pb
-    for pb in checks cri kubeadm control-planes; do
-        log "  ansible-playbook ${pb}.yaml"
-        ansible-playbook -i "${INVENTORY}" "${REPO}/bootstrap/${pb}.yaml" "${ha_vars[@]}"
-    done
-
-    # 2. kube-vip AVANT l'init, en super-admin.conf (amorçage k8s ≥ 1.29).
-    log "  ansible-playbook kube-vip.yaml (amorçage : super-admin.conf)"
-    ansible-playbook -i "${INVENTORY}" "${REPO}/bootstrap/kube-vip.yaml" \
-        "${ha_vars[@]}" -e "kube_vip_kubeconfig_path=/etc/kubernetes/super-admin.conf"
-
-    # 3. Init du CP primaire (controlPlaneEndpoint = VIP). La VIP répond via kube-vip.
-    log "  ansible-playbook initialisation.yaml (kubeadm init via VIP)"
-    ansible-playbook -i "${INVENTORY}" "${REPO}/bootstrap/initialisation.yaml" "${ha_vars[@]}"
-
-    # 4. Bascule kube-vip sur admin.conf (régime permanent ; super-admin.conf est
-    #    sensible et non distribué). Re-render idempotent du manifeste statique.
-    log "  ansible-playbook kube-vip.yaml (régime : admin.conf)"
-    ansible-playbook -i "${INVENTORY}" "${REPO}/bootstrap/kube-vip.yaml" \
-        "${ha_vars[@]}" -e "kube_vip_kubeconfig_path=/etc/kubernetes/admin.conf"
-
-    # 5. CNI (Cilium) — local-path, donc plage LB-IPAM + L2 dérivées du réseau.
-    local lb_prefix="${cp_ip%.*}"
-    apply_gwapi_crds_in_vm "${CP}" "${GWAPI_VERSION}"
-    run_cni "${CP}" \
-        "LB_IPAM_RANGE_START=${lb_prefix}.240" \
-        "LB_IPAM_RANGE_STOP=${lb_prefix}.250" \
-        "L2_INTERFACE=${vip_iface}"
-    fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}" cluster-banc
-
-    # GATE : le primaire est Ready (1 nœud à ce stade).
-    retry 300 10 nodes_ready_all \
-        || die "CP primaire non Ready : $("${KUBECTL[@]}" get nodes 2>&1)"
-    ok "CP primaire ${CP} Ready derrière la VIP ${vip}"
-}
-
-# ── Phase join-control-plane — promeut UN CP additionnel (ha-3cp, #250) ──────
-# Args : CP_À_PROMOUVOIR VIP. Pose kube-vip (admin.conf) sur le nœud puis joue
-# join-control-plane.yaml limité à ce nœud (le rôle prépare la certificate-key
-# fraîche sur le primaire). La gate etcd est portée par l'appelant (run_ha_3cp).
-phase_join_control_plane() {
-    local cp=$1 vip=$2
-    preflight
-    log "Phase join-control-plane — promotion de ${cp} (VIP ${vip})"
-
-    # Ajouter le nœud au groupe control de l'inventaire (il devient CP membre).
-    # On reconstruit l'inventaire control = primaire + CP déjà promus + ce cp.
-    local control="${CP}" entry vm
-    for entry in "${NODES[@]}"; do
-        vm="${entry%%:*}"
-        [ "${vm}" = "${CP}" ] && continue
-        # Inclure les CP déjà promus (marqueur cp-joined.log) + le cp courant.
-        if [ "${vm}" = "${cp}" ] || vm_sh "${vm}" test -f cp-joined.log 2>/dev/null; then
-            control="${control} ${vm}"
-        fi
-    done
-    write_inventory "${INVENTORY}" "${control}" ""
-
-    local -a ha_vars=(
-        -e "control_plane_endpoint=${vip}"
-        -e "kube_vip_address=${vip}"
-        -e "kube_vip_interface=${HA_VIP_IFACE:-$(vm_uservv2_iface "${CP}")}"
-    )
-
-    # kube-vip (admin.conf — la VIP est déjà portée par le primaire) sur ce nœud,
-    # puis join --control-plane limité à ce nœud.
-    ansible-playbook -i "${INVENTORY}" "${REPO}/bootstrap/kube-vip.yaml" \
-        "${ha_vars[@]}" -e "kube_vip_kubeconfig_path=/etc/kubernetes/admin.conf" --limit "${cp}"
-    ansible-playbook -i "${INVENTORY}" "${REPO}/bootstrap/join-control-plane.yaml" \
-        "${ha_vars[@]}" --limit "${cp},${CP}"
-
-    retry 300 10 nodes_ready_all \
-        || die "${cp} non Ready après promotion : $("${KUBECTL[@]}" get nodes 2>&1)"
-    ok "${cp} promu control-plane (derrière la VIP ${vip})"
 }
 
 # ── Phase bootstrap-fault — ARRÊT INJECTÉ : prouve le rescue (ADR 0050/0052 §5) ─
@@ -1610,6 +1514,15 @@ run_ha_3cp() {
     NODES=("cp1:control" "cp2:control" "cp3:control")
     CP=cp1  # CP primaire (init + kubeconfig + cni)
 
+    # RAM allégée : un CP local-path (etcd + apiserver + kubelet, PAS d'OSD/Ceph)
+    # tient bien en deçà des 8 GiB du défaut léger. On vise 5 GiB/CP (3×5 = 15 GiB
+    # au lieu de 3×8 = 24). NB : 4 GiB ALLOUÉS ne laissent que ~3922 MB VISIBLES
+    # (overhead firmware) → sous le plancher de 4096 MB asserté par k8s-pre-install ;
+    # 5 GiB donne ~4900 MB visibles, au-dessus. Abaisser ce plancher pour un CP
+    # SANS OSD (le 4096 vise le dimensionnement Ceph) est un suivi à mesurer (#250).
+    # N'écrase PAS un VM_MEMORY fourni explicitement par l'opérateur.
+    [ -z "${VM_MEMORY_SET}" ] && VM_MEMORY=5GiB
+
     time_phase up phase_up
 
     # IP user-v2 du primaire (advertise + /etc/hosts). La VIP = même /24, hors DHCP
@@ -1623,40 +1536,43 @@ run_ha_3cp() {
     [ -n "${vip_iface}" ] || die "${CP} : interface user-v2 introuvable (VIP)"
     ok "ha-3cp : VIP ${vip} sur ${vip_iface} (CP primaire ${CP} ${cp_ip})"
 
-    time_phase bootstrap-ha "phase_bootstrap_ha ${cp_ip} ${vip} ${vip_iface}"
+    # Inventaire (primaire seul en control au bootstrap ; les CP rejoignent ensuite,
+    # l'orchestration Python le reconstruit via --limit). HA_CP_IP/HA_VIP exportés
+    # pour la sous-commande Python et le rappel ha-cni.
+    write_inventory "${INVENTORY}" "${CP}" ""
+    export HA_CP_IP="${cp_ip}" HA_VIP="${vip}" HA_VIP_IFACE="${vip_iface}"
 
-    # Promotion des CP additionnels, UN À UN, gate etcd entre chaque.
-    local cp expected=1
-    for cp in $(ha_cp_join_order cp1 cp2 cp3); do
-        ha_gate_etcd_health "${expected}"
-        time_phase "join-cp-${cp}" "phase_join_control_plane ${cp} ${vip}"
-        expected=$((expected + 1))
-    done
-    ha_gate_etcd_health "${expected}"  # quorum final à 3
+    # Délégation de l'ORCHESTRATION ANSIBLE à Python (« Python parle Ansible »,
+    # ADR 0063) : topology.py ha-3cp lance les playbooks via runner.launch_phase,
+    # gère l'amorçage (super-admin→admin), les gates VIP/etcd, et rappelle ici
+    # `ha-cni` pour la CNI (qui reste du bash, ADR 0049). Le provisioning VM et la
+    # CNI restent à run-phases.sh ; le « cerveau » HA est en Python testé.
+    time_phase bootstrap-ha \
+        uv run python "${REPO}/scripts/topology.py" ha-3cp \
+        --nodes cp1,cp2,cp3 --cp-ip "${cp_ip}" --vip "${vip}" \
+        --vip-iface "${vip_iface}" --inventory "${INVENTORY}"
 
     time_phase storage-simple phase_storage_simple
     log "🎉 Chemin 'ha-3cp' : 3 CP hyperconvergés derrière la VIP ${vip} (local-path)."
 }
 
-# ha_gate_etcd_health EXPECTED — gate la santé etcd (classify_etcd_health) AVANT
-# de promouvoir le CP suivant. Lit `etcdctl endpoint health --cluster` sur le CP
-# primaire (toolbox kubeadm) ; refuse de continuer si le quorum est dégradé.
-ha_gate_etcd_health() {
-    local expected=$1 out verdict
-    log "  gate etcd : quorum sain à ${expected} membre(s) avant promotion ?"
-    out=$(vm_sh "${CP}" sudo sh -c \
-        'ETCDCTL_API=3 etcdctl \
-           --endpoints=https://127.0.0.1:2379 \
-           --cacert=/etc/kubernetes/pki/etcd/ca.crt \
-           --cert=/etc/kubernetes/pki/etcd/server.crt \
-           --key=/etc/kubernetes/pki/etcd/server.key \
-           endpoint health --cluster' 2>/dev/null) || true
-    verdict=$(classify_etcd_health "${out}" "${expected}")
-    case "${verdict%%|*}" in
-        ok) ok "  ${verdict#*|}" ;;
-        *)  die "ha-3cp : ${verdict#*|}" ;;
-    esac
+# ha_cni VIP_IFACE LB_PREFIX — pose Cilium sur le CP primaire (rappelé par la
+# sous-commande Python ha-3cp ; la CNI reste du bash, ADR 0049). Dérive la plage
+# LB-IPAM du /24 du primaire ; fetch le kubeconfig local après.
+phase_ha_cni() {
+    local vip_iface=$1 lb_prefix=$2
+    apply_gwapi_crds_in_vm "${CP}" "${GWAPI_VERSION}"
+    run_cni "${CP}" \
+        "LB_IPAM_RANGE_START=${lb_prefix}.240" \
+        "LB_IPAM_RANGE_STOP=${lb_prefix}.250" \
+        "L2_INTERFACE=${vip_iface}"
+    fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}" cluster-banc
 }
+
+# NB : l'orchestration HA (bootstrap primaire, gates VIP/etcd, promotion des CP)
+# vit désormais en PYTHON (cluster_topology/ha.py via runner.launch_phase, ADR
+# 0063), déléguée par run_ha_3cp ; seuls le provisioning VM et la CNI (phase_ha_cni)
+# restent du bash ici (orchestration de CLI, ADR 0049).
 
 # ── Dispatch ─────────────────────────────────────────────────────────────────
 case "${1:-}" in
@@ -1785,9 +1701,9 @@ case "${1:-}" in
         run_hardening_if_requested
         record_if_fresh "${run_start}"
         ;;
-    # Phases ha-3cp atomiques (diagnostic / re-jeu ciblé d'une promotion).
-    bootstrap-ha) [ "$#" -ge 4 ] || die "usage : bootstrap-ha <cp_ip> <vip> <vip_iface>"; time_phase bootstrap-ha "phase_bootstrap_ha $2 $3 $4" ;;
-    join-control-plane) [ -n "${3:-}" ] || die "usage : join-control-plane <cp> <vip>"; time_phase "join-cp-$2" "phase_join_control_plane $2 $3" ;;
+    # ha-cni : rappel interne de la sous-commande Python ha-3cp (la CNI reste bash,
+    # ADR 0049). Args : <vip_iface> <lb_prefix>.
+    ha-cni) [ -n "${3:-}" ] || die "usage : ha-cni <vip_iface> <lb_prefix>"; CP=cp1; phase_ha_cni "$2" "$3" ;;
     status) phase_status ;;
     down) phase_down ;;
     # Rollback d'UNE phase (ADR 0054, #274) : défait ce que `<phase>` a monté.

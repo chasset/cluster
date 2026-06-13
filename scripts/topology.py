@@ -78,6 +78,7 @@ from cluster_topology import (  # noqa: E402
     suggest_next,
     verdict_for_run,
 )
+from cluster_topology import ha as _ha  # noqa: E402
 from cluster_topology import roundtrip as _roundtrip  # noqa: E402
 from cluster_topology import runner as _runner  # noqa: E402
 from cluster_topology import smoke as _smoke  # noqa: E402
@@ -378,6 +379,94 @@ def cmd_next(args: argparse.Namespace) -> int:
     return 0 if result.rc == 0 else 1
 
 
+def cmd_ha_3cp(args: argparse.Namespace) -> int:
+    """Orchestre le montage HA `ha-3cp` (ADR 0047/0055, #250) — la partie ANSIBLE.
+
+    Les VM (limactl) et la CNI restent à run-phases.sh (orchestration de CLI, bash,
+    ADR 0049) ; cette commande reçoit `--cp-ip/--vip/--vip-iface` déjà dérivés du
+    banc, câble `ha.run_ha_3cp` au RÉEL : `launch` → runner.launch_phase (le MÊME
+    montage que `next --apply`), gates → limactl/kubectl, `run_cni` → un rappel vers
+    run-phases.sh. La logique (séquence, super-admin→admin, gates etcd) est testée
+    sans banc (tests/test_ha.py) ; ce câblage est la seule I/O réelle.
+    """
+    import time
+
+    private_data_dir = os.path.join(_ROOT, "bootstrap")
+    # L'inventaire du banc est généré par run-phases.sh dans son WORKDIR (chemin
+    # ABSOLU passé via --inventory) — pas dans bootstrap/. On l'utilise tel quel ;
+    # un chemin relatif est résolu depuis bootstrap/ (compat usage hors banc).
+    inventory = (
+        args.inventory
+        if os.path.isabs(args.inventory)
+        else os.path.join(private_data_dir, args.inventory)
+    )
+    ansible_cfg = os.path.join(private_data_dir, "ansible.cfg")
+    if not os.path.exists(inventory):
+        raise _UsageError(
+            f"inventaire absent : {inventory} (généré par run-phases.sh avant la délégation)"
+        )
+    kubeconfig = os.environ.get("KUBECONFIG")
+
+    def launch(playbook: str, extravars: dict):
+        # playbook = 'kube-vip.yaml' → relatif à private_data_dir/<project> ;
+        # bootstrap/*.yaml sont à la racine du private_data_dir.
+        return _runner.launch_phase(
+            playbook,
+            extravars,
+            private_data_dir,
+            inventory,
+            ansible_config=ansible_cfg,
+            kubeconfig=kubeconfig,
+            target_kind="lima",
+        )
+
+    # run_cni : la CNI reste portée par run-phases.sh (bash). On la rappelle via le
+    # sous-commande dédiée `run-cni <cp> <vip-iface> <lb-prefix>` (cf. dispatch).
+    def run_cni():
+        rc = subprocess.run(  # noqa: S603 — chemin codé, arguments contrôlés
+            [
+                "bash",
+                os.path.join(_ROOT, "test", "lima", "run-phases.sh"),
+                "ha-cni",
+                args.vip_iface,
+                args.cp_ip.rsplit(".", 1)[0],
+            ],
+            check=False,
+        ).returncode
+        if rc != 0:
+            raise _ha.HaError(f"CNI (run-phases.sh ha-cni) en échec (rc={rc})")
+
+    def ready_count() -> int:
+        out = subprocess.run(  # noqa: S603 — kubectl, pas d'entrée shell
+            ["kubectl", "get", "nodes", "--no-headers"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={**os.environ, **({"KUBECONFIG": kubeconfig} if kubeconfig else {})},
+        )
+        return sum(1 for ln in out.stdout.splitlines() if " Ready " in f" {ln} ")
+
+    nodes = args.nodes.split(",")
+    print(f"→ ha-3cp : {len(nodes)} CP derrière la VIP {args.vip} (Ansible via Python/runner)")
+    try:
+        result = _ha.run_ha_3cp(
+            nodes,
+            args.cp_ip,
+            args.vip,
+            args.vip_iface,
+            launch=launch,
+            run_cni=run_cni,
+            ready_count=ready_count,
+            sleep=time.sleep,
+        )
+    except _runner.RunnerUnavailable as exc:
+        raise _UsageError(str(exc)) from exc
+    for step in result.steps:
+        mark = "✓" if step.ok else "✗"
+        print(f"  {mark} {step.name}{f' — {step.detail}' if step.detail else ''}")
+    return 0 if result.built else 1
+
+
 def cmd_metrics(args: argparse.Namespace) -> int:
     """Expose les métriques DÉJÀ consignées dans runs-history.yaml (P6, exig. 8).
 
@@ -449,6 +538,7 @@ _DISPATCH = {
     "metrics": cmd_metrics,
     "smoke": cmd_smoke,
     "roundtrip": cmd_roundtrip,
+    "ha-3cp": cmd_ha_3cp,
 }
 
 
@@ -598,6 +688,16 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="sauter la confirmation interactive (requis hors TTY pour détruire)",
     )
+
+    p_ha = sub.add_parser(
+        "ha-3cp",
+        help="orchestre le montage HA ha-3cp (Ansible via Python ; VM/CNI restent run-phases.sh)",
+    )
+    p_ha.add_argument("--nodes", default="cp1,cp2,cp3", help="CP, le 1er = primaire (csv)")
+    p_ha.add_argument("--cp-ip", required=True, dest="cp_ip", help="IP réelle du CP primaire")
+    p_ha.add_argument("--vip", required=True, help="VIP de l'API (kube-vip)")
+    p_ha.add_argument("--vip-iface", required=True, dest="vip_iface", help="interface L2 de la VIP")
+    p_ha.add_argument("--inventory", default="hosts.yaml", help="inventaire (relatif à bootstrap/)")
     return ap
 
 
