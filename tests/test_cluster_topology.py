@@ -20,6 +20,12 @@ from cluster_topology.model import (  # noqa: E402
     TopologyError,
     topology_from_dict,
 )
+from cluster_topology.profile import (  # noqa: E402
+    derive_osd_expected,
+    derive_run_params,
+    required_profiles,
+    storage_params,
+)
 
 _ROOT = os.path.join(os.path.dirname(__file__), "..")
 
@@ -193,6 +199,107 @@ class LimaInventoryByteExact(unittest.TestCase):
         self.assertNotIn("    node", out)
         # et le bloc control_host suit immédiatement
         self.assertIn("  hosts: {}\ncontrol_host:\n", out)
+
+
+class ProfileInclusion(unittest.TestCase):
+    """P2 : inclusion cumulative base ⊂ store ⊂ obs ⊂ dataops (ADR 0039)."""
+
+    def test_cumulative_chain(self):
+        self.assertEqual(required_profiles("base"), ["base"])
+        self.assertEqual(required_profiles("store"), ["base", "store"])
+        self.assertEqual(required_profiles("obs"), ["base", "store", "obs"])
+        self.assertEqual(required_profiles("dataops"), ["base", "store", "obs", "dataops"])
+
+    def test_unknown_profile_rejected(self):
+        with self.assertRaises(TopologyError):
+            required_profiles("mlops")
+
+
+class StorageDerivationParity(unittest.TestCase):
+    """P2 : les paramètres dérivés du backend == les `-e` que run-phases.sh calcule.
+
+    Valeurs de référence LUES dans test/lima/run-phases.sh (dataops/monitoring/
+    gitops, branche `if WITH_CEPH`). Si le bash change ces valeurs, ce test casse
+    → garde-fou de parité de la dérivation.
+    """
+
+    def test_ceph_params_match_bash(self):
+        p = storage_params("ceph")
+        self.assertEqual(p["storage_class"], "rook-ceph-block-replicated")
+        self.assertEqual(p["s3_backing"], "rgw")
+        self.assertEqual(p["s3_endpoint"], "http://rook-ceph-rgw-datalake.rook-ceph:80")
+        self.assertTrue(p["argocd_apply_gateway"])
+
+    def test_local_path_params_match_bash(self):
+        p = storage_params("local-path")
+        self.assertEqual(p["storage_class"], "local-path")
+        self.assertEqual(p["s3_backing"], "seaweedfs")
+        self.assertEqual(p["s3_endpoint"], "http://seaweedfs.s3.svc.cluster.local:8333")
+        self.assertFalse(p["argocd_apply_gateway"])
+
+    def test_unknown_backend_rejected(self):
+        with self.assertRaises(TopologyError):
+            storage_params("nfs")
+
+    def test_run_params_full_dataops_ceph(self):
+        # profile dataops + ceph → tout le faisceau de -e, parité bash.
+        topo = topology_from_dict(
+            _base(
+                catalog={"profile": "dataops"},
+                storage={"backend": "ceph"},
+            )
+        )
+        rp = derive_run_params(topo)
+        self.assertEqual(rp["profiles"], ["base", "store", "obs", "dataops"])
+        self.assertEqual(rp["registry_storage_class"], "rook-ceph-block-replicated")
+        self.assertEqual(rp["cnpg_storage_class"], "rook-ceph-block-replicated")
+        self.assertEqual(rp["monitoring_storage_class"], "rook-ceph-block-replicated")
+        self.assertEqual(rp["loki_storage_class"], "rook-ceph-block-replicated")
+        self.assertEqual(rp["gitea_storage_class"], "rook-ceph-block-replicated")
+        self.assertEqual(rp["cnpg_s3_backing"], "rgw")
+        self.assertEqual(rp["cnpg_s3_endpoint"], "http://rook-ceph-rgw-datalake.rook-ceph:80")
+        self.assertTrue(rp["argocd_apply_gateway"])
+
+    def test_run_params_light_local_path(self):
+        topo = topology_from_dict(
+            _base(catalog={"profile": "obs"}, storage={"backend": "local-path"})
+        )
+        rp = derive_run_params(topo)
+        self.assertEqual(rp["profiles"], ["base", "store", "obs"])
+        self.assertEqual(rp["cnpg_storage_class"], "local-path")
+        self.assertEqual(rp["cnpg_s3_backing"], "seaweedfs")
+        self.assertFalse(rp["argocd_apply_gateway"])
+
+
+class OsdDerivation(unittest.TestCase):
+    """P2 : ceph_osd_expected = #nœuds-stockage × #disques (banc), sinon None."""
+
+    def test_ceph_with_disks_derives_count(self):
+        # 3 nœuds-stockage × 3 HDD = 9 OSD attendus (1 seul control → pas de VIP).
+        topo = topology_from_dict(
+            _base(
+                nodes=[
+                    {"name": "n1", "roles": ["control", "worker", "storage"]},
+                    {"name": "n2", "roles": ["worker", "storage"]},
+                    {"name": "n3", "roles": ["worker", "storage"]},
+                ],
+                storage={"backend": "ceph", "disks_per_node": 3},
+            )
+        )
+        self.assertEqual(derive_osd_expected(topo), 9)
+
+    def test_explicit_osd_expected_wins(self):
+        topo = topology_from_dict(_base(storage={"backend": "ceph", "osd_expected": 47}))
+        self.assertEqual(derive_osd_expected(topo), 47)
+
+    def test_local_path_has_no_osd(self):
+        topo = topology_from_dict(_base(storage={"backend": "local-path"}))
+        self.assertIsNone(derive_osd_expected(topo))
+
+    def test_ceph_without_disks_not_derivable(self):
+        # prod générique : pas de disks_per_node → None (le rôle/hosts.yaml décide).
+        topo = topology_from_dict(_base(storage={"backend": "ceph"}))
+        self.assertIsNone(derive_osd_expected(topo))
 
 
 if __name__ == "__main__":
