@@ -1,0 +1,56 @@
+# code: language=ansible
+#
+# Inventaire Ansible — MODÈLE d'exemple générique (ADR 0023).
+#
+# Copier en `hosts.yaml` (non versionné) et remplacer par les noms/IP réels :
+#   cp bootstrap/hosts.example.yaml bootstrap/hosts.yaml
+#
+# `hosts.yaml` est gitignoré : il porte les spécificités d'un déploiement
+# particulier. Ce `.example` reste versionné avec des valeurs GÉNÉRIQUES.
+#
+# Les noms ci-dessous (cp1, node1…) sont des exemples ; `ansible_host` est
+# optionnel (utile quand le nom n'est pas résolvable). Sur le banc multi-node,
+# c'est `test/multi-node/inventory.yaml` (gitignoré) qui fait foi.
+
+cloud:
+  children:
+    control:
+    workers:
+  vars:
+    # Marqueur de TOPOLOGIE (ADR 0053 (c)) : distingue cet inventaire prod du banc
+    # Lima (qui émet `target_kind: lima`). Le rôle audit-log, importé en pre_tasks,
+    # refuse de muter un parc dont le `target_kind` ne correspond pas à l'intention
+    # (EXPECTED_TARGET_KIND, défaut `prod`) → un mauvais `-i` échoue AVANT toute
+    # tâche distante, au lieu d'un faux-résultat silencieux. Valeur générique (ADR 0023).
+    target_kind: {{ target_kind }}
+
+# Astuce : ajouter `ansible_host: <ip>` sous un nœud si son nom n'est pas
+# résolvable (ex. cp1 → 10.0.0.11, node1 → 10.0.0.12, etc.).
+
+control:
+  hosts:
+{% for n in control_nodes %}    {{ n }}:
+{% endfor %}
+
+workers:
+  hosts:
+{% for n in worker_nodes %}    {{ n }}:
+{% endfor %}
+
+# Nœud(s) sur un site distant (exemple) — décommenter au besoin :
+# vm:
+#   hosts:
+#     site-distant:
+#       ansible_host: 10.1.0.10
+
+# Poste de contrôle (#277) : les playbooks plateforme/Ceph (dataops, ceph-*,
+# monitoring, metrics-server, local-path, cnpg-secrets, gitops) pilotent l'API
+# Kubernetes depuis `localhost`, pas depuis un nœud. Le groupe `control_host`
+# leur applique l'interpréteur du .venv du dépôt (group_vars/control_host.yaml :
+# kubernetes+certifi provisionnés par `uv sync`). Garder ce bloc tel quel suffit
+# dans le cas standard (.venv à la racine du dépôt). Ne surcharger
+# `ansible_python_interpreter` (chemin absolu) QUE si le .venv vit ailleurs.
+control_host:
+  hosts:
+    localhost:
+      ansible_connection: local
