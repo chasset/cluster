@@ -1,0 +1,40 @@
+---
+# Valeurs par défaut du rôle kube-vip (ADR 0047/0055, issue #250).
+# kube-vip porte la VIP devant les control-planes (topologie ha-3cp) en mode ARP
+# (bare-metal / Lima local), via un POD STATIQUE déposé dans
+# /etc/kubernetes/manifests/ sur chaque CP — le kubelet le démarre. Aucun objet
+# RBAC : en pod statique CP, kube-vip monte admin.conf (creds cluster-admin déjà
+# présents) ; le RBAC ne sert qu'au mode DaemonSet (non utilisé ici).
+
+# ─── Image épinglée par DIGEST d'index multi-arch (ADR 0006) ─────────────────
+# v1.2.0 (2026-05-28). Le digest pointe l'OCI image index couvrant linux/arm64
+# (banc Lima) ET linux/amd64 (prod) — vérifié `crane manifest` (MediaType
+# image.index). Bump = PR explicite (version + digest + matrice ADR 0006 §5).
+# Re-vérifier : crane digest ghcr.io/kube-vip/kube-vip:{{ kube_vip_version }}
+kube_vip_version: v1.2.0
+kube_vip_digest: sha256:fe8c7b6641ba7633a12b337821e9e83a6456e8edc3434f97577058edd4eecaf6
+
+# ─── VIP & interface (valeurs GÉNÉRIQUES — ADR 0023, surchargées hors dépôt) ──
+# kube_vip_address : la VIP de l'API (réseau privé d'exemple). EN RÉEL : dérivée
+#   du réseau (Lima) ou réservée avec l'admin (prod), via une surcharge gitignorée.
+#   La VIP reste HORS du pool LB-IPAM (exposition applicative) — deux plans.
+# kube_vip_interface : l'interface L2 portant la VIP (banc Lima : eth0).
+kube_vip_address: 10.0.0.40
+kube_vip_interface: eth0
+kube_vip_port: '6443'
+
+# ─── Élection de leader (un seul CP porte la VIP à la fois ; bascule à la panne) ─
+kube_vip_lease_name: plndr-cp-lock
+kube_vip_lease_duration: '15'
+kube_vip_renew_deadline: '10'
+kube_vip_retry_period: '2'
+
+# ─── Kubeconfig monté par le pod (AMORÇAGE — cf. README §séquence) ────────────
+# Régime permanent : admin.conf. Le PREMIER `kubeadm init` HA (k8s ≥ 1.29) exige
+# super-admin.conf le temps de l'init (admin.conf n'est pas utilisable avant que
+# l'API tourne), puis on rebascule sur admin.conf. Ce paramètre permet au chemin
+# d'amorçage codé (run-phases.sh, à venir) de piloter la bascule sans état manuel.
+kube_vip_kubeconfig_path: /etc/kubernetes/admin.conf
+
+# Répertoire des pods statiques surveillé par le kubelet.
+kube_vip_manifests_dir: /etc/kubernetes/manifests
