@@ -20,6 +20,10 @@ class TopologyError(ValueError):
 
 VALID_ROLES = {"control", "worker", "storage"}
 VALID_TARGET_KINDS = {"prod", "lima"}
+# Modes du point d'entrée HA devant les CP (ADR 0047/0055). kube-vip-arp =
+# bare-metal/local (pod statique, annonce ARP) ; kube-vip-lb = via LB-IPAM ;
+# external = LB fourni par le terrain (cloud, ADR 0040).
+VALID_LB_MODES = {"kube-vip-arp", "kube-vip-lb", "external"}
 
 
 @dataclass
@@ -111,11 +115,21 @@ def topology_from_dict(data: dict[str, Any]) -> Topology:
         target_kind=target_kind,
     )
     # Cohérence HA : > 1 CP exige un control_plane_lb déclaré (ADR 0047/0055).
-    if topo.is_ha_control_plane and not topo.network.get("control_plane_lb"):
+    lb = topo.network.get("control_plane_lb")
+    if topo.is_ha_control_plane and not lb:
         raise TopologyError(
             f"{len(topo.control_nodes)} control-planes mais aucun `network.control_plane_lb` "
             "(VIP requise dès > 1 CP — ADR 0047/0055)"
         )
+    # Si un control_plane_lb est déclaré, son `mode` doit être connu (sinon le delta
+    # d'outillage — kube-vip vs external — n'est pas dérivable, ADR 0047/0055).
+    if lb is not None:
+        mode = lb.get("mode") if isinstance(lb, dict) else None
+        if mode not in VALID_LB_MODES:
+            raise TopologyError(
+                f"`network.control_plane_lb.mode` = {mode!r} inconnu "
+                f"(valides : {sorted(VALID_LB_MODES)} — ADR 0047/0055)"
+            )
     return topo
 
 
