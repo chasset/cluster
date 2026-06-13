@@ -60,6 +60,18 @@ setup() {
     [ -z "$output" ]
 }
 
+@test "targeted : monitoring → OBC loki-buckets dans rook-ceph (libère datalake)" {
+    # L'OBC du backing S3 de Loki vit dans rook-ceph (ns ≠ monitoring) : sans elle,
+    # le CephObjectStore datalake reste bloqué en Deleting. #319-suite.
+    run rollback_phase_targeted_resources monitoring
+    [[ "$output" == *"-n rook-ceph objectbucketclaim.objectbucket.io loki-buckets"* ]]
+}
+
+@test "targeted : dataops → OBC cnpg-backups dans rook-ceph (libère datalake)" {
+    run rollback_phase_targeted_resources dataops
+    [[ "$output" == *"-n rook-ceph objectbucketclaim.objectbucket.io cnpg-backups"* ]]
+}
+
 # ─── rollback_phase_crd_groups ──────────────────────────────────────────────
 
 @test "crd : ceph → ceph.rook.io" {

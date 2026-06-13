@@ -56,6 +56,16 @@ rollback_phase_targeted_resources() {
             printf 'storageclass.storage.k8s.io rook-cephfs\n' ;;
         metrics-server)
             printf -- '-n kube-system deployment.apps metrics-server\n' ;;
+        monitoring)
+            # OBC du backing S3 de Loki, posée par platform-loki DANS rook-ceph
+            # (ns ≠ monitoring). Sans elle, le CephObjectStore datalake reste bloqué
+            # en Deleting (finalizer : un bucket dépendant subsiste). #319-suite.
+            printf -- '-n rook-ceph objectbucketclaim.objectbucket.io loki-buckets\n' ;;
+        dataops)
+            # OBC du backing S3 de CNPG/Barman, posée par platform-cnpg DANS
+            # rook-ceph (ns ≠ postgres). Même raison que monitoring : libère le
+            # datalake. (Sans incidence en profil léger : pas d'OBC → no-op delete.)
+            printf -- '-n rook-ceph objectbucketclaim.objectbucket.io cnpg-backups\n' ;;
         gitops-seed)
             # Données dans Gitea (org/repo) + Application Argo CD seed — best-effort.
             printf -- '-n argocd applications.argoproj.io atlas\n' ;;
