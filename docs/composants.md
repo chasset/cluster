@@ -138,15 +138,6 @@ nécessaires). C'est du **defense-in-depth**, pas une correction de faille : si
 un pod est compromis, il ne peut pas balayer librement le cluster
 ([`platform/network-policies/`](../platform/network-policies/)).
 
-### Tailscale
-
-Tailscale est un VPN maillé (basé sur WireGuard) qui crée un réseau privé
-chiffré entre machines. Il sert ici de **compensation de sécurité** : c'est
-parce que l'accès réseau est supposé privé (cluster isolé, ADR 0003) qu'on
-s'autorise à exposer certains services en HTTP sans authentification interne. Il
-ne fait pas partie du déploiement du cluster lui-même mais cadre l'hypothèse de
-menace.
-
 ## Stockage
 
 ### Rook-Ceph

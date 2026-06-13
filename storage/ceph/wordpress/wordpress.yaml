@@ -11,8 +11,8 @@ spec:
     app: wordpress
     tier: frontend
   # ClusterIP (audit P6 #25) : pas d'exposition externe directe. Accès via
-  # `kubectl port-forward` ou Tailscale. Cohérent avec le réseau isolé (ADR 0003)
-  # — l'exemple WordPress n'a pas vocation à être publié sur Internet.
+  # `kubectl port-forward`. Cohérent avec le réseau isolé (ADR 0003) —
+  # l'exemple WordPress n'a pas vocation à être publié sur Internet.
   type: ClusterIP
 ---
 apiVersion: v1

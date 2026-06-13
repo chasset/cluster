@@ -187,30 +187,15 @@ Aucun chiffrement Ceph n'est activé : `network.connections.encryption.enabled`
 reste à `false` dans `cluster.yaml`, et le datalake RGW expose `port: 80` sans
 TLS. La décision tient parce que les flux internes au cluster restent confinés
 au réseau privé `10.0.0.0/22`, et que **l'accès externe est limité par le
-contrôle d'accès au Service** (réseau cluster, port-forward sur API K8s, ou
-tunnel Tailscale si l'operator est déployé — voir ci-dessous). À revisiter le
-jour où ces hypothèses changent (exposition publique, données classifiées,
-etc.).
+contrôle d'accès au Service** (réseau cluster, ou `kubectl port-forward` depuis
+un poste autorisé à parler à l'API K8s). À revisiter le jour où ces hypothèses
+changent (exposition publique, données classifiées, etc.).
 
-## Tailscale operator (optionnel)
+## Accès distant
 
-L'installation du Tailscale operator est **facultative**. Sans lui, les
-annotations `tailscale.com/expose` et `tailscale.com/hostname` posées sur
-certains Services (registry, RStudio) sont simplement ignorées, et l'accès
-distant se fait par `kubectl port-forward`. Avec lui, ces Services deviennent
-joignables depuis le tailnet.
-
-```bash
-helm repo add tailscale https://pkgs.tailscale.com/helmcharts
-helm repo update
-export $(grep -v '^#' .env | xargs)
-helm upgrade \
-  --install tailscale-operator tailscale/tailscale-operator \
-  --namespace tailscale --create-namespace \
-  --set-string oauth.clientId="${clientID}" \
-  --set-string oauth.clientSecret="${clientSecret}" \
-  --wait
-```
+L'accès distant aux Services internes (registry, RStudio…) se fait par
+`kubectl port-forward` depuis un poste autorisé à parler à l'API K8s. Aucune
+exposition réseau dédiée n'est requise côté cluster.
 
 ## Récupérer les clefs d'un object store
 

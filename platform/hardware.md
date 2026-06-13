@@ -9,12 +9,12 @@
 
 ## Vue d'ensemble
 
-| Nœud    | IP        | Rôle Kubernetes             |
-| ------- | --------- | --------------------------- |
-| `cp1`   | 10.0.0.11 | control plane (+ Tailscale) |
-| `node1` | 10.0.0.12 | worker                      |
-| `node2` | 10.0.0.13 | worker                      |
-| `node3` | 10.0.0.14 | worker                      |
+| Nœud    | IP        | Rôle Kubernetes |
+| ------- | --------- | --------------- |
+| `cp1`   | 10.0.0.11 | control plane   |
+| `node1` | 10.0.0.12 | worker          |
+| `node2` | 10.0.0.13 | worker          |
+| `node3` | 10.0.0.14 | worker          |
 
 Rôles définis dans l'inventaire Ansible (modèle :
 [`bootstrap/hosts.example.yaml`](../bootstrap/hosts.example.yaml) ; le

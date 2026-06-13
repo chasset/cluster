@@ -37,15 +37,14 @@ librement le cluster.
 | Namespace  | Ingress                                                              | Egress                                          |
 | ---------- | -------------------------------------------------------------------- | ----------------------------------------------- |
 | `default`  | wordpress:80 depuis n'importe où ; mysql:3306 ⬅ wordpress uniquement | DNS ; wordpress → mysql:3306 ; API server :6443 |
-| `rstudio`  | rstudio:8787 depuis n'importe où (Service/Tailscale)                 | DNS ; API server :6443                          |
+| `rstudio`  | rstudio:8787 depuis n'importe où (Service)                           | DNS ; API server :6443                          |
 | `registry` | registry:5000 depuis n'importe où (pulls de tout le cluster)         | DNS ; API server :6443                          |
 
 **Volontairement permissif** sur l'ingress des Services exposés (wordpress,
-rstudio, registry) : ils sont conçus pour être joignables (LoadBalancer /
-Tailscale). La valeur de ces policies est ailleurs : **isoler MySQL** (seul
-WordPress y accède), **bloquer tout egress non listé** (un pod compromis ne peut
-pas exfiltrer ni scanner), et **poser un cadre** pour durcir plus finement
-ensuite.
+rstudio, registry) : ils sont conçus pour être joignables (LoadBalancer). La
+valeur de ces policies est ailleurs : **isoler MySQL** (seul WordPress y
+accède), **bloquer tout egress non listé** (un pod compromis ne peut pas
+exfiltrer ni scanner), et **poser un cadre** pour durcir plus finement ensuite.
 
 > Note Ceph : l'accès au stockage RBD/CephFS passe par le **kubelet** (montage
 > noyau), pas par le réseau pod — il n'est donc PAS bloqué par ces policies et
