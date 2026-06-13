@@ -17,4 +17,5 @@ composant…).
 
 Le site est publié sur
 [univ-lehavre.github.io/cluster](https://univ-lehavre.github.io/cluster/). Suivi
-d'avancement du durcissement : [`STATUS.md`](../STATUS.md).
+d'avancement : les plans de mise en œuvre ([`docs/plans/`](plans/), ADR 0057) et
+les passages d'audit datés ([`docs/audit/`](audit/), ADR 0058).
