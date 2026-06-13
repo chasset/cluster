@@ -19,10 +19,15 @@ requires-python = ">=3.12"
 #                coup par la pré-tâche `pip`) pour que `uv sync` provisionne un
 #                contrôleur reproductible — banc ET prod, y compris sur un macOS
 #                « externally-managed » où le `pip` système échoue (#277).
+#   jinja2     : moteur de rendu de l'outil déclaratif `cluster_topology` (ADR
+#                0056) — le générateur rend l'inventaire/les group_vars depuis
+#                topology.yaml via des templates Jinja2 (même moteur qu'Ansible,
+#                zéro coût de diversité, ADR 0049/0061). Adoption posture ADR 0061.
 dependencies = [
     "pyyaml>=6,<7",
     "kubernetes>=31,<37",
     "certifi",
+    "jinja2>=3,<4",
 ]
 
 [dependency-groups]
