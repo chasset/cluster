@@ -25,7 +25,7 @@
 #   test/lima/run-phases.sh dataops        # chaîne DataOps via Ansible (dataops.yaml) + lineage (#173/#148)
 #   test/lima/run-phases.sh gitops         # socle GitOps : Gitea + Argo CD via Ansible (gitops.yaml) + gate Ready (#230)
 #   test/lima/run-phases.sh gitops-seed    # init dépôt Gitea : org/repo + workflow jouet + webhook + Application atlas (#231)
-#   test/lima/run-phases.sh monitoring     # observabilité (Prometheus + Grafana + Loki), profil selon WITH_CEPH
+#   test/lima/run-phases.sh monitoring     # observabilité (Prometheus + Grafana + Loki), profil auto-détecté
 #   ── Chemins d'installation nommés (ADR 0045) ──
 #   test/lima/run-phases.sh socle          # up → bootstrap → stockage (smoke rapide)
 #   test/lima/run-phases.sh atlas          # socle léger → metrics-server → monitoring → gitops → dataops → gitops-seed (banc atlas, local-path)
@@ -253,6 +253,32 @@ preflight() {
 # (set_default_sc : SUPPRIMÉ — le marquage « exactement 1 SC default » est porté
 #  dans les rôles Ansible platform-local-path et platform-ceph-storageclasses,
 #  ADR 0049. Anti-double-source.)
+
+# detect_storage_profile : DÉRIVE le profil de stockage de l'ÉTAT RÉEL du cluster
+# (ADR 0065 : un état se détecte, il ne se re-saisit pas — drift L44 / #319). Pose
+# STORAGE_SC / STORAGE_BACKING / STORAGE_ENDPOINT / STORAGE_APPLY_GW selon la
+# StorageClass présente, AU LIEU de brancher sur WITH_CEPH dans chaque phase
+# post-bootstrap (monitoring/dataops/gitops). Détection FIABLE ou refus franc :
+# pas de profil par défaut silencieux (la leçon de L44).
+#   - SC `rook-ceph-block-replicated` présente → profil Ceph (RGW, gateway) ;
+#   - SC `local-path` présente → profil léger (SeaweedFS, pas de gateway) ;
+#   - aucune des deux → die (socle non monté ? cluster injoignable ?).
+detect_storage_profile() {
+    if "${KUBECTL[@]}" get sc rook-ceph-block-replicated -o name > /dev/null 2>&1; then
+        STORAGE_SC=rook-ceph-block-replicated
+        STORAGE_BACKING=rgw
+        STORAGE_ENDPOINT=http://rook-ceph-rgw-datalake.rook-ceph:80
+        STORAGE_APPLY_GW=true
+    elif "${KUBECTL[@]}" get sc local-path -o name > /dev/null 2>&1; then
+        STORAGE_SC=local-path
+        STORAGE_BACKING=seaweedfs
+        STORAGE_ENDPOINT=http://seaweedfs.s3.svc.cluster.local:8333
+        STORAGE_APPLY_GW=false
+    else
+        die "profil de stockage indétectable : ni la SC 'rook-ceph-block-replicated' ni 'local-path' (socle monté ? cluster joignable ?)"
+    fi
+    log "  profil détecté : storageClass=${STORAGE_SC}, backing S3=${STORAGE_BACKING} (${STORAGE_ENDPOINT})"
+}
 
 # Gate commun : crée un PVC test sur la SC $1 (défaut si vide) et vérifie Bound.
 gate_test_pvc() {
@@ -912,35 +938,25 @@ phase_dataops() {
     # build_emitter_image=true : le banc build aussi l'émetteur OpenLineage jetable
     # (harnais e2e, ADR 0022) requis par la preuve lineage ci-dessous — JAMAIS en
     # prod (défaut false). Drift L31.
-    # Profil de stockage/backing par topologie (ADR 0035/0036), comme monitoring :
-    #   - mode Ceph (WITH_CEPH=1) : storageClass rook-ceph ; backups CNPG → RGW.
-    #   - mode léger (défaut)      : storageClass local-path ; backups CNPG →
-    #     SeaweedFS (déployé par la phase monitoring). Permet la chaîne DataOps
-    #     SANS Ceph (banc léger, ADR 0036).
+    # Profil de stockage/backing DÉTECTÉ du cluster (ADR 0035/0036/0065), comme
+    # monitoring : SC rook-ceph présente → Ceph (backups CNPG → RGW) ; sinon
+    # local-path → léger (backups CNPG → SeaweedFS, posé par `monitoring`). Permet
+    # la chaîne DataOps SANS Ceph (banc léger, ADR 0036).
     # DÉPENDANCE (ADR 0045) : en mode léger, `dataops` ne déploie PAS SeaweedFS —
     # il en CONSOMME l'endpoint. Le backing doit donc être posé AVANT (par
     # `monitoring`). Les chemins `atlas`/`cluster` garantissent cet ordre ;
     # lancer `dataops` seul en léger sans `monitoring` préalable échouerait.
-    local sc backing endpoint
-    if [ "${WITH_CEPH:-0}" = 1 ]; then
-        sc=rook-ceph-block-replicated
-        backing=rgw
-        endpoint=http://rook-ceph-rgw-datalake.rook-ceph:80
-    else
-        sc=local-path
-        backing=seaweedfs
-        endpoint=http://seaweedfs.s3.svc.cluster.local:8333
-    fi
-    log "  storageClass=${sc}, backing S3 CNPG=${backing} (${endpoint})"
+    # Profil DÉTECTÉ du cluster (ADR 0065 — plus de WITH_CEPH, #319/drift L44).
+    detect_storage_profile
 
     KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
         "${REPO}/bootstrap/dataops.yaml" \
         -e dataops_k8s_host=localhost \
         -e build_emitter_image=true \
-        -e "registry_storage_class=${sc}" \
-        -e "cnpg_storage_class=${sc}" \
-        -e "cnpg_s3_backing=${backing}" \
-        -e "cnpg_s3_endpoint=${endpoint}" \
+        -e "registry_storage_class=${STORAGE_SC}" \
+        -e "cnpg_storage_class=${STORAGE_SC}" \
+        -e "cnpg_s3_backing=${STORAGE_BACKING}" \
+        -e "cnpg_s3_endpoint=${STORAGE_ENDPOINT}" \
         || die "dataops.yaml : échec du déploiement de la chaîne"
     ok "chaîne DataOps déployée (Ansible) — CNPG sain, Dagster + Marquez Ready"
 
@@ -975,25 +991,18 @@ phase_gitops() {
     [ -f "${INVENTORY}" ] || die "inventaire absent — lancer 'bootstrap' d'abord"
     log "Phase gitops — socle GitOps via Ansible (Gitea → Argo CD)"
 
-    # storageClass du PVC Gitea + exposition UI : SUIVENT le profil du banc
-    # (comme dataops/monitoring) — WITH_CEPH=1 ⇒ stockage Ceph (sinon le PVC
-    # demande local-path, absent en mode Ceph → Gitea Pending). En mode Ceph,
-    # cert-manager est présent (posé par dataops, prérequis Barman) → on peut
-    # exposer l'UI Argo CD via Gateway ; en léger, non (pas de cert-manager garanti).
-    local sc apply_gw
-    if [ "${WITH_CEPH:-0}" = 1 ]; then
-        sc=rook-ceph-block-replicated
-        apply_gw=true
-    else
-        sc=local-path
-        apply_gw=false
-    fi
-    log "  gitea_storage_class=${sc}, argocd_apply_gateway=${apply_gw}"
+    # storageClass du PVC Gitea + exposition UI : SUIVENT le profil DÉTECTÉ du
+    # cluster (comme dataops/monitoring). SC rook-ceph présente → Ceph + Gateway UI
+    # (cert-manager présent, posé par dataops) ; sinon local-path → léger, pas de
+    # Gateway (cert-manager non garanti).
+    # Profil DÉTECTÉ du cluster (ADR 0065 — plus de WITH_CEPH, #319/drift L44).
+    detect_storage_profile
+    log "  argocd_apply_gateway=${STORAGE_APPLY_GW}"
     KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
         "${REPO}/bootstrap/gitops.yaml" \
         -e dataops_k8s_host=localhost \
-        -e "gitea_storage_class=${sc}" \
-        -e "argocd_apply_gateway=${apply_gw}" \
+        -e "gitea_storage_class=${STORAGE_SC}" \
+        -e "argocd_apply_gateway=${STORAGE_APPLY_GW}" \
         || die "gitops.yaml : échec du déploiement du socle GitOps"
     ok "socle GitOps déployé (Ansible) — Gitea + Argo CD Ready"
 
@@ -1043,9 +1052,9 @@ phase_access() {
 
 # ── Phase monitoring — observabilité (Prometheus + Grafana + Loki) ───────────
 # Déploie kube-prometheus-stack + Loki via bootstrap/monitoring.yaml (ADR
-# 0016/0036). Profil de stockage choisi selon le mode du banc :
-#   - mode Ceph (WITH_CEPH=1) : storageClass rook-ceph, Loki en profil s3 → RGW.
-#   - mode léger (défaut)      : storageClass local-path, Loki en s3 → SeaweedFS.
+# 0016/0036). Profil de stockage DÉTECTÉ du cluster (ADR 0065, plus de WITH_CEPH) :
+#   - SC rook-ceph présente : storageClass rook-ceph, Loki en profil s3 → RGW ;
+#   - sinon SC local-path   : storageClass local-path, Loki en s3 → SeaweedFS.
 # Le profil léger NE requiert PAS Ceph (testable en banc rapide, ADR 0035/0036).
 phase_monitoring() {
     preflight
@@ -1056,27 +1065,18 @@ phase_monitoring() {
     # Profil par topologie (ADR 0035/0036) : Loki est TOUJOURS en S3 (même code
     # que prod) ; seul le backing change — SeaweedFS en banc léger (S3 sans Ceph),
     # RGW Ceph en mode Ceph.
-    local sc backing endpoint
-    if [ "${WITH_CEPH:-0}" = 1 ]; then
-        sc=rook-ceph-block-replicated
-        backing=rgw
-        endpoint=http://rook-ceph-rgw-datalake.rook-ceph:80
-    else
-        sc=local-path
-        backing=seaweedfs
-        endpoint=http://seaweedfs.s3.svc.cluster.local:8333
-    fi
-    log "  storageClass=${sc}, backing S3 Loki=${backing} (${endpoint})"
+    # Profil DÉTECTÉ du cluster (ADR 0065 — plus de WITH_CEPH, #319/drift L44).
+    detect_storage_profile
 
     KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
         "${REPO}/bootstrap/monitoring.yaml" \
         -e dataops_k8s_host=localhost \
-        -e "monitoring_storage_class=${sc}" \
-        -e "loki_storage_class=${sc}" \
-        -e "loki_s3_backing=${backing}" \
-        -e "loki_s3_endpoint=${endpoint}" \
+        -e "monitoring_storage_class=${STORAGE_SC}" \
+        -e "loki_storage_class=${STORAGE_SC}" \
+        -e "loki_s3_backing=${STORAGE_BACKING}" \
+        -e "loki_s3_endpoint=${STORAGE_ENDPOINT}" \
         || die "monitoring.yaml : échec du déploiement de l'observabilité"
-    ok "🎉 observabilité déployée — Prometheus + Grafana + Loki (S3/${backing}) Ready"
+    ok "🎉 observabilité déployée — Prometheus + Grafana + Loki (S3/${STORAGE_BACKING}) Ready"
 }
 
 # Prédicats CNPG réutilisés par la phase (purs côté décision via dataops-assert.sh).

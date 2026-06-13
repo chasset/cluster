@@ -84,3 +84,4 @@ Format léger inspiré de Michael Nygard :
 | 0062 | [Cultures d'ingénierie revendiquées (principe-chapeau)](0062-cultures-ingenierie.md)                                                 | Accepted           |
 | 0063 | [`ansible-runner` pour la boucle « suggère → lance » (P5)](0063-ansible-runner-boucle-p5.md)                                         | Accepted           |
 | 0064 | [Longhorn comme option de stockage du catalogue (3ᵉ profil)](0064-longhorn-option-stockage-catalogue.md)                             | Proposed           |
+| 0065 | [Variables d'environnement : intention vs état détectable](0065-variables-env-intention-vs-etat.md)                                  | Accepted           |
