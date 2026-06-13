@@ -364,6 +364,21 @@ setup() {
     [ "$a" = "$b" ]
 }
 
+@test "atom/stuck : la dérivée (atlas-ceph) COUVRE chaque vrai kind de _STUCK_CR_KINDS" {
+    # Garde-fou de la bascule Lot 3 : quand component_stuck_cr_kinds remplacera
+    # _STUCK_CR_KINDS, la couverture ne doit pas régresser. On vérifie que chaque
+    # entrée de la liste figée qui est un VRAI kind (group.kind) est dérivée.
+    # EXCEPTION documentée : `objectbucket.io` SEUL (groupe API nu, pas un kind)
+    # est une redondance défensive de la figée — `obc.objectbucket.io` est le kind
+    # réel et il EST dérivé ; on ne réintroduit pas le groupe nu.
+    local derived kind
+    derived=$(component_stuck_cr_kinds $(component_expand_alias atlas-ceph))
+    for kind in ${_STUCK_CR_KINDS}; do
+        [ "$kind" = "objectbucket.io" ] && continue  # groupe nu, cf. ci-dessus
+        [[ "$derived" == *"$kind"* ]] || { echo "kind figé non dérivé : $kind"; false; }
+    done
+}
+
 # ─── component_known : catalogue ────────────────────────────────────────────
 
 @test "atom/known : cnpg-operator connu ; nom inconnu rejeté" {
