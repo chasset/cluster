@@ -284,20 +284,30 @@ detect_storage_profile() {
 # (ADR 0065 §2 : le durcissement est un état CONSTATABLE, pas un flag à re-saisir).
 # Constate via SSH (comme state.sh) les couches que phase_hardening pose sur le
 # banc (tags `audit,detection` → auditd + fail2ban) et pose HARDENING_STATE :
-#   - les deux actifs   → HARDENING_STATE=hardened (l'hôte EST durci → +hardening) ;
-#   - les deux inactifs → HARDENING_STATE=plain ;
-#   - illisible (hôte injoignable) → die (« détection fiable ou refus franc », L44) ;
-#   - état partiel      → die (durcissement incohérent à corriger, pas à deviner).
+#   - les deux actifs            → HARDENING_STATE=hardened (durci → +hardening) ;
+#   - les deux inactifs/absents  → HARDENING_STATE=plain ;
+#   - hôte INJOIGNABLE (SSH KO)  → die (« détection fiable ou refus franc », L44) ;
+#   - état PARTIEL (un seul actif) → die (durcissement incohérent à corriger).
 # WITH_HARDENING=1 reste l'INTENTION d'APPLIQUER sur un build neuf (run_hardening_
 # if_requested) ; cette détection sert à dériver le suffixe TARGET de la RÉALITÉ.
 detect_hardening_state() {
     local node="${CP}" auditd fail2ban verdict
-    auditd=$(vm_sh "${node}" systemctl is-active auditd 2> /dev/null || true)
-    fail2ban=$(vm_sh "${node}" systemctl is-active fail2ban 2> /dev/null || true)
-    # `systemctl is-active` rend `active`/`inactive`/`failed`/`unknown` — on
-    # normalise tout ce qui n'est pas `active`/`inactive` en `unknown` (illisible).
-    case "${auditd}" in active | inactive) : ;; *) auditd=unknown ;; esac
-    case "${fail2ban}" in active | inactive) : ;; *) fail2ban=unknown ;; esac
+    # 1. Sonder la JOIGNABILITÉ d'abord, séparément de l'état des unités : seul un
+    # hôte injoignable doit `die` (illisible). Un paquet de durcissement ABSENT
+    # (auditd/fail2ban non installé) est légitimement « inactif » → plain, pas
+    # `unknown` (sinon un hôte plain ferait échouer la détection selon la version
+    # de systemd qui rend ''/'unknown' pour une unité inconnue).
+    if ! vm_sh "${node}" true > /dev/null 2>&1; then
+        auditd=unknown
+        fail2ban=unknown
+    else
+        # SSH OK : `is-active` rend active/inactive/failed/unknown sur stdout. Tout
+        # ce qui n'est pas `active` (inactif, échoué, absent) compte comme inactif.
+        auditd=$(vm_sh "${node}" systemctl is-active auditd 2> /dev/null || true)
+        fail2ban=$(vm_sh "${node}" systemctl is-active fail2ban 2> /dev/null || true)
+        [ "${auditd}" = active ] || auditd=inactive
+        [ "${fail2ban}" = active ] || fail2ban=inactive
+    fi
     verdict=$(classify_hardening_signal "${auditd}" "${fail2ban}")
     case "${verdict%%|*}" in
         ok)
