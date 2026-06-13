@@ -23,11 +23,17 @@ requires-python = ">=3.12"
 #                0056) — le générateur rend l'inventaire/les group_vars depuis
 #                topology.yaml via des templates Jinja2 (même moteur qu'Ansible,
 #                zéro coût de diversité, ADR 0049/0061). Adoption posture ADR 0061.
+#   ansible-runner : pilote les playbooks bootstrap/*.yaml depuis Python avec
+#                des résultats structurés (rc, status, events) pour la boucle P5
+#                « suggère → lance » (ADR 0063). Lib officielle d'Ansible —
+#                écarte le subprocess+parse fragile que l'ADR 0056 combat ; seul
+#                cluster_topology/runner.py l'importe (couche d'exécution isolée).
 dependencies = [
     "pyyaml>=6,<7",
     "kubernetes>=31,<37",
     "certifi",
     "jinja2>=3,<4",
+    "ansible-runner>=2,<3",
 ]
 
 [dependency-groups]
