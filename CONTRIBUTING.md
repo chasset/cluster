@@ -44,13 +44,15 @@ Quatre natures d'écrits, quatre rôles non chevauchants — **un ADR DÉCIDE, u
 plan MET EN ŒUVRE, une issue EXÉCUTE, une PR LIVRE**
 ([ADR 0057](docs/decisions/0057-gouvernance-documentaire-adr-plan-issue.md)) :
 
-| Trace     | Où                | Rôle                                                                                                                                       |
-| --------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **ADR**   | `docs/decisions/` | **Décide** (le _pourquoi_) — structurante, numérotée, **immuable**.                                                                        |
-| **Plan**  | `docs/plans/`     | **Met en œuvre** une décision (paliers + suivi) — thématique, **vivant**.                                                                  |
-| **Issue** | GitHub            | **Exécute** — unité de travail fermable.                                                                                                   |
-| **PR**    | GitHub            | **Livre** un changement + sa preuve, ferme une issue / coche un palier.                                                                    |
-| **Audit** | `docs/audit/`     | **Mesure** l'écart à un standard — grille permanente + passages datés ([ADR 0058](docs/decisions/0058-doctrine-audit-grille-passages.md)). |
+| Trace              | Où                                         | Rôle                                                                                                                                                                                                                                                                                  |
+| ------------------ | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **ADR**            | `docs/decisions/`                          | **Décide** (le _pourquoi_) — structurante, numérotée, **immuable**.                                                                                                                                                                                                                   |
+| **Plan**           | `docs/plans/`                              | **Met en œuvre** une décision (paliers + suivi) — thématique, **vivant**.                                                                                                                                                                                                             |
+| **Issue**          | GitHub                                     | **Exécute** — unité de travail fermable.                                                                                                                                                                                                                                              |
+| **PR**             | GitHub                                     | **Livre** un changement + sa preuve, ferme une issue / coche un palier.                                                                                                                                                                                                               |
+| **Audit**          | `docs/audit/`                              | **Mesure** l'écart à un standard — grille permanente + passages datés ([ADR 0058](docs/decisions/0058-doctrine-audit-grille-passages.md)).                                                                                                                                            |
+| **Drift**          | `docs/architecture/registre-drifts.yaml`   | **Capture** un écart révélé par un run e2e (`Lnn` indexé) — trace empirique datée, `ouvert` ⇒ issue liée ([ADR 0058](docs/decisions/0058-doctrine-audit-grille-passages.md) §6).                                                                                                      |
+| **Preuve de banc** | `test/lima/RESULTS.md` + `test/scenarios/` | **Valide** par un run e2e from-scratch (ADR [0034](docs/decisions/0034-validation-e2e-from-scratch.md)/[0052](docs/decisions/0052-reproductibilite-des-resultats.md)) — la trace empirique **mère** (les drifts en naissent) ; fraîcheur surveillée par `bench-freshness` (ADR 0042). |
 
 **Le test de découpe (par temporalité,
 [ADR 0057](docs/decisions/0057-gouvernance-documentaire-adr-plan-issue.md))** :
@@ -65,9 +67,13 @@ Règles :
   immuable, un déroulé évolue). Un ADR purement conceptuel peut n'avoir aucun
   plan. Le plan **référence l'ADR qui le fonde** en en-tête.
 - **Plans THÉMATIQUES et vivants** : `plan-<thème>.md` (pas daté). Chaque plan
-  porte une section **« Suivi »** : paliers (cases à cocher), **issues créées**
-  (liens `#NNN`), **état d'achèvement** global, renvoi aux runs de preuve
-  (`RESULTS.md`). Le plan est le **tableau de bord** d'une décision.
+  porte (1) un **en-tête `## État`** (Brouillon / Actif / Achevé / Abandonné,
+  daté, comme l'ADR a son `## Statut`) et (2) une section **« Suivi »** :
+  paliers (cases à cocher), **issues rattachées** (`#NNN`, créées ou
+  préexistantes adoptées), renvoi aux runs de preuve (`RESULTS.md`). Le plan est
+  le **tableau de bord** d'une décision. **`Proposed` ⇒ pas d'implémentation** :
+  un plan ne passe `Actif` (code mergeable) qu'une fois l'ADR fondateur
+  **`Accepted`**.
 - **Audit = grille permanente + passages datés**
   ([ADR 0058](docs/decisions/0058-doctrine-audit-grille-passages.md)) : la
   grille (dimensions/critères/méthode) ne périme pas ; un passage est daté
