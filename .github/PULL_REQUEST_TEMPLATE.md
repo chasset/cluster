@@ -38,7 +38,8 @@ Closes #
 - [ ] `pnpm lint:k8s` / `ansible-lint` passent si manifestes/rôles modifiés
 - [ ] Décision de conception tracée en ADR si structurante (`docs/decisions/`)
 - [ ] Validé sur le banc si changement d'infra (ou raison expliquée)
-- [ ] `STATUS.md` mis à jour si un item d'audit avance (avec horodatage)
+- [ ] Plan/passage d'audit mis à jour si un item avance (`docs/plans/` ADR 0057,
+      `docs/audit/` ADR 0058)
 
 ## Notes pour la revue
 
