@@ -23,6 +23,7 @@ Usage :
   uv run python scripts/topology.py stack ls                              (calque pulumi stack)
   uv run python scripts/topology.py stack select <nom>
   uv run python scripts/topology.py stack validate [-f topology.yaml]
+  uv run python scripts/topology.py stack refresh             (calque pulumi refresh)
   uv run python scripts/topology.py generate [--kind prod|lima] [--what inventory|run-params]
   uv run python scripts/topology.py status [--real [--hosts cp1 node1]]
   uv run python scripts/topology.py diff [--kind prod|lima --against PATH]
@@ -61,6 +62,7 @@ import argparse
 import datetime as dt
 import difflib
 import glob
+import json
 import os
 import subprocess
 import sys
@@ -77,6 +79,7 @@ from cluster_topology import (  # noqa: E402
     TopologyError,
     build_topology_dict,
     catalog_entry,
+    classify_refresh,
     default_target,
     derive_run_params,
     diff_phases,
@@ -112,6 +115,9 @@ _EXAMPLE_TOPOLOGY = os.path.join(_CATALOG_DIR, "socle.example.yaml")
 _PROD_INVENTORY = os.path.join(_ROOT, "bootstrap", "hosts.example.yaml")
 _STATE_SH = os.path.join(_ROOT, "bootstrap", "state.sh")
 _RUNS_HISTORY = os.path.join(_ROOT, "test", "lima", "runs-history.yaml")
+# Borne l'attente de `stack refresh` sur limactl/kubectl : un cluster injoignable ou
+# un démon Lima bloqué ne doit JAMAIS figer le refresh (leçon du timeout ha._vm_exec).
+_REFRESH_TIMEOUT_S = 8
 # Chemins nommés connus de l'historique (ADR 0045 §6) pour le verdict par chemin.
 _CHEMINS_NOMMES = ["atlas", "storage-real", "cluster-dataops"]
 
@@ -378,6 +384,92 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
     return 0
 
 
+def _real_vms() -> list[str]:
+    """Noms des VMs Lima EXISTANTES (toute stack), via `limactl list --format json`.
+
+    Lecture seule du réel (ADR 0056 §7 : on ne stocke pas de state, on le lit). Une
+    sortie illisible / `limactl` absent → liste vide (le refresh reste informatif,
+    il ne plante pas le poste sans Lima)."""
+    try:
+        out = subprocess.run(  # noqa: S603 — argv fixe, pas d'entrée shell
+            ["limactl", "list", "--format", "json"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=_REFRESH_TIMEOUT_S,
+        )
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return []
+    vms = []
+    for line in out.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        # On ne retient que les VMs RUNNING (une VM Stopped n'occupe pas le cluster).
+        if obj.get("status") == "Running" and obj.get("name"):
+            vms.append(obj["name"])
+    return vms
+
+
+def _ready_nodes() -> list[str]:
+    """Noms des nœuds k8s à l'état Ready (`kubectl get nodes`). Vide si injoignable."""
+    kubeconfig = os.environ.get("KUBECONFIG")
+    try:
+        out = subprocess.run(  # noqa: S603 — argv fixe, pas d'entrée shell
+            # --request-timeout borne l'attente côté kubectl (cluster injoignable) ;
+            # `timeout=` borne le subprocess lui-même (double garde-fou anti-blocage).
+            ["kubectl", "get", "nodes", "--no-headers", "--request-timeout=5s"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={**os.environ, **({"KUBECONFIG": kubeconfig} if kubeconfig else {})},
+            timeout=_REFRESH_TIMEOUT_S,
+        )
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return []
+    ready = []
+    for ln in out.stdout.splitlines():
+        cols = ln.split()
+        # format : NAME STATUS ROLES AGE VERSION ; STATUS == "Ready" (pas NotReady).
+        if len(cols) >= 2 and cols[1] == "Ready":
+            ready.append(cols[0])
+    return ready
+
+
+def cmd_stack_refresh(args: argparse.Namespace) -> int:
+    """`stack refresh` : resynchronise l'état RÉEL de la stack active depuis le réel.
+
+    Calque `pulumi refresh` : lit les VMs Lima (`limactl`) + les nœuds k8s (`kubectl`)
+    et CLASSE (classify_refresh, pur) l'état de la stack active : VMs présentes, VMs
+    ORPHELINES (réelles mais hors stack → à détruire d'abord), VMs manquantes (à créer),
+    nœuds Ready. Read-only : ne STOCKE aucun state (ADR 0056 §7), ne lance rien. Code 0
+    toujours (informatif). C'est la base que `preview` consomme pour dire quoi détruire
+    avant d'installer."""
+    path = _resolve(args.file)
+    topo = load_topology(path)
+    stack = topo.catalog.get("topology", "—")
+    declared = topo.control_nodes + topo.worker_nodes
+    state = classify_refresh(stack, declared, _real_vms(), _ready_nodes())
+
+    print(f"stack : {stack}  (état réel lu — non stocké, ADR 0056 §7)")
+    if state.vms_orphan:
+        print(
+            f"  ⚠ VMs ORPHELINES (hors stack, à détruire d'abord) : {', '.join(state.vms_orphan)}"
+        )
+    print(f"  VMs de la stack présentes : {', '.join(state.vms_present) or '—'}")
+    print(f"  VMs à créer (déclarées, absentes) : {', '.join(state.vms_missing) or '—'}")
+    print(f"  nœuds k8s Ready : {', '.join(state.nodes_ready) or '—'}")
+    if state.is_empty:
+        print("→ terrain vierge (aucune VM) — montage propre depuis zéro.")
+    elif state.must_destroy_first:
+        print("→ détruire les VMs orphelines avant un montage propre de cette stack.")
+    return 0
+
+
 def _active_target_rel() -> str | None:
     """Cible du symlink d'activation `topology.yaml` (chemin relatif), ou None.
 
@@ -419,9 +511,9 @@ def cmd_stack_ls(args: argparse.Namespace) -> int:
 
 
 def cmd_stack(args: argparse.Namespace) -> int:
-    """Routeur du groupe `stack` (new | ls | select | validate). Façade de dispatch.
+    """Routeur du groupe `stack` (new | ls | select | validate | refresh). Façade de dispatch.
 
-    Calque `pulumi stack`. argparse garantit `stack_cmd` ∈ {new, ls, select, validate}
+    Calque `pulumi stack`. argparse garantit `stack_cmd` ∈ {new, ls, select, validate, refresh}
     (sous-parser `required`) — on route vers la façade dédiée. Un `stack` sans verbe
     est une erreur d'usage (argparse l'arrête en amont avec le help du groupe)."""
     return _STACK_DISPATCH[args.stack_cmd](args)
@@ -884,6 +976,7 @@ _STACK_DISPATCH = {
     "ls": cmd_stack_ls,
     "select": cmd_stack_select,
     "validate": cmd_stack_validate,
+    "refresh": cmd_stack_refresh,
 }
 
 _DISPATCH = {
@@ -945,7 +1038,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # `new` top-level — on n'a pas de notion de « projet » Pulumi, donc créer = créer
     # une STACK (verbe du groupe), pas un projet.
     p_stack = sub.add_parser(
-        "stack", help="gère les stacks (new | ls | select | validate) — calque `pulumi stack`"
+        "stack",
+        help="gère les stacks (new | ls | select | validate | refresh) — calque `pulumi stack`",
     )
     stack_sub = p_stack.add_subparsers(dest="stack_cmd", required=True)
 
@@ -980,6 +1074,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_stack_val = stack_sub.add_parser("validate", help="valide le schéma d'une topologie")
     _add_file(p_stack_val)
+
+    p_stack_ref = stack_sub.add_parser(
+        "refresh", help="resynchronise l'état réel (VMs Lima + nœuds k8s) — calque `pulumi refresh`"
+    )
+    _add_file(p_stack_ref)
 
     p_gen = sub.add_parser("generate", help="dérive un artefact (inventaire ou run-params)")
     _add_file(p_gen)

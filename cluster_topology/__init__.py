@@ -31,6 +31,7 @@ from cluster_topology.plan import (
     suggest_next,
 )
 from cluster_topology.profile import derive_run_params
+from cluster_topology.refresh import RefreshState, classify_refresh
 from cluster_topology.roundtrip import RoundtripResult, run_roundtrip
 from cluster_topology.scaffold import (
     QUESTION_LB_MODE,
@@ -69,6 +70,8 @@ __all__ = [
     "format_metrics",
     "RoundtripResult",
     "run_roundtrip",
+    "RefreshState",
+    "classify_refresh",
     "InitPlan",
     "Question",
     "QUESTIONS",
