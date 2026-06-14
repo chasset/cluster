@@ -19,6 +19,7 @@ from cluster_topology.plan import (  # noqa: E402
     default_target,
     diff_phases,
     expected_phase_sequence,
+    phase_label,
     suggest_next,
 )
 
@@ -235,6 +236,16 @@ class PhaseTable(unittest.TestCase):
             phases.update(expected_phase_sequence(topo_ceph, tgt))
         phases.update(expected_phase_sequence(topo_light, "atlas"))
         self.assertTrue(phases.issubset(set(PHASE_PLAYBOOK)))
+
+    def test_phase_label_is_human_readable(self):
+        # Libellé métier pour preview : up → « créer les VMs », bootstrap → k8s+CNI.
+        self.assertEqual(phase_label("up"), "créer les VMs")
+        self.assertIn("Kubernetes", phase_label("bootstrap"))
+        self.assertIn("local-path", phase_label("storage-simple"))
+
+    def test_phase_label_falls_back_to_name(self):
+        # Phase inconnue de la table → repli sur le nom (pas de masquage).
+        self.assertEqual(phase_label("frobnicate"), "frobnicate")
 
 
 if __name__ == "__main__":

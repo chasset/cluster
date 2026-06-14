@@ -28,6 +28,7 @@ from cluster_topology.plan import (
     default_target,
     diff_phases,
     expected_phase_sequence,
+    phase_label,
     suggest_next,
 )
 from cluster_topology.profile import derive_run_params
@@ -64,6 +65,7 @@ __all__ = [
     "default_target",
     "diff_phases",
     "expected_phase_sequence",
+    "phase_label",
     "suggest_next",
     "RunMetrics",
     "metrics_of",

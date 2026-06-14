@@ -326,15 +326,15 @@ runs:
       ceph: 1
       sc: 1
 """
-    # Run frais d'une AUTRE topologie (multi-node-3) → ne doit PAS être attribué à
-    # _EXAMPLE (multi-node-4). Régression du bug « preview faux avec 1cp ».
-    _OTHER_TOPO_FRESH = f"""\
+    # Run PÉRIMÉ de _EXAMPLE (date vieille → freshness=perime, pas jamais) : le socle
+    # est « déjà monté mais pas frais » → « à rejouer », distinct de l'inédit.
+    _SOCLE_STALE = """\
 runs:
   - id: r1
-    date: {dt_today()}
+    date: 2020-01-01T00:00:00Z
     target: atlas-ceph
     profil: ceph
-    topologie: multi-node-3
+    topologie: multi-node-4
     phases:
       up: 1
       bootstrap: 1
@@ -342,32 +342,60 @@ runs:
       sc: 1
 """
 
-    def test_shows_full_sequence_with_states(self):
-        # Historique frais partiel → début à-jour, suite à jouer ; TOUTE la séquence
-        # est affichée (vs `next` qui ne montre que la 1re manquante).
+    def setUp(self):
+        # Stub de l'I/O réelle (limactl/kubectl) : les tests preview NE dépendent PAS
+        # du banc réel. Sans VM réelle, pas d'orphelin parasite dans la sortie.
+        self._orig_vms, self._orig_ready = cli._real_vms, cli._ready_nodes
+        cli._real_vms = lambda: []
+        cli._ready_nodes = lambda: []
+        self.addCleanup(setattr, cli, "_real_vms", self._orig_vms)
+        self.addCleanup(setattr, cli, "_ready_nodes", self._orig_ready)
+
+    def test_shows_full_sequence_with_labels(self):
+        # Historique frais partiel → socle à-jour, queue à installer ; libellés MÉTIER.
         hist = _tmp(self._SOCLE_FRESH)
         self.addCleanup(os.unlink, hist)
         code, out, _ = _capture(
             ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
         )
         self.assertEqual(code, 0)
-        # Socle joué = à-jour ; datalake/monitoring/… = à jouer.
-        self.assertIn("up", out)
-        self.assertIn("à-jour", out)
-        self.assertIn("à jouer", out)
-        self.assertIn("datalake", out)  # phase de queue, présente dans le plan complet
-        self.assertIn("à appliquer", out)
+        self.assertIn("créer les VMs", out)  # libellé métier de `up`
+        self.assertIn("à-jour", out)  # socle joué
+        self.assertIn("à installer", out)  # queue
+        self.assertIn("datalake", out)  # libellé de queue présent (plan complet)
 
-    def test_no_run_replays_whole_sequence(self):
-        # Pas de run frais (historique vide) → toute la séquence en `rejeu`.
+    def test_never_run_is_a_installer_not_rejeu(self):
+        # Stack jamais montée (historique vide) → « à installer » (inédit), PAS « rejeu ».
         hist = _tmp(self._EMPTY_HIST)
         self.addCleanup(os.unlink, hist)
         code, out, _ = _capture(
             ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
         )
         self.assertEqual(code, 0)
-        self.assertIn("rejeu", out)
+        self.assertIn("à installer", out)
+        self.assertNotIn("rejouer", out)  # jamais monté ≠ rejeu
+
+    def test_stale_run_is_a_rejouer(self):
+        # Run PÉRIMÉ (date 2020) → « à rejouer » (déjà monté mais pas frais).
+        hist = _tmp(self._SOCLE_STALE)
+        self.addCleanup(os.unlink, hist)
+        code, out, _ = _capture(
+            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
+        )
+        self.assertEqual(code, 0)
         self.assertIn("à rejouer", out)
+
+    def test_orphan_vms_listed_to_destroy(self):
+        # Des VMs réelles hors stack → preview les liste « à détruire d'abord ».
+        cli._real_vms = lambda: ["cp9", "cp8"]
+        hist = _tmp(self._EMPTY_HIST)
+        self.addCleanup(os.unlink, hist)
+        code, out, _ = _capture(
+            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("détruire", out)
+        self.assertIn("cp9", out)
 
     def test_never_launches(self):
         # preview est READ-ONLY : le runner ansible n'est JAMAIS appelé.
@@ -382,16 +410,16 @@ runs:
 
     def test_other_topology_run_not_attributed(self):
         # RÉGRESSION (bug « preview faux avec 1cp ») : un run frais d'une AUTRE stack
-        # (multi-node-3) ne doit PAS rendre _EXAMPLE (multi-node-4) « à-jour ». Le
-        # match est par NOM de stack, sans retombée sur le dernier run global.
-        hist = _tmp(self._OTHER_TOPO_FRESH)
-        self.addCleanup(os.unlink, hist)
+        # ne doit PAS rendre _EXAMPLE « à-jour ». Match par NOM de stack, sans
+        # retombée globale → tout reste « à installer ».
+        other = _tmp(self._SOCLE_FRESH.replace("multi-node-4", "multi-node-3"))
+        self.addCleanup(os.unlink, other)
         code, out, _ = _capture(
-            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
+            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", other]
         )
         self.assertEqual(code, 0)
-        self.assertNotIn("rien à appliquer", out)  # NE doit PAS croire la stack à-jour
-        self.assertIn("à rejouer", out)  # aucun run de CETTE stack → tout à rejouer
+        self.assertNotIn("rien à appliquer", out)
+        self.assertIn("à installer", out)  # aucun run de CETTE stack → inédit
 
     def test_incoherent_target_is_usage_error(self):
         # atlas sur backend ceph (incohérent) → erreur d'usage (code 2), comme `next`.

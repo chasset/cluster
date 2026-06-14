@@ -32,28 +32,69 @@ from cluster_topology.model import Topology
 @dataclass(frozen=True)
 class PhaseSpec:
     playbook: str | None  # chemin relatif au repo, ou None si pas un play unitaire
-    note: str = ""
+    note: str = ""  # note DÉVELOPPEUR (diagnostic --apply : « script, pas un play »…)
+    label: str = ""  # libellé MÉTIER lisible de la couche installée (pour `preview`)
 
 
 PHASE_PLAYBOOK: dict[str, PhaseSpec] = {
-    "up": PhaseSpec(None, "provision Lima (script, pas un play)"),
-    "bootstrap": PhaseSpec(None, "socle k8s complet (enchaînement de plays)"),
-    "ceph": PhaseSpec("bootstrap/ceph-cluster.yaml", "operator + cluster Rook-Ceph"),
-    "sc": PhaseSpec("bootstrap/ceph-storageclasses.yaml", "StorageClasses Ceph"),
-    "storage-simple": PhaseSpec("bootstrap/local-path.yaml", "local-path provisioner"),
-    "metrics-server": PhaseSpec("bootstrap/metrics-server.yaml"),
-    "datalake": PhaseSpec("bootstrap/ceph-datalake.yaml", "RGW + bucket datalake"),
-    "monitoring": PhaseSpec("bootstrap/monitoring.yaml", "kube-prometheus-stack + Loki"),
-    "gitops": PhaseSpec("bootstrap/gitops.yaml", "Gitea + Argo CD"),
-    "dataops": PhaseSpec("bootstrap/dataops.yaml", "registry + CNPG + Dagster + Marquez"),
-    "gitops-seed": PhaseSpec(None, "init Gitea (données, ADR 0044 — script)"),
+    "up": PhaseSpec(None, "provision Lima (script, pas un play)", "créer les VMs"),
+    "bootstrap": PhaseSpec(
+        None, "socle k8s complet (enchaînement de plays)", "Kubernetes + CNI Cilium"
+    ),
+    "bootstrap-ha": PhaseSpec(
+        None, "amorçage HA (kube-vip + init derrière la VIP)", "Kubernetes HA (kube-vip)"
+    ),
+    "join-cp": PhaseSpec(
+        None, "promotion des CP additionnels (join + quorum etcd)", "control-planes additionnels"
+    ),
+    "ceph": PhaseSpec(
+        "bootstrap/ceph-cluster.yaml", "operator + cluster Rook-Ceph", "stockage Ceph (Rook)"
+    ),
+    "sc": PhaseSpec(
+        "bootstrap/ceph-storageclasses.yaml", "StorageClasses Ceph", "StorageClasses Ceph"
+    ),
+    "storage-simple": PhaseSpec(
+        "bootstrap/local-path.yaml", "local-path provisioner", "stockage local-path"
+    ),
+    "metrics-server": PhaseSpec(
+        "bootstrap/metrics-server.yaml", "", "metrics-server (kubectl top)"
+    ),
+    "datalake": PhaseSpec(
+        "bootstrap/ceph-datalake.yaml", "RGW + bucket datalake", "datalake S3 (RGW)"
+    ),
+    "monitoring": PhaseSpec(
+        "bootstrap/monitoring.yaml",
+        "kube-prometheus-stack + Loki",
+        "observabilité (Prometheus + Grafana + Loki)",
+    ),
+    "gitops": PhaseSpec("bootstrap/gitops.yaml", "Gitea + Argo CD", "GitOps (Gitea + Argo CD)"),
+    "dataops": PhaseSpec(
+        "bootstrap/dataops.yaml",
+        "registry + CNPG + Dagster + Marquez",
+        "DataOps (registry + CNPG + Dagster + Marquez)",
+    ),
+    "gitops-seed": PhaseSpec(
+        None, "init Gitea (données, ADR 0044 — script)", "init GitOps (seed Gitea)"
+    ),
     # hardening lance bootstrap/security/secure.yml AVEC --tags audit,detection et
     # un préflight d'env (phase_hardening, run-phases.sh) que `--apply` ne pose pas
     # — non lançable comme play unitaire ici, déléguée au chemin nommé run-phases.sh.
-    "hardening": PhaseSpec(None, "durcissement hôte (secure.yml + tags/env, via run-phases.sh)"),
-    "smoke-s3": PhaseSpec(None, "épreuve S3 jetable (harnais)"),
-    "wordpress": PhaseSpec(None, "montage WordPress jetable (harnais)"),
+    "hardening": PhaseSpec(
+        None, "durcissement hôte (secure.yml + tags/env, via run-phases.sh)", "durcissement hôte"
+    ),
+    "smoke-s3": PhaseSpec(None, "épreuve S3 jetable (harnais)", "épreuve S3 (jetable)"),
+    "wordpress": PhaseSpec(None, "montage WordPress jetable (harnais)", "WordPress (jetable)"),
 }
+
+
+def phase_label(phase: str) -> str:
+    """Libellé MÉTIER lisible d'une phase (couche installée), pour `preview`.
+
+    Repli sur le nom technique si aucun label n'est défini (phase inconnue de la
+    table) — préserve l'information plutôt que de masquer."""
+    spec = PHASE_PLAYBOOK.get(phase)
+    return spec.label if spec and spec.label else phase
+
 
 # ── Séquences ordonnées des chemins nommés (transcription de run-phases.sh) ──
 # Le socle de BASE = up → bootstrap (k8s + CNI SEULS). Le STOCKAGE n'en fait PAS

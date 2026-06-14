@@ -89,6 +89,7 @@ from cluster_topology import (  # noqa: E402
     load_runs,
     load_topology,
     metrics_of,
+    phase_label,
     plan_init,
     render_lima_inventory,
     render_prod_inventory,
@@ -699,15 +700,17 @@ def _run_for_target(runs, target: str | None):
 def cmd_preview(args: argparse.Namespace) -> int:
     """`preview` : montre le PLAN complet (voulu → réel) sans rien appliquer.
 
-    Calque `pulumi preview` : affiche TOUTE la séquence de phases du chemin dérivé
-    de la stack active (expected_phase_sequence), et pour chacune son état confronté
-    au dernier run (history) : `✓ à-jour`, `+ à jouer` (manquante), `~ rejeu` (pas de
-    run frais → toute la séquence rejoue). Read-only : ne LANCE rien (l'application
-    reste `next --apply`, décision humaine, ADR 0063). Code 0 toujours (informatif) ;
-    PlanError (chemin incohérent avec le backend) → usage (2).
+    Calque `pulumi preview`. Confronte la stack active au RÉEL (VMs Lima existantes
+    → ce qu'il faut DÉTRUIRE d'abord) ET liste TOUTE la séquence de couches à monter,
+    chacune avec son libellé MÉTIER (phase_label) et son état :
+    - `- détruire`  : VMs orphelines d'une autre stack (à retirer avant un montage propre) ;
+    - `+ à installer`: couche jamais montée (stack neuve — on n'a JAMAIS joué l'inédit) ;
+    - `~ à rejouer`  : couche d'un run PÉRIMÉ (déjà montée mais run plus frais) ;
+    - `✓ à-jour`     : couche présente et fraîche.
 
-    Là où `next` ne montre QUE le 1er drift, `preview` montre le plan ENTIER —
-    le « ce qui changerait si on appliquait » de Pulumi.
+    Read-only : ne LANCE rien, ne DÉTRUIT rien (`next --apply` applique ; détruire = down/
+    destroy). Code 0 toujours (informatif) ; chemin incohérent avec le backend → usage (2).
+    Là où `next` ne montre QUE le 1er drift, `preview` montre le plan ENTIER.
     """
     path = _resolve(args.file)
     topo = load_topology(path)
@@ -722,27 +725,43 @@ def cmd_preview(args: argparse.Namespace) -> int:
     stack_name = topo.catalog.get("topology", "—")
     # Le run de référence est celui de CETTE stack (match par nom, PAS de retombée
     # sur le dernier run global) : une stack jamais montée (status: cible, aucun run
-    # à son nom) n'hérite pas du verdict d'une autre topologie — tout est à jouer.
+    # à son nom) n'hérite pas du verdict d'une autre topologie — tout est à installer.
     run = last_run_for_topology(runs, stack_name)
     freshness, _ = verdict_for_run(run, resolved_target, now)
     done = set(run.phases) if run is not None else set()
-    # Phases restant à appliquer (mêmes règles que `next` : rejeu si pas de run frais).
     a_appliquer = set(diff_phases(seq, done, freshness))
-    rejeu = freshness in ("perime", "jamais")
+    # jamais monté ≠ rejeu : `jamais` (aucun run de la stack) → « à installer » (inédit) ;
+    # `perime` (run existant mais plus frais) → « à rejouer ».
+    rejeu = freshness == "perime"
+    inedit = freshness == "jamais"
+
+    # État réel : les VMs ORPHELINES (d'une autre stack) à détruire AVANT un montage propre.
+    declared = topo.control_nodes + topo.worker_nodes
+    real = classify_refresh(stack_name, declared, _real_vms(), [])
 
     print(f"stack : {stack_name}  →  chemin : {resolved_target}")
+    if real.vms_orphan:
+        for vm in real.vms_orphan:
+            print(f"  - détruire {vm:<22} VM d'une autre stack (à retirer d'abord)")
     for phase in seq:
+        label = phase_label(phase)
         if phase in a_appliquer:
-            mark, etat = ("~", "rejeu") if rejeu else ("+", "à jouer")
+            mark, etat = ("~", "à rejouer") if rejeu else ("+", "à installer")
         else:
             mark, etat = "✓", "à-jour"
-        print(f"  {mark} {phase:<16} ({etat})")
+        print(f"  {mark} {label:<42} ({etat})")
     n = len(a_appliquer)
-    if n == 0:
-        print("→ rien à appliquer (séquence complète, run frais).")
+    head = []
+    if real.vms_orphan:
+        head.append(f"{len(real.vms_orphan)} VM(s) à détruire d'abord")
+    if n:
+        verbe = "à rejouer" if rejeu else "à installer"
+        head.append(f"{n} couche(s) {verbe}")
+    if not head:
+        print("→ rien à appliquer (stack à jour, terrain propre).")
     else:
-        verbe = "à rejouer" if rejeu else "à appliquer"
-        print(f"→ {n} phase(s) {verbe} (rien lancé — `next --apply` pour la 1re).")
+        suffix = "" if inedit else " — `next --apply` pour la 1re couche"
+        print(f"→ {' ; '.join(head)} (rien lancé{suffix}).")
     return 0
 
 
