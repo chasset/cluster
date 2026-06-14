@@ -1592,6 +1592,30 @@ phase_ha_cni() {
 # 0063), déléguée par run_ha_3cp ; seuls le provisioning VM et la CNI (phase_ha_cni)
 # restent du bash ici (orchestration de CLI, ADR 0049).
 
+# emit_facts — CONTRAT MACHINE pour topology.py (inversion de frontière, ADR 0049/0056).
+# Imprime sur stdout, en KEY=VALUE byte-stable, les faits du banc que Python consomme :
+# l'IP user-v2 du CP primaire (advertiseAddress), son interface L2 (LB-IPAM/CNI), et la
+# VIP dérivée si la topo est HA (> 1 nœud control). Réutilise les briques irréductibles
+# vm_uservv2_ip/iface (limactl shell). Python DEMANDE ces faits ; le bash ne pilote plus.
+emit_facts() {
+    require_lima
+    local cp_ip l2_if n_control=0 entry
+    cp_ip=$(vm_uservv2_ip "${CP}")
+    [ -n "${cp_ip}" ] || die "${CP} : pas d'IP user-v2 (banc non provisionné ?)"
+    l2_if=$(vm_uservv2_iface "${CP}")
+    [ -n "${l2_if}" ] || die "${CP} : interface user-v2 introuvable"
+    printf 'CP_IP=%s\n' "${cp_ip}"
+    printf 'L2_IFACE=%s\n' "${l2_if}"
+    # HA = plus d'un nœud `control` dans NODES → on émet la VIP (même règle que run_ha_3cp).
+    for entry in "${NODES[@]}"; do
+        [ "${entry##*:}" = control ] && n_control=$((n_control + 1))
+    done
+    if [ "${n_control}" -gt 1 ]; then
+        printf 'VIP=%s\n' "${cp_ip%.*}.40"
+        printf 'VIP_IFACE=%s\n' "${l2_if}"
+    fi
+}
+
 # ── Dispatch ─────────────────────────────────────────────────────────────────
 case "${1:-}" in
     up) time_phase up phase_up ;;
@@ -1723,9 +1747,14 @@ case "${1:-}" in
     # ha-cni : rappel interne de la sous-commande Python ha-3cp (la CNI reste bash,
     # ADR 0049). Args : <vip_iface> <lb_prefix>.
     ha-cni) [ -n "${3:-}" ] || die "usage : ha-cni <vip_iface> <lb_prefix>"; CP=cp1; phase_ha_cni "$2" "$3" ;;
-    # ha-inventory <cp1,cp2,…> — réécrit l'inventaire avec ces CP en `control`
-    # (rappel de la sous-commande Python ha-3cp avant chaque join ; l'écriture
-    # d'inventaire reste du bash, write_inventory). Workers vide (HA hyperconvergé).
+    # facts — contrat machine : imprime CP_IP/L2_IFACE (+ VIP/VIP_IFACE si HA) que
+    # topology.py consomme (inversion de frontière, ADR 0049/0056). Brique LUE par Python.
+    facts) emit_facts ;;
+    # inventory <control_csv> [workers_csv] — réécrit l'inventaire (control + workers).
+    # Brique générique appelée par topology.py (write_inventory reste bash, byte-stable).
+    inventory) [ -n "${2:-}" ] || die "usage : inventory <control_csv> [workers_csv]"; mkdir -p "${WORKDIR}"; write_inventory "${INVENTORY}" "$(echo "$2" | tr ',' ' ')" "$(echo "${3:-}" | tr ',' ' ')" ;;
+    # ha-inventory <cp1,cp2,…> — ALIAS de compat (= inventory <cp> sans workers, HA
+    # hyperconvergé). Conservé le temps de la transition (rappel ha-3cp). Préférer `inventory`.
     ha-inventory) [ -n "${2:-}" ] || die "usage : ha-inventory <cp1,cp2,…>"; mkdir -p "${WORKDIR}"; write_inventory "${INVENTORY}" "$(echo "$2" | tr ',' ' ')" "" ;;
     status) phase_status ;;
     down) phase_down "${@:2}" ;;
