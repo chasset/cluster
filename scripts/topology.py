@@ -101,6 +101,7 @@ from cluster_topology import (  # noqa: E402
     suggest_next,
     verdict_for_run,
 )
+from cluster_topology import bootstrap as _bootstrap  # noqa: E402
 from cluster_topology import ha as _ha  # noqa: E402
 from cluster_topology import roundtrip as _roundtrip  # noqa: E402
 from cluster_topology import runner as _runner  # noqa: E402
@@ -1013,6 +1014,69 @@ def cmd_ha_3cp(args: argparse.Namespace) -> int:
     return 0 if result.built else 1
 
 
+def cmd_bootstrap_seq(args: argparse.Namespace) -> int:
+    """Orchestre le socle k8s (`bootstrap`) — la partie ANSIBLE (interne, ADR 0063).
+
+    Migration de bootstrap_node_sequence vers Python : lance les 6 playbooks du socle
+    (checks→…→join-workers) via runner.launch_phase (le MÊME montage que ha-3cp), avec
+    `-e control_plane_ip=<cp_ip>`. L'inventaire, la dérivation de cp_ip/iface, la CNI
+    (Cilium dans la VM) et le kubeconfig restent à run-phases.sh (briques bash, ADR
+    0049) ; cette commande reçoit cp_ip/inventaire déjà dérivés du banc et rappelle
+    `ha-cni <iface> <lb-prefix>` pour la CNI. La logique (séquence, fail-fast) est
+    testée sans banc (tests/test_bootstrap.py)."""
+    private_data_dir = os.path.join(_ROOT, "bootstrap")
+    inventory = (
+        args.inventory
+        if os.path.isabs(args.inventory)
+        else os.path.join(private_data_dir, args.inventory)
+    )
+    ansible_cfg = os.path.join(private_data_dir, "ansible.cfg")
+    if not os.path.exists(inventory):
+        raise _UsageError(
+            f"inventaire absent : {inventory} (généré par run-phases.sh avant la délégation)"
+        )
+    kubeconfig = os.environ.get("KUBECONFIG")
+
+    def launch(playbook: str, extravars: dict):
+        return _runner.launch_phase(
+            playbook,
+            extravars,
+            private_data_dir,
+            inventory,
+            ansible_config=ansible_cfg,
+            kubeconfig=kubeconfig,
+            target_kind="lima",
+        )
+
+    def run_cni() -> int:
+        # CNI (+ GW API CRDs + kubeconfig) : brique bash réutilisée (ha-cni <iface>
+        # <lb-prefix>). lb_prefix = le /24 du cp_ip (ex. 10.0.0.5 → 10.0.0).
+        lb_prefix = args.cp_ip.rsplit(".", 1)[0]
+        return subprocess.run(  # noqa: S603 — chemin codé, arguments contrôlés
+            [
+                "bash",
+                os.path.join(_ROOT, "test", "lima", "run-phases.sh"),
+                "ha-cni",
+                args.l2_iface,
+                lb_prefix,
+            ],
+            check=False,
+        ).returncode
+
+    print(f"→ bootstrap : socle k8s (6 playbooks via Python/runner, CP {args.cp_ip})")
+    try:
+        result = _bootstrap.run_bootstrap(args.cp_ip, launch=launch, run_cni=run_cni)
+    except _runner.RunnerUnavailable as exc:
+        raise _UsageError(str(exc)) from exc
+    except _bootstrap.BootstrapError as exc:
+        print(f"  ✗ {exc}", file=sys.stderr)
+        return 1
+    for step in result.steps:
+        mark = "✓" if step.ok else "✗"
+        print(f"  {mark} {step.name}{f' — {step.detail}' if step.detail else ''}")
+    return 0 if result.built else 1
+
+
 def cmd_metrics(args: argparse.Namespace) -> int:
     """Expose les métriques DÉJÀ consignées dans runs-history.yaml (P6, exig. 8).
 
@@ -1121,6 +1185,7 @@ _DISPATCH = {
     "artifact": cmd_artifact,
     "test": cmd_test,
     "ha-3cp": cmd_ha_3cp,  # interne (routée à part dans main, hors menu)
+    "bootstrap-seq": cmd_bootstrap_seq,  # interne : socle k8s en Python (migration)
 }
 
 
@@ -1377,12 +1442,36 @@ def _build_ha_parser() -> argparse.ArgumentParser:
     return ap
 
 
+def _build_bootstrap_parser() -> argparse.ArgumentParser:
+    """Parser DÉDIÉ à la commande interne `bootstrap-seq` (hors du menu public).
+
+    Appelée par run-phases.sh:phase_bootstrap avec --cp-ip/--l2-iface/--inventory
+    dérivés du banc — orchestre les 6 playbooks du socle en Python (migration de
+    bootstrap_node_sequence). Interne, routée à part dans main() comme ha-3cp."""
+    ap = argparse.ArgumentParser(prog="topology bootstrap-seq")
+    ap.add_argument("--cp-ip", required=True, dest="cp_ip", help="IP réelle du CP primaire")
+    ap.add_argument(
+        "--l2-iface", required=True, dest="l2_iface", help="interface L2 (LB-IPAM/CNI)"
+    )
+    ap.add_argument("--inventory", default="hosts.yaml", help="inventaire (relatif à bootstrap/)")
+    return ap
+
+
+# Commandes INTERNES (hors menu) : nom → (builder de parser dédié). Routées à part
+# dans main() pour ne PAS polluer le --help / la liste des choix du menu public.
+_INTERNAL_PARSERS = {
+    "ha-3cp": _build_ha_parser,
+    "bootstrap-seq": _build_bootstrap_parser,
+}
+
+
 def main(argv: list[str] | None = None) -> int:
-    # ha-3cp est interceptée AVANT le parser principal (commande interne, hors menu).
+    # Les commandes internes sont interceptées AVANT le parser principal (hors menu).
     args_list = sys.argv[1:] if argv is None else argv
-    if args_list and args_list[0] == "ha-3cp":
-        args = _build_ha_parser().parse_args(args_list[1:])
-        args.cmd = "ha-3cp"
+    if args_list and args_list[0] in _INTERNAL_PARSERS:
+        cmd = args_list[0]
+        args = _INTERNAL_PARSERS[cmd]().parse_args(args_list[1:])
+        args.cmd = cmd
         return _run(args)
     args = _build_parser().parse_args(args_list)
     return _run(args)

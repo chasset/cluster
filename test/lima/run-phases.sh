@@ -447,28 +447,20 @@ phase_bootstrap() {
     [ -n "${cp_ip}" ] || die "${CP} : pas d'IP user-v2"
     ok "${CP} : IP user-v2 ${cp_ip}"
 
-    bootstrap_node_sequence "${INVENTORY}" -e "control_plane_ip=${cp_ip}"
-
-    # Exposition tout-Cilium (ADR 0020) : DÉRIVER la plage LB-IPAM et l'interface
-    # L2 du réseau user-v2 réel du banc (pas de valeur codée en dur — ADR 0023).
-    # Plage = .240-.250 du /24 des nœuds (hors DHCP) ; interface = NIC user-v2
-    # détecté côté invité (Lima ne garantit pas le nom selon les versions).
-    local lb_prefix l2_if
-    lb_prefix=${cp_ip%.*}                       # ex. 192.168.104.1 → 192.168.104
+    # Interface L2 du réseau user-v2 (LB-IPAM/CNI), dérivée du banc (ADR 0023).
+    local l2_if
     l2_if=$(vm_uservv2_iface "${CP}")
     [ -n "${l2_if}" ] || die "${CP} : interface user-v2 introuvable"
-    ok "expo : LB-IPAM ${lb_prefix}.240-.250, L2 sur ${l2_if}"
-    # CRDs Gateway API AVANT Cilium (drift L56) : l'operator les vérifie au boot.
-    apply_gwapi_crds_in_vm "${CP}" "${GWAPI_VERSION}"
-    run_cni "${CP}" \
-        "LB_IPAM_RANGE_START=${lb_prefix}.240" \
-        "LB_IPAM_RANGE_STOP=${lb_prefix}.250" \
-        "L2_INTERFACE=${l2_if}"
-    # Contexte nommé `cluster-banc` (ADR 0053 (b)) : tue l'homonymie kubeadm
-    # (`kubernetes-admin@kubernetes`) qui ferait s'écraser banc et prod dans une
-    # fusion KUBECONFIG=banc:prod. Étiquette générique (ADR 0023), pas une valeur
-    # de déploiement. La prod reçoit son `cluster-prod` côté kubeadm (k8s-init).
-    fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}" cluster-banc
+
+    # ORCHESTRATION des 6 playbooks du socle DÉLÉGUÉE à Python (« Python parle Ansible »,
+    # ADR 0063 ; migration de bootstrap_node_sequence). topology.py bootstrap-seq lance
+    # checks→…→join-workers via runner.launch_phase, puis rappelle ICI `ha-cni` (CNI +
+    # CRDs GW API + kubeconfig) — qui reste du bash (Cilium dans la VM, ADR 0049). Le
+    # provisioning VM, l'inventaire (write_inventory) et la dérivation cp_ip/iface
+    # restent au bash ; la SÉQUENCE et le fail-fast sont en Python testé (test_bootstrap).
+    uv run python "${REPO}/scripts/topology.py" bootstrap-seq \
+        --cp-ip "${cp_ip}" --l2-iface "${l2_if}" --inventory "${INVENTORY}" \
+        || die "bootstrap : socle k8s (orchestration Python) en échec"
 
     # GATE : tous les nœuds attendus (${#NODES[@]}) Ready.
     log "Attente des ${#NODES[@]} nœud(s) Ready (max 5 min)"
