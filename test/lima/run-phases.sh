@@ -181,18 +181,43 @@ time_phase() {
     return "${rc}"
 }
 
+# derive_topology_label : étiquette de topologie DÉRIVÉE de NODES (honnêteté de Run,
+# ADR 0052) — l'historique doit refléter les nœuds RÉELS du run, pas un littéral. On
+# compte les rôles `control`/`worker` de NODES (qui suit NODES_OVERRIDE) :
+#   1 control seul        → mono-node      (ex. topo 1cp)
+#   ≥2 control            → ha-<n>cp       (ex. ha-3cp)
+#   1 control + N workers → multi-node-<n> (défaut historique : multi-node-3 = 1+2)
+derive_topology_label() {
+    local entry role n_control=0 n_worker=0 total=${#NODES[@]}
+    for entry in "${NODES[@]}"; do
+        role=${entry##*:}
+        case "${role}" in
+            control) n_control=$((n_control + 1)) ;;
+            *) n_worker=$((n_worker + 1)) ;;
+        esac
+    done
+    if [ "${n_control}" -ge 2 ]; then
+        printf 'ha-%dcp' "${n_control}"
+    elif [ "${n_worker}" -eq 0 ]; then
+        printf 'mono-node'
+    else
+        printf 'multi-node-%d' "${total}"
+    fi
+}
+
 # Consigne le run complet dans l'historique versionné (#216) et, si Prometheus
 # est déployé, y joint les métriques de coût échantillonnées (#217). Appelé en
 # fin d'un run de chemin réussi. <total_s> = durée cumulée ; <profil> dérivé de WITH_CEPH.
 record_full_run() {
-    local total=$1 profil block
+    local total=$1 profil block topo
     profil=$(metro_profil "${WITH_CEPH:-0}")
+    topo=$(derive_topology_label) # étiquette RÉELLE (NODES), pas un littéral (ADR 0052)
     # Échantillonnage Prometheus sur la fenêtre du run (best-effort, non bloquant).
     block=$(METRO_METRICS_BLOCK='' metro_sample_prometheus "${total}" || true)
     # TARGET (chemin nommé courant, suffixe +hardening inclus) consigné pour la
     # fraîcheur PAR CHEMIN (ADR 0045 §6 / #244).
     METRO_METRICS_BLOCK="${block}" \
-        metro_record_run "${profil}" "multi-node-3" "${total}" "${PHASE_DURATIONS}" "${TARGET:-}"
+        metro_record_run "${profil}" "${topo}" "${total}" "${PHASE_DURATIONS}" "${TARGET:-}"
 }
 
 # Joue un playbook Ansible de plateforme (depuis l'hôte, kubeconfig banc) PUIS
