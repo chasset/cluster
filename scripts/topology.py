@@ -22,6 +22,7 @@ Usage :
   uv run python scripts/topology.py context create <nom> [--activate] [--no-input]
   uv run python scripts/topology.py context list
   uv run python scripts/topology.py context activate <nom>
+  uv run python scripts/topology.py context validate [-f topology.yaml]
   uv run python scripts/topology.py generate [--kind prod|lima] [--what inventory|run-params]
   uv run python scripts/topology.py status [--real [--hosts cp1 node1]]
   uv run python scripts/topology.py diff [--kind prod|lima --against PATH]
@@ -147,8 +148,8 @@ class _UsageError(Exception):
 # ── Sous-commandes (chacune renvoie un code de sortie) ──────────────────────
 
 
-def cmd_validate(args: argparse.Namespace) -> int:
-    """Charge + valide topology.yaml et force la dérivation backend/profil.
+def cmd_context_validate(args: argparse.Namespace) -> int:
+    """`context validate` : charge + valide topology.yaml et force la dérivation backend/profil.
 
     Porte d'entrée CI du contrat : tout verdict de schéma (rôle inconnu,
     HA-sans-VIP, backend/profil inconnu) est levé par le paquet (TopologyError)
@@ -485,11 +486,21 @@ def cmd_status(args: argparse.Namespace) -> int:
     """
     path = _resolve(args.file)
     topo = load_topology(path)
+    # Hyperconvergence : un nœud control qui porte aussi `worker` schedule des pods
+    # mais vit dans control_nodes (pas worker_nodes) — on l'annote pour que
+    # `workers: —` ne donne pas l'illusion d'un cluster sans capacité de calcul.
+    hc = set(topo.hyperconverged_nodes)
+    control_disp = ", ".join(
+        f"{n}+worker" if n in hc else n for n in topo.control_nodes
+    )
+    workers_disp = ", ".join(topo.worker_nodes) or (
+        "— (control hyperconvergés schedulent)" if hc else "—"
+    )
     lines = [
         f"topologie       : {topo.catalog.get('topology', '—')} (kind={topo.target_kind})",
-        f"control-planes  : {', '.join(topo.control_nodes) or '—'}"
+        f"control-planes  : {control_disp or '—'}"
         f"{'  [HA → VIP requise]' if topo.is_ha_control_plane else ''}",
-        f"workers         : {', '.join(topo.worker_nodes) or '—'}",
+        f"workers         : {workers_disp}",
         f"profil          : {topo.catalog.get('profile', 'base')}",
         f"stockage        : {topo.storage.get('backend', 'local-path')}",
         f"exposition      : {topo.exposition.get('mode', '—')}",
@@ -498,9 +509,14 @@ def cmd_status(args: argparse.Namespace) -> int:
     if not args.real:
         return 0
     # État réel : déléguer à state.sh (SSH+kubectl). Hérite l'env du shell.
-    # shell=False : args.hosts est passé LITTÉRALEMENT à bash (pas d'expansion
-    # shell), donc pas d'injection même si --hosts vient de la ligne de commande.
-    cmd = ["bash", _STATE_SH, *(args.hosts or [])]
+    # Les hôtes interrogés sont ceux de la TOPO ACTIVE (control + workers dérivés),
+    # pas la liste codée en dur de state.sh (cp1 node1 node2 node3) — sinon `--real`
+    # constate une réalité décorrélée du déclaré (ADR 0056). `--hosts` force une
+    # liste explicite (diagnostic ciblé). control_nodes d'abord (le 1er porte kubectl).
+    hosts = args.hosts or (topo.control_nodes + topo.worker_nodes)
+    # shell=False : `hosts` est passé LITTÉRALEMENT à bash (pas d'expansion shell),
+    # donc pas d'injection même si --hosts vient de la ligne de commande.
+    cmd = ["bash", _STATE_SH, *hosts]
     completed = subprocess.run(cmd, check=False)  # noqa: S603 — shell=False, args littéraux
     return completed.returncode
 
@@ -801,6 +817,7 @@ _CONTEXT_DISPATCH = {
     "create": cmd_context_create,
     "list": cmd_context_list,
     "activate": cmd_context_activate,
+    "validate": cmd_context_validate,
 }
 
 _DISPATCH = {
@@ -854,15 +871,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # `validate` et `default-target` sont RETIRÉS du menu CLI pour l'instant (les
     # fonctions cmd_validate/cmd_default_target restent dans le module, juste plus
-    # exposées comme sous-commandes). `default-target` reviendra avec topology.py up
-    # (son consommateur) ; la validation se fait via context create/activate qui
-    # valident déjà le schéma. La fonction default_target() de plan.py reste utilisée
-    # en interne (context list/activate/create).
+    # `default-target` reste retiré du menu pour l'instant (reviendra avec topology.py
+    # up, son consommateur) ; cmd_default_target reste dans le module, juste plus
+    # exposé. La fonction default_target() de plan.py reste utilisée en interne
+    # (context list/activate/create).
 
-    # Groupe `context` (noun-verb) : create | list | activate — gère le catalogue de
-    # topologies et la sélection de l'active (modèle kubectl/terraform workspace).
+    # Groupe `context` (noun-verb) : create | list | activate | validate — gère le
+    # catalogue de topologies et la sélection de l'active (modèle kubectl/terraform).
     p_ctx = sub.add_parser(
-        "context", help="gère le catalogue de topologies (create | list | activate)"
+        "context", help="gère le catalogue de topologies (create | list | activate | validate)"
     )
     ctx_sub = p_ctx.add_subparsers(dest="ctx_cmd", required=True)
 
@@ -894,6 +911,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p_ctx_act.add_argument(
         "name", help="nom de l'entrée du catalogue (ex : 3-nodes-1-cp, socle.example)"
     )
+
+    p_ctx_val = ctx_sub.add_parser("validate", help="valide le schéma d'une topologie")
+    _add_file(p_ctx_val)
 
     p_gen = sub.add_parser("generate", help="dérive un artefact (inventaire ou run-params)")
     _add_file(p_gen)

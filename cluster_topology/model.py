@@ -69,6 +69,16 @@ class Topology:
         return [n.name for n in self.nodes if n.has_role("worker") and not n.has_role("control")]
 
     @property
+    def hyperconverged_nodes(self) -> list[str]:
+        """Noms des nœuds control qui portent AUSSI `worker` (hyperconvergés, ADR 0055).
+
+        Ils vivent dans `control_nodes` (control prime) et PAS dans `worker_nodes`
+        (workers purs) — d'où un affichage `workers: —` trompeur si on ne signale
+        pas qu'un control schedule. Cette liste rend l'hyperconvergence visible
+        sans changer le classement des groupes (inventaire inchangé)."""
+        return [n.name for n in self.nodes if n.has_role("control") and n.has_role("worker")]
+
+    @property
     def is_ha_control_plane(self) -> bool:
         """> 1 control-plane → exige un control_plane_lb (VIP), ADR 0047/0055."""
         return len(self.control_nodes) > 1

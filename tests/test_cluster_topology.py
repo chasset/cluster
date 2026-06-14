@@ -73,6 +73,8 @@ class Derivations(unittest.TestCase):
         self.assertEqual(t.control_nodes, ["n1"])
         self.assertEqual(t.worker_nodes, ["n2"])
         self.assertNotIn("n1", t.worker_nodes)
+        # hyperconverged_nodes liste les control qui portent AUSSI worker (n1, pas n2).
+        self.assertEqual(t.hyperconverged_nodes, ["n1"])
 
     def test_ha_detection(self):
         single = topology_from_dict(_base())

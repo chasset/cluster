@@ -91,32 +91,29 @@ def _stdin(text):
         sys.stdin = saved
 
 
-@unittest.skip(
-    "commande `validate` retirée du menu CLI pour l'instant (reviendra en `context "
-    "validate`). Le rejet de schéma (rôle inconnu, HA sans VIP, fichier absent) reste "
-    "couvert au niveau modèle : tests/test_cluster_topology.py (load_topology → TopologyError)."
-)
-class Validate(unittest.TestCase):
+class ContextValidate(unittest.TestCase):
+    """`context validate` : verdict de schéma (0 valide / 1 invalide ou absent)."""
+
     def test_example_is_valid(self):
-        code, out, _ = _capture(["validate", "-f", _EXAMPLE])
+        code, out, _ = _capture(["context", "validate", "-f", _EXAMPLE])
         self.assertEqual(code, 0)
         self.assertIn("valide", out)
 
     def test_invalid_role_rejected(self):
         path = _tmp(_INVALID_TOPO)
         self.addCleanup(os.unlink, path)
-        code, _, err = _capture(["validate", "-f", path])
+        code, _, err = _capture(["context", "validate", "-f", path])
         self.assertEqual(code, 1)
         self.assertIn("erreur", err)
 
     def test_ha_without_vip_rejected(self):
         path = _tmp(_HA_NO_VIP)
         self.addCleanup(os.unlink, path)
-        code, _, _ = _capture(["validate", "-f", path])
+        code, _, _ = _capture(["context", "validate", "-f", path])
         self.assertEqual(code, 1)
 
     def test_missing_file_is_business_error(self):
-        code, _, err = _capture(["validate", "-f", "/nope/topology.yaml"])
+        code, _, err = _capture(["context", "validate", "-f", "/nope/topology.yaml"])
         self.assertEqual(code, 1)
         self.assertIn("erreur", err)
 
@@ -220,6 +217,40 @@ class Status(unittest.TestCase):
         self.addCleanup(setattr, cli.subprocess, "run", orig)
         code, _, _ = _capture(["status", "-f", _EXAMPLE, "--real"])
         self.assertEqual(code, 2)
+
+    def test_real_passes_topology_hosts_not_hardcoded(self):
+        # --real sans --hosts interroge les nœuds de la TOPO active (dérivés), pas la
+        # liste codée en dur de state.sh. On capture la commande passée à subprocess.
+        import subprocess
+
+        captured = {}
+
+        def _spy(cmd, *a, **k):
+            captured["cmd"] = cmd
+            return subprocess.CompletedProcess(args=cmd, returncode=0)
+
+        orig = cli.subprocess.run
+        cli.subprocess.run = _spy
+        self.addCleanup(setattr, cli.subprocess, "run", orig)
+        _capture(["status", "-f", _EXAMPLE, "--real"])
+        # _EXAMPLE (socle) = cp1 + node1..node4 → tous présents, dérivés de la topo.
+        topo = load_topology(_EXAMPLE)
+        for host in topo.control_nodes + topo.worker_nodes:
+            self.assertIn(host, captured["cmd"])
+
+    def test_hyperconverged_node_annotated(self):
+        # Un nœud control+worker s'affiche `<nom>+worker` ; workers purs = «—» annoté.
+        topo_yaml = (
+            "catalog: {topology: hc, profile: base}\n"
+            "nodes:\n  - {name: node1, roles: [control, worker]}\n"
+            "storage: {backend: local-path}\ntarget_kind: lima\n"
+        )
+        path = _tmp(topo_yaml)
+        self.addCleanup(os.unlink, path)
+        code, out, _ = _capture(["status", "-f", path])
+        self.assertEqual(code, 0)
+        self.assertIn("node1+worker", out)
+        self.assertIn("hyperconvergés", out)  # la ligne workers signale l'hyperconvergence
 
 
 class Epreuves(unittest.TestCase):
