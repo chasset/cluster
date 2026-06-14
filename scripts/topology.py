@@ -25,7 +25,7 @@ Usage — gestion des stacks (catalogue, calque `pulumi stack`) :
   uv run python scripts/topology.py stack validate [-f topology.yaml]
 Usage — cycle de vie (top-level, calque Pulumi) :
   uv run python scripts/topology.py preview [--target …]      (voir : VOULU+RÉEL+PLAN)
-  uv run python scripts/topology.py up [--target …]          (appliquer la couche suivante)
+  uv run python scripts/topology.py next [--target …]        (appliquer la couche suivante)
   uv run python scripts/topology.py destroy [--yes]          (calque pulumi destroy)
 Usage — artefacts (dériver/constater, groupe `artifact`) :
   uv run python scripts/topology.py artifact generate [--kind prod|lima] [--what …]
@@ -699,7 +699,7 @@ def cmd_preview(args: argparse.Namespace) -> int:
       état (`✓ à-jour`, `+ à installer` si inédit, `~ à rejouer` si run périmé), plus
       les VMs orphelines `- à détruire d'abord`.
 
-    Read-only : ne LANCE ni ne DÉTRUIT rien (`up` applique ; `destroy` détruit). Code 0
+    Read-only : ne LANCE ni ne DÉTRUIT rien (`next` applique ; `destroy` détruit). Code 0
     (informatif) ; chemin incohérent avec le backend → usage (2)."""
     path = _resolve(args.file)
     topo = load_topology(path)
@@ -773,19 +773,19 @@ def cmd_preview(args: argparse.Namespace) -> int:
     if not head:
         print("→ rien à appliquer (stack à jour, terrain propre).")
     else:
-        suffix = "" if inedit else " — `up` pour appliquer"
+        suffix = "" if inedit else " — `next` pour appliquer la couche suivante"
         print(f"→ {' ; '.join(head)} (rien lancé{suffix}).")
     return 0
 
 
-def cmd_up(args: argparse.Namespace) -> int:
-    """`up` : applique la prochaine couche manquante du plan (calque `pulumi up`).
+def cmd_next(args: argparse.Namespace) -> int:
+    """`next` : applique la PROCHAINE couche manquante du plan (1er drift).
 
-    Le pendant de `preview` : là où `preview` MONTRE le plan (voir), `up` l'APPLIQUE.
-    Lancer `up` EST la décision humaine (G2, ADR 0063) — pas de flag --apply (l'ancien
-    `next --apply`) : on n'invoque `up` que pour appliquer. Applique la PREMIÈRE couche
-    manquante (1er drift, parité state.sh) via ansible-runner ; ré-invoquer `up` monte
-    la suivante (jamais d'auto-enchaînement silencieux de toute la séquence).
+    PAS le calque `pulumi up` complet (qui provisionnerait les VMs et monterait TOUTE
+    la séquence) — `next` ne monte qu'UNE couche unitaire via ansible-runner (parité
+    state.sh : le 1er drift). Lancer `next` EST la décision humaine (G2, ADR 0063) ;
+    ré-invoquer `next` monte la suivante (jamais d'auto-enchaînement silencieux). Le
+    vrai `up` (entrée complète : provisioning + orchestration) reste à coder.
 
     Code 0 si la couche est montée (ou rien à monter) ; 1 si le run échoue ; 2 (usage)
     si la couche n'est pas un play unitaire / inventaire absent / chemin incohérent.
@@ -1040,10 +1040,11 @@ def cmd_test(args: argparse.Namespace) -> int:
 
 _DISPATCH = {
     "stack": cmd_stack,  # calque `pulumi stack` (new | ls | select | validate)
-    # Cycle de vie au TOP-LEVEL (calque Pulumi). `preview` = voir (VOULU+RÉEL+PLAN,
-    # absorbe status+refresh+la lecture de next) ; `up` = appliquer (ex next --apply).
+    # Cycle de vie au TOP-LEVEL. `preview` = voir (VOULU+RÉEL+PLAN, absorbe status+
+    # refresh) ; `next` = appliquer LA prochaine couche (le vrai `up` complet — VMs +
+    # orchestration de TOUTE la séquence — reste à coder).
     "preview": cmd_preview,  # calque `pulumi preview`
-    "up": cmd_up,  # calque `pulumi up`
+    "next": cmd_next,  # applique la prochaine couche (le vrai `up` complet reste à coder)
     "destroy": cmd_destroy,  # calque `pulumi destroy`
     # Groupes noun-verb (annexe rangée) : artefacts dérivés/constatés + épreuves.
     "artifact": cmd_artifact,
@@ -1210,14 +1211,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--yes", action="store_true", help="sauter la confirmation (requis hors TTY pour détruire)"
     )
 
-    p_up = sub.add_parser(
-        "up", help="applique la prochaine couche manquante du plan (calque `pulumi up`)"
+    p_next = sub.add_parser(
+        "next", help="applique la prochaine couche manquante du plan (1er drift)"
     )
-    _add_file(p_up)
-    p_up.add_argument(
+    _add_file(p_next)
+    p_next.add_argument(
         "--target", default=None, help="chemin nommé visé (défaut : déduit du profil+backend)"
     )
-    p_up.add_argument(
+    p_next.add_argument(
         "--history", default=None, help="chemin du runs-history.yaml (défaut : test/lima/)"
     )
 

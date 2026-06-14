@@ -408,8 +408,8 @@ runs:
         self.assertIn("usage", err)
 
 
-class Up(unittest.TestCase):
-    """`up` (ex `next --apply`) : applique la prochaine couche manquante via runner."""
+class Next(unittest.TestCase):
+    """`next` : applique LA prochaine couche manquante via runner (1er drift)."""
 
     _EMPTY_HIST = "runs: []\n"
     # Historique frais où le socle Ceph est joué → la 1re couche manquante de
@@ -428,12 +428,12 @@ runs:
 """
 
     def test_unknown_target_is_usage_error(self):
-        code, _, err = _capture(["up", "-f", _EXAMPLE, "--target", "frobnicate"])
+        code, _, err = _capture(["next", "-f", _EXAMPLE, "--target", "frobnicate"])
         self.assertEqual(code, 2)
         self.assertIn("usage", err)
 
     def _ensure_inventory(self):
-        """Garantit un bootstrap/hosts.yaml (gitignoré, absent en CI) pour `up` ;
+        """Garantit un bootstrap/hosts.yaml (gitignoré, absent en CI) pour `next` ;
         le retire ensuite si on l'a créé. Sinon le garde-fou d'inventaire bloque."""
         inv = os.path.join(_ROOT, "bootstrap", "hosts.yaml")
         if not os.path.exists(inv):
@@ -458,7 +458,7 @@ runs:
         hist = _tmp(self._SOCLE_DONE)
         self.addCleanup(os.unlink, hist)
         code, _, _ = _capture(
-            ["up", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist]
+            ["next", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist]
         )
         self.assertEqual(code, 0)
         self.assertEqual(len(calls), 1)  # UNE couche montée, pas la séquence
@@ -475,7 +475,7 @@ runs:
         hist = _tmp(self._SOCLE_DONE)
         self.addCleanup(os.unlink, hist)
         code, _, err = _capture(
-            ["up", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist]
+            ["next", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist]
         )
         self.assertEqual(code, 2)
         self.assertIn("inventaire absent", err)
@@ -490,7 +490,7 @@ runs:
         hist = _tmp(self._SOCLE_DONE)
         self.addCleanup(os.unlink, hist)
         code, _, _ = _capture(
-            ["up", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist]
+            ["next", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist]
         )
         self.assertEqual(code, 1)  # run KO → code 1
 
@@ -502,7 +502,7 @@ runs:
         hist = _tmp(self._EMPTY_HIST)
         self.addCleanup(os.unlink, hist)
         code, _, err = _capture(
-            ["up", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist]
+            ["next", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist]
         )
         self.assertEqual(code, 2)
         self.assertIn("usage", err)
