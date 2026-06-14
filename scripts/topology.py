@@ -67,6 +67,7 @@ import yaml  # noqa: E402
 from cluster_topology import (  # noqa: E402
     PlanError,
     TopologyError,
+    default_target,
     derive_run_params,
     filter_epreuves,
     format_metrics,
@@ -146,6 +147,19 @@ def cmd_validate(args: argparse.Namespace) -> int:
         f"({len(topo.control_nodes)} control / {len(topo.worker_nodes)} worker, "
         f"kind={topo.target_kind})."
     )
+    return 0
+
+
+def cmd_default_target(args: argparse.Namespace) -> int:
+    """Imprime le CHEMIN NOMMÉ dérivé de la topologie ACTIVE (topology.yaml).
+
+    C'est le pont qui rend la SÉLECTION déclarative : run-phases.sh (sans
+    argument) lit ce chemin et le monte, au lieu d'exiger le nom en dur. Activer
+    une topologie = poser/éditer `topology.yaml` ; l'outil en dérive le chemin
+    (ADR 0056). Sortie = le seul nom du chemin (consommable par `$(...)`).
+    """
+    topo = load_topology(_resolve(args.file))
+    print(default_target(topo))
     return 0
 
 
@@ -537,6 +551,7 @@ def cmd_roundtrip(args: argparse.Namespace) -> int:
 
 _DISPATCH = {
     "validate": cmd_validate,
+    "default-target": cmd_default_target,
     "generate": cmd_generate,
     "diff": cmd_diff,
     "status": cmd_status,
@@ -585,6 +600,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_val = sub.add_parser("validate", help="valide le schéma de topology.yaml")
     _add_file(p_val)
+
+    p_dt = sub.add_parser(
+        "default-target", help="imprime le chemin nommé dérivé de la topologie active"
+    )
+    _add_file(p_dt)
 
     p_gen = sub.add_parser("generate", help="dérive un artefact (inventaire ou run-params)")
     _add_file(p_gen)
