@@ -25,6 +25,7 @@ Usage — gestion des stacks (catalogue, calque `pulumi stack`) :
   uv run python scripts/topology.py stack validate [-f topology.yaml]
 Usage — cycle de vie (top-level, calque Pulumi) :
   uv run python scripts/topology.py preview [--target …]      (voir : VOULU+RÉEL+PLAN)
+  uv run python scripts/topology.py up [--yes]               (monter TOUTE la séquence)
   uv run python scripts/topology.py next [--target …]        (appliquer la couche suivante)
   uv run python scripts/topology.py destroy [--yes]          (calque pulumi destroy)
 Usage — artefacts (dériver/constater, groupe `artifact`) :
@@ -787,6 +788,66 @@ def cmd_preview(args: argparse.Namespace) -> int:
     return 0
 
 
+def _confirm_apply(target: str, *, assume_yes: bool) -> bool:
+    """Confirme le montage COMPLET du chemin `target` avant de déléguer à run-phases.sh.
+
+    --yes saute ; hors TTY sans --yes : refus (un montage complet n'est jamais
+    silencieux). Sur TTY : invite explicite (le chemin nommé monte toute la séquence)."""
+    if assume_yes:
+        return True
+    if not (sys.stdin.isatty() and sys.stdout.isatty()):
+        print("montage refusé hors TTY sans --yes (pas de montage silencieux).", file=sys.stderr)
+        return False
+    rep = input(f"Monter TOUTE la séquence du chemin `{target}` ? [oui/non] ")
+    return rep.strip().lower() in ("oui", "o", "yes", "y")
+
+
+def cmd_up(args: argparse.Namespace) -> int:
+    """`up` : monte la stack active de bout en bout (calque `pulumi up`).
+
+    L'ENTRÉE déclarative complète (inversion de frontière, ADR 0049/0056) : lit la
+    stack active → DÉRIVE le chemin nommé (default_target) → affiche le PLAN (les
+    couches) → CONFIRME → DÉLÈGUE le montage COMPLET à `run-phases.sh <chemin>` (la
+    séquence PROUVÉE au banc, ADR 0034 — Python n'orchestre pas mieux limactl/le
+    bootstrap que bash ; il en est l'entrée, pas le moteur). Le code de sortie du
+    montage est propagé.
+
+    Là où `next` monte UNE couche (1er drift), `up` monte TOUTE la séquence. Code 0
+    si le montage réussit ; 1 si run-phases.sh échoue ; 2 (usage) si confirmation
+    refusée / chemin incohérent avec le backend."""
+    path = _resolve(args.file)
+    topo = load_topology(path)
+    target = args.target or default_target(topo)
+    try:
+        seq = expected_phase_sequence(topo, target)
+    except PlanError as exc:
+        raise _UsageError(str(exc)) from exc
+    stack_name = topo.catalog.get("topology", "—")
+
+    # Affiche le PLAN (les couches à monter) avant de confirmer — comme `preview`.
+    print(f"stack : {stack_name}  →  chemin : {target}")
+    print("Couches à monter (séquence complète) :")
+    for phase in seq:
+        print(f"  + {phase_label(phase)}")
+
+    if not _confirm_apply(target, assume_yes=args.yes):
+        print("montage annulé.", file=sys.stderr)
+        return 2
+
+    # Délégation à run-phases.sh <chemin> : la séquence prouvée au banc (provisioning
+    # VM + bootstrap + orchestration ha-3cp + apps), bash garde le moteur (ADR 0049).
+    print(f"→ montage du chemin `{target}` via run-phases.sh…")
+    rc = subprocess.run(  # noqa: S603 — chemin codé, target dérivé d'une topo validée
+        ["bash", os.path.join(_ROOT, "test", "lima", "run-phases.sh"), target],
+        check=False,
+    ).returncode
+    if rc != 0:
+        print(f"échec du montage (run-phases.sh {target} rc={rc}).", file=sys.stderr)
+        return 1
+    print(f"✓ stack `{stack_name}` montée (chemin {target}).")
+    return 0
+
+
 def cmd_next(args: argparse.Namespace) -> int:
     """`next` : applique la PROCHAINE couche manquante du plan (1er drift).
 
@@ -1053,7 +1114,8 @@ _DISPATCH = {
     # refresh) ; `next` = appliquer LA prochaine couche (le vrai `up` complet — VMs +
     # orchestration de TOUTE la séquence — reste à coder).
     "preview": cmd_preview,  # calque `pulumi preview`
-    "next": cmd_next,  # applique la prochaine couche (le vrai `up` complet reste à coder)
+    "up": cmd_up,  # calque `pulumi up` : monte TOUTE la séquence (délègue à run-phases.sh)
+    "next": cmd_next,  # applique la PROCHAINE couche (1er drift, granularité fine)
     "destroy": cmd_destroy,  # calque `pulumi destroy`
     # Groupes noun-verb (annexe rangée) : artefacts dérivés/constatés + épreuves.
     "artifact": cmd_artifact,
@@ -1218,6 +1280,17 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_file(p_destroy)
     p_destroy.add_argument(
         "--yes", action="store_true", help="sauter la confirmation (requis hors TTY pour détruire)"
+    )
+
+    p_up = sub.add_parser(
+        "up", help="monte la stack active de bout en bout (calque `pulumi up`)"
+    )
+    _add_file(p_up)
+    p_up.add_argument(
+        "--target", default=None, help="chemin nommé visé (défaut : dérivé de la stack active)"
+    )
+    p_up.add_argument(
+        "--yes", action="store_true", help="sauter la confirmation (requis hors TTY)"
     )
 
     p_next = sub.add_parser(

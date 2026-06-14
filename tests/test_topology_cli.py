@@ -788,6 +788,60 @@ class Stack(unittest.TestCase):
         self.assertIn("atlas-ceph", out)
 
 
+class UpCommand(unittest.TestCase):
+    """`up` : dérive le chemin → affiche le plan → confirme → délègue à run-phases.sh."""
+
+    def _stub_runphases(self, rc=0):
+        # Capture l'appel à run-phases.sh (PAS de vrai montage en test).
+        calls = []
+
+        def _spy(cmd, *a, **k):
+            calls.append(cmd)
+            return subprocess.CompletedProcess(args=cmd, returncode=rc)
+
+        orig = cli.subprocess.run
+        cli.subprocess.run = _spy
+        self.addCleanup(setattr, cli.subprocess, "run", orig)
+        return calls
+
+    def test_yes_derives_path_and_delegates(self):
+        calls = self._stub_runphases()
+        code, out, _ = _capture(["up", "-f", _EXAMPLE, "--yes"])
+        self.assertEqual(code, 0)
+        self.assertIn("Couches à monter", out)  # le plan affiché
+        # Délégation à run-phases.sh <chemin dérivé> (atlas-ceph pour socle.example).
+        self.assertEqual(len(calls), 1)
+        self.assertIn("run-phases.sh", " ".join(calls[0]))
+        self.assertIn("atlas-ceph", calls[0])
+
+    def test_explicit_target_overrides_derivation(self):
+        calls = self._stub_runphases()
+        code, _, _ = _capture(["up", "-f", _EXAMPLE, "--target", "atlas-ceph", "--yes"])
+        self.assertEqual(code, 0)
+        self.assertIn("atlas-ceph", calls[0])
+
+    def test_refuses_without_yes_off_tty(self):
+        calls = self._stub_runphases()
+        code, _, err = _capture(["up", "-f", _EXAMPLE])  # hors TTY, pas de --yes
+        self.assertEqual(code, 2)
+        self.assertEqual(calls, [])  # run-phases.sh JAMAIS appelé
+        self.assertIn("refusé", err)
+
+    def test_propagates_mount_failure(self):
+        self._stub_runphases(rc=2)  # run-phases.sh échoue
+        code, _, err = _capture(["up", "-f", _EXAMPLE, "--yes"])
+        self.assertEqual(code, 1)
+        self.assertIn("échec", err)
+
+    def test_incoherent_target_is_usage_error(self):
+        # atlas sur backend ceph (incohérent) → usage (2), avant toute délégation.
+        calls = self._stub_runphases()
+        code, _, err = _capture(["up", "-f", _EXAMPLE, "--target", "atlas", "--yes"])
+        self.assertEqual(code, 2)
+        self.assertEqual(calls, [])
+        self.assertIn("usage", err)
+
+
 class Destroy(unittest.TestCase):
     """`destroy` : détruit les VMs de la stack active, confirmation, délègue à down."""
 
