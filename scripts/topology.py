@@ -28,6 +28,7 @@ Usage :
   uv run python scripts/topology.py diff [--kind prod|lima --against PATH]
   uv run python scripts/topology.py epreuves [--all] [--type unit|intég|chaos]   (P4)
   uv run python scripts/topology.py runs [--target atlas|storage-real|…]          (P4)
+  uv run python scripts/topology.py preview [--target …]            (calque pulumi preview)
   uv run python scripts/topology.py next [--target …] [--apply]                   (P5)
   uv run python scripts/topology.py metrics [--last]                               (P6)
   uv run python scripts/topology.py smoke [--namespace …]                          (P6)
@@ -78,6 +79,8 @@ from cluster_topology import (  # noqa: E402
     catalog_entry,
     default_target,
     derive_run_params,
+    diff_phases,
+    expected_phase_sequence,
     filter_epreuves,
     format_metrics,
     load_runs,
@@ -596,6 +599,53 @@ def _run_for_target(runs, target: str | None):
     return run if run is not None else latest_run(runs)
 
 
+def cmd_preview(args: argparse.Namespace) -> int:
+    """`preview` : montre le PLAN complet (voulu → réel) sans rien appliquer.
+
+    Calque `pulumi preview` : affiche TOUTE la séquence de phases du chemin dérivé
+    de la stack active (expected_phase_sequence), et pour chacune son état confronté
+    au dernier run (history) : `✓ à-jour`, `+ à jouer` (manquante), `~ rejeu` (pas de
+    run frais → toute la séquence rejoue). Read-only : ne LANCE rien (l'application
+    reste `next --apply`, décision humaine, ADR 0063). Code 0 toujours (informatif) ;
+    PlanError (chemin incohérent avec le backend) → usage (2).
+
+    Là où `next` ne montre QUE le 1er drift, `preview` montre le plan ENTIER —
+    le « ce qui changerait si on appliquait » de Pulumi.
+    """
+    path = _resolve(args.file)
+    topo = load_topology(path)
+    runs = load_runs(args.history or _RUNS_HISTORY)
+    now = int(dt.datetime.now(tz=dt.UTC).timestamp())
+    target = args.target  # None → default_target le déduit
+    run = _run_for_target(runs, target)
+    freshness, _ = verdict_for_run(run, target, now)
+    done = set(run.phases) if run is not None else set()
+    try:
+        seq = expected_phase_sequence(topo, target)
+    except PlanError as exc:
+        raise _UsageError(str(exc)) from exc
+    resolved_target = target or default_target(topo)
+    # Phases restant à appliquer (mêmes règles que `next` : rejeu si pas de run frais).
+    a_appliquer = set(diff_phases(seq, done, freshness))
+    rejeu = freshness in ("perime", "jamais")
+
+    stack_name = topo.catalog.get("topology", "—")
+    print(f"stack : {stack_name}  →  chemin : {resolved_target}")
+    for phase in seq:
+        if phase in a_appliquer:
+            mark, etat = ("~", "rejeu") if rejeu else ("+", "à jouer")
+        else:
+            mark, etat = "✓", "à-jour"
+        print(f"  {mark} {phase:<16} ({etat})")
+    n = len(a_appliquer)
+    if n == 0:
+        print("→ rien à appliquer (séquence complète, run frais).")
+    else:
+        verbe = "à rejouer" if rejeu else "à appliquer"
+        print(f"→ {n} phase(s) {verbe} (rien lancé — `next --apply` pour la 1re).")
+    return 0
+
+
 def cmd_next(args: argparse.Namespace) -> int:
     """Suggère la prochaine phase (diff voulu − réel) ; --apply la LANCE (ADR 0063).
 
@@ -835,6 +885,7 @@ _DISPATCH = {
     "status": cmd_status,
     "epreuves": cmd_epreuves,
     "runs": cmd_runs,
+    "preview": cmd_preview,
     "next": cmd_next,
     "metrics": cmd_metrics,
     "smoke": cmd_smoke,
@@ -979,6 +1030,17 @@ def _build_parser() -> argparse.ArgumentParser:
     p_runs.add_argument("--no-input", action="store_true", help="mode non interactif (CI)")
     p_runs.add_argument("--target", default=None, help="chemin nommé ciblé (atlas, storage-real…)")
     p_runs.add_argument(
+        "--history", default=None, help="chemin du runs-history.yaml (défaut : test/lima/)"
+    )
+
+    p_prev = sub.add_parser(
+        "preview", help="montre le plan complet voulu→réel sans appliquer (calque `pulumi preview`)"
+    )
+    _add_file(p_prev)
+    p_prev.add_argument(
+        "--target", default=None, help="chemin nommé visé (défaut : déduit de la stack active)"
+    )
+    p_prev.add_argument(
         "--history", default=None, help="chemin du runs-history.yaml (défaut : test/lima/)"
     )
 

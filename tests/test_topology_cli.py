@@ -307,6 +307,70 @@ runs:
         self.assertIn("erreur", err)
 
 
+class Preview(unittest.TestCase):
+    """`preview` : plan COMPLET voulu→réel (toute la séquence + état), read-only."""
+
+    _EMPTY_HIST = "runs: []\n"
+    # Socle Ceph frais joué → up/bootstrap/ceph/sc à-jour ; la queue reste à jouer.
+    _SOCLE_FRESH = f"""\
+runs:
+  - id: r1
+    date: {dt_today()}
+    target: atlas-ceph
+    profil: ceph
+    topologie: multi-node-3
+    phases:
+      up: 1
+      bootstrap: 1
+      ceph: 1
+      sc: 1
+"""
+
+    def test_shows_full_sequence_with_states(self):
+        # Historique frais partiel → début à-jour, suite à jouer ; TOUTE la séquence
+        # est affichée (vs `next` qui ne montre que la 1re manquante).
+        hist = _tmp(self._SOCLE_FRESH)
+        self.addCleanup(os.unlink, hist)
+        code, out, _ = _capture(
+            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
+        )
+        self.assertEqual(code, 0)
+        # Socle joué = à-jour ; datalake/monitoring/… = à jouer.
+        self.assertIn("up", out)
+        self.assertIn("à-jour", out)
+        self.assertIn("à jouer", out)
+        self.assertIn("datalake", out)  # phase de queue, présente dans le plan complet
+        self.assertIn("à appliquer", out)
+
+    def test_no_run_replays_whole_sequence(self):
+        # Pas de run frais (historique vide) → toute la séquence en `rejeu`.
+        hist = _tmp(self._EMPTY_HIST)
+        self.addCleanup(os.unlink, hist)
+        code, out, _ = _capture(
+            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
+        )
+        self.assertEqual(code, 0)
+        self.assertIn("rejeu", out)
+        self.assertIn("à rejouer", out)
+
+    def test_never_launches(self):
+        # preview est READ-ONLY : le runner ansible n'est JAMAIS appelé.
+        called = []
+        orig = cli._runner.launch_phase
+        cli._runner.launch_phase = lambda *a, **k: called.append(1)
+        self.addCleanup(setattr, cli._runner, "launch_phase", orig)
+        hist = _tmp(self._EMPTY_HIST)
+        self.addCleanup(os.unlink, hist)
+        _capture(["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist])
+        self.assertEqual(called, [])
+
+    def test_incoherent_target_is_usage_error(self):
+        # atlas sur backend ceph (incohérent) → erreur d'usage (code 2), comme `next`.
+        code, _, err = _capture(["preview", "-f", _EXAMPLE, "--target", "atlas"])
+        self.assertEqual(code, 2)
+        self.assertIn("usage", err)
+
+
 class Next(unittest.TestCase):
     _EMPTY_HIST = "runs: []\n"
     # Historique frais où le socle Ceph est joué → la 1re phase manquante de

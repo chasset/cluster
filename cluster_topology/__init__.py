@@ -26,6 +26,7 @@ from cluster_topology.plan import (
     PlanError,
     Suggestion,
     default_target,
+    diff_phases,
     expected_phase_sequence,
     suggest_next,
 )
@@ -60,6 +61,7 @@ __all__ = [
     "PlanError",
     "KNOWN_TARGETS",
     "default_target",
+    "diff_phases",
     "expected_phase_sequence",
     "suggest_next",
     "RunMetrics",
