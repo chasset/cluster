@@ -1513,7 +1513,12 @@ run_hardening_if_requested() {
     # État : le suffixe reflète ce que l'hôte EST, détecté via SSH (refus franc si
     # injoignable/incohérent). Couvre aussi un hôte durci hors de CE run.
     detect_hardening_state
-    [ "${HARDENING_STATE:-plain}" = hardened ] && TARGET="${TARGET}+hardening"
+    # `if` (et non `[ … ] && …`) : sous `set -e`, un `[ … ] && …` FAUX en DERNIÈRE
+    # instruction d'une fonction propage son rc=1 → abort du chemin alors que tout a
+    # réussi (8e/9e bug du run : socle monté, nœud Ready, puis rc=1 sur l'hôte `plain`).
+    if [ "${HARDENING_STATE:-plain}" = hardened ]; then
+        TARGET="${TARGET}+hardening"
+    fi
 }
 
 # ── Chemin ha-3cp — control-plane HA hyperconvergé (ADR 0047/0055, #250) ─────
