@@ -22,7 +22,29 @@ run comme le fait `lib.sh`.
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
+
+# Artefacts persistés par ansible-runner dans <private_data_dir>/env/ et RÉUTILISÉS
+# au run suivant : si on ne les purge pas, les extravars/cmdline d'un run PRÉCÉDENT
+# (ex. la VIP `control_plane_host_ip` d'un run HA) CONTAMINENT un run mono-nœud
+# (drift constaté : /etc/hosts pointé sur la VIP .40). On les supprime AVANT chaque
+# lancement pour que SEULS les paramètres passés en kwargs comptent (ADR 0063 G3 :
+# rien d'ambiant ; même esprit que le `limit` passé en kwarg, pas via cmdline).
+_RUNNER_ENV_RESIDUALS = ("extravars", "envvars", "cmdline", "settings", "passwords")
+
+
+def _purge_runner_env(private_data_dir: str) -> None:
+    """Supprime les artefacts env/* d'un run ansible-runner PRÉCÉDENT (anti-contamination)."""
+    env_dir = os.path.join(private_data_dir, "env")
+    for name in _RUNNER_ENV_RESIDUALS:
+        path = os.path.join(env_dir, name)
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except OSError:  # pragma: no cover - droits/FS ; on ne bloque pas le run
+            pass
 
 
 @dataclass
@@ -126,6 +148,9 @@ def launch_phase(
     la fois). Passé via le kwarg `limit` d'ansible-runner — PAS via `cmdline`, qui
     persisterait dans `env/cmdline` et fausserait les runs suivants.
     """
+    # Purge les artefacts env/* d'un run PRÉCÉDENT : sinon ansible-runner réutilise
+    # ses extravars persistés (ex. la VIP d'un run HA) et contamine ce run (ADR 0046).
+    _purge_runner_env(private_data_dir)
     envvars: dict[str, str] = {"EXPECTED_TARGET_KIND": target_kind}
     if ansible_config:
         envvars["ANSIBLE_CONFIG"] = ansible_config

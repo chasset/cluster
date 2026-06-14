@@ -74,6 +74,51 @@ class LaunchPhase(unittest.TestCase):
         self.assertEqual(res.changed, 3)
 
 
+class PurgeRunnerEnv(unittest.TestCase):
+    """Anti-contamination : les env/* d'un run précédent sont purgés avant le suivant."""
+
+    def test_removes_residual_extravars(self):
+        import tempfile
+
+        pdd = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(pdd, ignore_errors=True))
+        env = os.path.join(pdd, "env")
+        os.makedirs(env)
+        # Résidu d'un run HA : extravars avec la VIP.
+        with open(os.path.join(env, "extravars"), "w") as f:
+            f.write('{"control_plane_host_ip": "192.168.104.40"}')
+        with open(os.path.join(env, "cmdline"), "w") as f:
+            f.write("--syntax-check")
+        runner._purge_runner_env(pdd)
+        self.assertFalse(os.path.exists(os.path.join(env, "extravars")))
+        self.assertFalse(os.path.exists(os.path.join(env, "cmdline")))
+
+    def test_no_env_dir_is_noop(self):
+        import tempfile
+
+        pdd = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(pdd, ignore_errors=True))
+        # Pas de dossier env/ → ne lève pas.
+        runner._purge_runner_env(pdd)
+
+    def test_launch_phase_purges_before_run(self):
+        # launch_phase purge AVANT de lancer : un extravars résiduel ne survit pas.
+        import tempfile
+
+        pdd = tempfile.mkdtemp()
+        self.addCleanup(lambda: __import__("shutil").rmtree(pdd, ignore_errors=True))
+        env = os.path.join(pdd, "env")
+        os.makedirs(env)
+        residual = os.path.join(env, "extravars")
+        with open(residual, "w") as f:
+            f.write('{"vip": "old"}')
+        orig = runner._runner_run
+        runner._runner_run = lambda **k: _FakeRun(0, "successful")
+        self.addCleanup(setattr, runner, "_runner_run", orig)
+        runner.launch_phase("p.yaml", {"control_plane_ip": "10.0.0.3"}, pdd, "/inv")
+        self.assertFalse(os.path.exists(residual))  # purgé avant le run
+
+
 class ClassifyIdempotence(unittest.TestCase):
     """Portage fidèle de dataops-assert.sh:classify_idempotence (3 cas)."""
 
