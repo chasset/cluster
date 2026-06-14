@@ -91,6 +91,11 @@ def _stdin(text):
         sys.stdin = saved
 
 
+@unittest.skip(
+    "commande `validate` retirée du menu CLI pour l'instant (reviendra en `context "
+    "validate`). Le rejet de schéma (rôle inconnu, HA sans VIP, fichier absent) reste "
+    "couvert au niveau modèle : tests/test_cluster_topology.py (load_topology → TopologyError)."
+)
 class Validate(unittest.TestCase):
     def test_example_is_valid(self):
         code, out, _ = _capture(["validate", "-f", _EXAMPLE])

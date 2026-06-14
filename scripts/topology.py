@@ -19,11 +19,9 @@ sous-commandes triviales n'en justifient aucune ; l'ADR 0056 §2 cite « typer/c
 comme illustration de style, pas comme exigence d'outillage.
 
 Usage :
-  uv run python scripts/topology.py validate [-f topology.yaml]
   uv run python scripts/topology.py context create <nom> [--activate] [--no-input]
   uv run python scripts/topology.py context list
   uv run python scripts/topology.py context activate <nom>
-  uv run python scripts/topology.py default-target [-f topology.yaml]
   uv run python scripts/topology.py generate [--kind prod|lima] [--what inventory|run-params]
   uv run python scripts/topology.py status [--real [--hosts cp1 node1]]
   uv run python scripts/topology.py diff [--kind prod|lima --against PATH]
@@ -806,8 +804,6 @@ _CONTEXT_DISPATCH = {
 }
 
 _DISPATCH = {
-    "validate": cmd_validate,
-    "default-target": cmd_default_target,
     "context": cmd_context,
     "generate": cmd_generate,
     "diff": cmd_diff,
@@ -856,13 +852,12 @@ def _build_parser() -> argparse.ArgumentParser:
         # --no-input accepté partout (uniformité CI) ; sans interactivité, no-op.
         p.add_argument("--no-input", action="store_true", help="mode non interactif (CI)")
 
-    p_val = sub.add_parser("validate", help="valide le schéma de topology.yaml")
-    _add_file(p_val)
-
-    p_dt = sub.add_parser(
-        "default-target", help="imprime le chemin nommé dérivé de la topologie active"
-    )
-    _add_file(p_dt)
+    # `validate` et `default-target` sont RETIRÉS du menu CLI pour l'instant (les
+    # fonctions cmd_validate/cmd_default_target restent dans le module, juste plus
+    # exposées comme sous-commandes). `default-target` reviendra avec topology.py up
+    # (son consommateur) ; la validation se fait via context create/activate qui
+    # valident déjà le schéma. La fonction default_target() de plan.py reste utilisée
+    # en interne (context list/activate/create).
 
     # Groupe `context` (noun-verb) : create | list | activate — gère le catalogue de
     # topologies et la sélection de l'active (modèle kubectl/terraform workspace).
