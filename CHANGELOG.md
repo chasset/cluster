@@ -11,6 +11,103 @@ quotidien dépose (ou met à jour) une PR `chore(main): release vX.Y.Z` qui agr�
 les commits depuis la dernière release. Merger cette PR publie la version (bump +
 tag + entrée de changelog). Rien à lancer en local.
 
+## [2.35.0](https://github.com/univ-lehavre/cluster/compare/v2.34.1...v2.35.0) (2026-06-14)
+
+
+### Features
+
+* **banc:** auto-détecter l'état de durcissement (2ᵉ axe ADR 0065) ([354a769](https://github.com/univ-lehavre/cluster/commit/354a7691d63717e669649c6fb6e9ba581b4989eb))
+* **banc:** classify_hardening_signal — verdict d'état de durcissement (ADR 0065 §2) ([1145d29](https://github.com/univ-lehavre/cluster/commit/1145d29627a41a4bd914306fc00c042bd0604752))
+* **banc:** détecter l'état de durcissement, dériver +hardening de la réalité ([0bf4fdb](https://github.com/univ-lehavre/cluster/commit/0bf4fdb8efc8e475c66be1989f0d5d282e125f91))
+* **docs:** remanier la sidebar et la nav (adr par thème, archi & preuves, liens à jour) ([2cdb96e](https://github.com/univ-lehavre/cluster/commit/2cdb96e9211fc1edf87107df44ecf7c04f40bfec))
+* **gouvernance:** auditer le respect des conventions + afficher les chiffres (adr 0060) ([2023a96](https://github.com/univ-lehavre/cluster/commit/2023a96b4a64d2dab94cca1b1be475a6b2c91e33))
+* **gouvernance:** auditer le respect des conventions + afficher les chiffres (ADR 0060) ([da17034](https://github.com/univ-lehavre/cluster/commit/da17034b06a07184735d228cc65fc2245155e9ba))
+* **ha-3cp:** chemin codé + rôle de promotion CP + gates etcd ([#250](https://github.com/univ-lehavre/cluster/issues/250)) ([bd5e469](https://github.com/univ-lehavre/cluster/commit/bd5e469a68e223b34554c30da3be9d87ab242173))
+* **ha-3cp:** chemin codé + rôle de promotion CP + gates etcd ([#250](https://github.com/univ-lehavre/cluster/issues/250)) ([52c1b70](https://github.com/univ-lehavre/cluster/commit/52c1b705dea42e1c3785a39753a67ef0ef20c15e))
+* **ha-3cp:** rôle kube-vip (VIP API, pod statique ARP) + certSANs VIP ([#250](https://github.com/univ-lehavre/cluster/issues/250)) ([08ab880](https://github.com/univ-lehavre/cluster/commit/08ab880c0443231901358d876ba759ca45ac21ef))
+* **ha-3cp:** rôle kube-vip (VIP API) + certSANs VIP ([#250](https://github.com/univ-lehavre/cluster/issues/250)) ([c9fc13f](https://github.com/univ-lehavre/cluster/commit/c9fc13ffd14cc15f4d5301e69a71e85a8cd6ab98))
+* **rollback:** arêtes stockage bloc + clôture par phase dérivée (ADR 0066 Lot 1) ([43314db](https://github.com/univ-lehavre/cluster/commit/43314db7fa8b6d6248a5b0cc794b4c58b39f992d))
+* **rollback:** graphe atomique des composants (ADR 0066 Lot 0) ([39614a2](https://github.com/univ-lehavre/cluster/commit/39614a262a3622077ab4d65496356b7f202cd2d2))
+* **rollback:** graphe atomique des composants + 1ʳᵉ trace workflow (ADR 0066 Lot 0) ([00e2060](https://github.com/univ-lehavre/cluster/commit/00e2060c14b694999a800ee186be92c52114a493))
+* **topologie:** boucle « que faire ensuite » via ansible-runner (adr 0056/0063, p5) ([d79daf0](https://github.com/univ-lehavre/cluster/commit/d79daf0ea2d2fec625c548dac24b814d8bf51a91))
+* **topologie:** boucle « que faire ensuite » via ansible-runner (ADR 0056/0063, P5) ([1d9d222](https://github.com/univ-lehavre/cluster/commit/1d9d222dab0983c7a22de6497a6795c914a01961))
+* **topologie:** commande roundtrip — réversibilité de couche par clôture (adr 0056/0066) ([e841818](https://github.com/univ-lehavre/cluster/commit/e841818702188215bbcf805d0e65d9ab88102fe6))
+* **topologie:** commande roundtrip — réversibilité de couche par clôture (ADR 0056/0066) ([9f37018](https://github.com/univ-lehavre/cluster/commit/9f37018c110d73194e43dd1204a4eb8f0f9a0bbe))
+* **topologie:** dérivation de profil pure à parité bash (adr 0056, p2) ([77928b5](https://github.com/univ-lehavre/cluster/commit/77928b5d7db550f37ae5cfac65fe789e3c960ff3))
+* **topologie:** dérivation de profil pure à parité bash (ADR 0056, P2) ([c710be3](https://github.com/univ-lehavre/cluster/commit/c710be3fe589108c3cc35dc192d05b1e71cdbd41))
+* **topologie:** épreuves filtrées + lecture de l'historique (adr 0056, p4) ([976c97e](https://github.com/univ-lehavre/cluster/commit/976c97e97cdd6603a3296f0e4f76952a341f50b6))
+* **topologie:** épreuves filtrées + lecture de l'historique (ADR 0056, P4) ([ba63c7c](https://github.com/univ-lehavre/cluster/commit/ba63c7c829d67935fa88859890903346713a27c4))
+* **topologie:** façade CLI/CI generate/validate/status/diff (adr 0056, p3) ([2692756](https://github.com/univ-lehavre/cluster/commit/2692756819be4d35ceaa2572959c98492331f2b6))
+* **topologie:** façade CLI/CI generate/validate/status/diff (ADR 0056, P3) ([71abd16](https://github.com/univ-lehavre/cluster/commit/71abd16fc33a283a4c05fdc0aea37ce076c2c258))
+* **topologie:** générateur byte-identique de l'inventaire banc Lima (adr 0056, p1) ([32d8d0e](https://github.com/univ-lehavre/cluster/commit/32d8d0ee1b10df211db5dd96dc9a0fdb184e62c8))
+* **topologie:** générateur byte-identique de l'inventaire banc Lima (ADR 0056, P1) ([773406e](https://github.com/univ-lehavre/cluster/commit/773406e1f2d2d0e333f317fcbf34d44db8628b93))
+* **topologie:** métriques exposées + smoke-test de réversibilité (adr 0056, p6) ([1544b58](https://github.com/univ-lehavre/cluster/commit/1544b58da6198efc8099f351f4017a41dd4f59c6))
+* **topologie:** métriques exposées + smoke-test de réversibilité (ADR 0056, P6) ([0ac3f65](https://github.com/univ-lehavre/cluster/commit/0ac3f65a5defaddc9291741acda2a3fe0f2134ea))
+* **topologie:** socle de l'outil déclaratif — schéma + générateur byte-identique (adr 0056, p0/p1) ([ebb5806](https://github.com/univ-lehavre/cluster/commit/ebb58065e52196b55867a660762409c656871487))
+* **topologie:** socle de l'outil déclaratif — schéma + générateur byte-identique (ADR 0056, P0/P1) ([21f2771](https://github.com/univ-lehavre/cluster/commit/21f277181715c4027e70c4e7f0551a7c377b0d4c))
+* **topology:** déclarer ha-3cp + valider control_plane_lb.mode (P7 [#250](https://github.com/univ-lehavre/cluster/issues/250)) ([b07febb](https://github.com/univ-lehavre/cluster/commit/b07febbaea02ace0c6ef2f03bdaadee0a61dcd80))
+* **topology:** déclarer la topologie ha-3cp + valider control_plane_lb.mode (P7 [#250](https://github.com/univ-lehavre/cluster/issues/250)) ([c0d3c47](https://github.com/univ-lehavre/cluster/commit/c0d3c476f3ae45dd6cca31acc61af57d1571722b))
+
+
+### Bug Fixes
+
+* **banc:** auto-détecter le profil de stockage ([#319](https://github.com/univ-lehavre/cluster/issues/319)) + ADR 0065 + durcissement rollback ([d003840](https://github.com/univ-lehavre/cluster/commit/d0038400659939fa967ee60be4c64297da7e1c59))
+* **banc:** auto-détecter le profil de stockage au lieu de WITH_CEPH ([#319](https://github.com/univ-lehavre/cluster/issues/319), adr 0065) ([54a5c66](https://github.com/univ-lehavre/cluster/commit/54a5c6633aaa1e24954c6d0c79062a371ee6ac05))
+* **banc:** détection durcissement — sonder la joignabilité, paquet absent = plain ([e5685ec](https://github.com/univ-lehavre/cluster/commit/e5685ec591910a7c84621905efe351d56f153d00))
+* **banc:** durcir k8s_force_delete_ns (finalize canonique, continue-on-error, barman) ([e8b0e05](https://github.com/univ-lehavre/cluster/commit/e8b0e054b77fe6a423fb423b7896c83d561862b2))
+* **banc:** rollback monitoring/dataops emporte leur OBC dans rook-ceph ([#319](https://github.com/univ-lehavre/cluster/issues/319)-suite) ([6ee4738](https://github.com/univ-lehavre/cluster/commit/6ee473830bf2fd27ef05a7be1044c8e3fac8dd24))
+* **bootstrap:** figer le patch kubernetes à l'install (reproductibilité, [#295](https://github.com/univ-lehavre/cluster/issues/295)) ([97303e4](https://github.com/univ-lehavre/cluster/commit/97303e4636da59431ab13cd09b0f5f38577801c1))
+* **bootstrap:** poser le hold apt sur containerd.io (aligne adr 0005, [#295](https://github.com/univ-lehavre/cluster/issues/295)) ([7c3c543](https://github.com/univ-lehavre/cluster/commit/7c3c5436a7351197933a1e635fe09073981732d2))
+* **bootstrap:** reproductibilité install + supply-chain (hold containerd, patch k8s figé, actions par sha) ([7cb8cdb](https://github.com/univ-lehavre/cluster/commit/7cb8cdba0b547aedafdcb41004da2ba8cc813872))
+* **bootstrap:** versionner le client k8s et le provisionner par uv sync ([137aa65](https://github.com/univ-lehavre/cluster/commit/137aa65fa054012339484120aff3f76631bb7dea))
+
+
+### Refactor
+
+* abandonner tailscale au profit de kubectl port-forward ([6ad1832](https://github.com/univ-lehavre/cluster/commit/6ad18320045de49f762b3f60becbab27da9864e9))
+* abandonner tailscale au profit de kubectl port-forward ([#281](https://github.com/univ-lehavre/cluster/issues/281)) ([46421d4](https://github.com/univ-lehavre/cluster/commit/46421d4222306c41f94847f1a115e50643345892))
+* **gouvernance:** renommer le workflow en conventions-freshness (éviter la collision « audit ») ([ef6802f](https://github.com/univ-lehavre/cluster/commit/ef6802f96629340f3c7e3f60dbac00495cb1879b))
+* retirer les buckets de cas d'usage nommés du datalake ([b515d3e](https://github.com/univ-lehavre/cluster/commit/b515d3e5eb4f73052c631db7af076bfc02b3811b))
+* retirer les buckets de cas d'usage nommés du datalake (adr 0023) ([ae45df0](https://github.com/univ-lehavre/cluster/commit/ae45df0e1cd69f7c266d8a31821f87a59e84d568))
+* **roundtrip:** consommer le graphe atomique (supprime la 2ᵉ source) ([ed1b39f](https://github.com/univ-lehavre/cluster/commit/ed1b39f0bf115eb6babb9362e1920b8ea88f9f46))
+* **roundtrip:** consommer le graphe atomique + arêtes stockage bloc (ADR 0066 Lot 1) ([e7f5d2b](https://github.com/univ-lehavre/cluster/commit/e7f5d2ba097aaf9b73fa9f22fd9eb8c69a2d1329))
+
+
+### Documentation
+
+* achever le manifeste (méthode, voyage, résultats) et ajouter la vitrine des preuves ([cb4803e](https://github.com/univ-lehavre/cluster/commit/cb4803ee08cb1b90d712a65867aeb02cf3627743))
+* **adr:** acter ansible-runner pour la boucle p5, différer textual (adr 0063) ([383f2f8](https://github.com/univ-lehavre/cluster/commit/383f2f8d4892b96defbb00ea61547c019d191be3))
+* **adr:** acter les cultures d'ingénierie revendiquées (adr 0062) + vue transverse ([99c54e6](https://github.com/univ-lehavre/cluster/commit/99c54e6cda77ee85617df01e204501a7a0d3bd18))
+* **adr:** consigner les workflows multi-agents comme 4ᵉ trace empirique (ADR 0067) ([6552455](https://github.com/univ-lehavre/cluster/commit/65524551e1a1787872fb4520d53eb2b430e8a85d))
+* **adr:** cultures d'ingénierie revendiquées (ADR 0062) + vue transverse ([343f9fe](https://github.com/univ-lehavre/cluster/commit/343f9fe65601f069a85ad4291ebf45a35fe6420c))
+* **adr:** poser la posture d'adoption des bonnes pratiques (adr 0061, principe-chapeau) ([d35cff8](https://github.com/univ-lehavre/cluster/commit/d35cff808e6791d8e467d5f7ac357713ec2f600a))
+* **adr:** posture d'adoption des bonnes pratiques (ADR 0061) + inventaire ([1dfd271](https://github.com/univ-lehavre/cluster/commit/1dfd271bd3f00446e3e49604359ec8973b8281df))
+* **adr:** rollback atomique — composants + graphe de dépendances unique (adr 0066) ([987b0e7](https://github.com/univ-lehavre/cluster/commit/987b0e72859e8783f03989b6106ef25e443fafd5))
+* **adr:** rollback atomique — composants + graphe de dépendances unique (ADR 0066) ([5edc4e9](https://github.com/univ-lehavre/cluster/commit/5edc4e94a8fe705d5b21ab10dd857bf3a9a94bc2))
+* **adr:** variables d'env — intention vs état détectable (adr 0065) ([04a42c8](https://github.com/univ-lehavre/cluster/commit/04a42c8cbc2b9384d95f2b807f040e5e963973c3))
+* **adr:** workflows multi-agents consignés — 4ᵉ trace empirique (ADR 0067) ([4da00bb](https://github.com/univ-lehavre/cluster/commit/4da00bb14f429ff5fde19a18113dcadd10a3a89d))
+* ajouter la preuve de banc à la cartographie de traçabilité (adr 0034/0052) ([a9faaa2](https://github.com/univ-lehavre/cluster/commit/a9faaa2e36c390d6ec15243c735df397f741fe95))
+* aligner sur le catalogue générique (adr 0023), enrichir le glossaire, rafraîchir les chiffres ([9d1f0c5](https://github.com/univ-lehavre/cluster/commit/9d1f0c58bbfa982b877619d99a78fa435205f764))
+* **audit:** consigner le workflow de vérification du graphe atomique (4ᵉ trace) ([651e60c](https://github.com/univ-lehavre/cluster/commit/651e60c2cb051e1b255a7c5d8897002932dc7509))
+* **drifts:** porter L12 et L44 par leurs issues ([#318](https://github.com/univ-lehavre/cluster/issues/318), [#319](https://github.com/univ-lehavre/cluster/issues/319)) ([3ede52d](https://github.com/univ-lehavre/cluster/commit/3ede52dd492aa783ab6e7ca0ee4353fdc8a19932))
+* **drifts:** porter L12 et L44 par leurs issues ([#318](https://github.com/univ-lehavre/cluster/issues/318), [#319](https://github.com/univ-lehavre/cluster/issues/319)) ([024ce4f](https://github.com/univ-lehavre/cluster/commit/024ce4fff2c70058dd5ef0870985daabe5c92bbb))
+* durcir le workflow documentaire (adr 0057) — état du plan, cycle de vie adr, nommage ([8a4aaa2](https://github.com/univ-lehavre/cluster/commit/8a4aaa2c7f2b2730e26583860ab0da5a63d7382e))
+* durcir le workflow documentaire (ADR 0057) — état du plan, cycle de vie ADR, nommage ([5f1d4ad](https://github.com/univ-lehavre/cluster/commit/5f1d4ad64e3576f821f0a5dc307075c18cedc766))
+* inscrire le registre des drifts dans la cartographie du workflow (adr 0058 §6) ([f529ec6](https://github.com/univ-lehavre/cluster/commit/f529ec60fa840b0b820ed8c0140e05dea06ea04f))
+* inventorier les bonnes pratiques appliquées au dépôt (réf. adr 0061) ([f29ddc6](https://github.com/univ-lehavre/cluster/commit/f29ddc627177baf6db085cd58282baee2c11e657))
+* **plans:** ajouter la section Suivi manquante aux 3 plans achevés (adr 0057 §3) ([376d0fd](https://github.com/univ-lehavre/cluster/commit/376d0fdbb7d9004c49d1ade8cc9b1dbcd78955bb))
+* **plans:** ajouter la section Suivi manquante aux 3 plans achevés (ADR 0057 §3) ([528d489](https://github.com/univ-lehavre/cluster/commit/528d4895c2deef92f200da8c9d77f59536843942))
+* **plans:** câbler le plan rollback-par-phase à son issue [#274](https://github.com/univ-lehavre/cluster/issues/274) ([01abe9b](https://github.com/univ-lehavre/cluster/commit/01abe9b0670efac8064a474e26fdc940d37bc55b))
+* **plans:** câbler le plan rollback-par-phase à son issue [#274](https://github.com/univ-lehavre/cluster/issues/274) (adr 0057) ([03ab579](https://github.com/univ-lehavre/cluster/commit/03ab5794680aa945d8fb4e576b42ef94b4e1716d))
+* rattraper la refonte documentaire (manifeste + diátaxis) de [#279](https://github.com/univ-lehavre/cluster/issues/279) ([9f856df](https://github.com/univ-lehavre/cluster/commit/9f856dfdb0b35773619ab99bd6d86c629642e499))
+* refonte — achever le manifeste, vitrine des preuves, diátaxis & nav ([ad7a49a](https://github.com/univ-lehavre/cluster/commit/ad7a49a59410536c83307da950e3b5997cad556d))
+* refonte documentaire — hero, manifeste, Diátaxis (ADR 0055) ([c245e15](https://github.com/univ-lehavre/cluster/commit/c245e1599a5e245b86e08645b85776d861c508bf))
+* retirer STATUS.md au profit des plans et passages d'audit ([ceeb91f](https://github.com/univ-lehavre/cluster/commit/ceeb91fa761a1356d00a644ee6c149b97287e148))
+* retirer STATUS.md au profit des plans et passages d'audit (adr 0057/0058) ([e6975e5](https://github.com/univ-lehavre/cluster/commit/e6975e53352ce78f46fdc5354986348418cbd0b8))
+* scinder le guide dev data selon diátaxis (how-to, tutorial, référence) ([718d13e](https://github.com/univ-lehavre/cluster/commit/718d13e2812e5018f78242e85026a2d61e602b7e))
+* **stockage:** acter Longhorn comme 3e profil du catalogue (ADR 0064, Proposed) ([b105196](https://github.com/univ-lehavre/cluster/commit/b105196ae877794d57fc2a2917a545cbd6eac587))
+* **stockage:** acter longhorn comme 3e profil du catalogue (adr 0064) ([dc2f53e](https://github.com/univ-lehavre/cluster/commit/dc2f53e879b55855f1e28556056938ef916d3288))
+
 ## [2.34.1](https://github.com/univ-lehavre/cluster/compare/v2.34.0...v2.34.1) (2026-06-13)
 
 
