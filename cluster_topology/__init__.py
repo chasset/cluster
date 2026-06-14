@@ -18,6 +18,13 @@ diff) relève de P3 et vit dans `scripts/topology.py` (façade fine, hors paquet
 
 from cluster_topology.epreuves import EPREUVES, Epreuve, filter_epreuves
 from cluster_topology.facts import parse_facts
+from cluster_topology.gates import (
+    GateError,
+    GateResult,
+    gate_nodes_ready,
+    gate_osds_up,
+    gate_pvc_bound,
+)
 from cluster_topology.generator import render_lima_inventory, render_prod_inventory
 from cluster_topology.history import Run, load_runs, verdict_for_run
 from cluster_topology.metrics import RunMetrics, format_metrics, metrics_of
@@ -59,6 +66,11 @@ __all__ = [
     "EPREUVES",
     "filter_epreuves",
     "parse_facts",
+    "GateError",
+    "GateResult",
+    "gate_pvc_bound",
+    "gate_nodes_ready",
+    "gate_osds_up",
     "Run",
     "load_runs",
     "verdict_for_run",
