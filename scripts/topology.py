@@ -18,21 +18,24 @@ le besoin » (model.py / ADR 0049 — lisibilité néophyte, coût de diversité
 sous-commandes triviales n'en justifient aucune ; l'ADR 0056 §2 cite « typer/click »
 comme illustration de style, pas comme exigence d'outillage.
 
-Usage :
+Usage — gestion des stacks (catalogue, calque `pulumi stack`) :
   uv run python scripts/topology.py stack new <nom> [--activate] [--no-input]
-  uv run python scripts/topology.py stack ls                              (calque pulumi stack)
+  uv run python scripts/topology.py stack ls
   uv run python scripts/topology.py stack select <nom>
   uv run python scripts/topology.py stack validate [-f topology.yaml]
-  uv run python scripts/topology.py stack refresh             (calque pulumi refresh)
+Usage — cycle de vie (top-level, calque Pulumi) :
+  uv run python scripts/topology.py refresh                   (calque pulumi refresh)
+  uv run python scripts/topology.py preview [--target …]      (calque pulumi preview)
+  uv run python scripts/topology.py next [--target …] [--apply]                   (P5)
+  uv run python scripts/topology.py destroy [--yes]           (calque pulumi destroy)
+Usage — inspection & artefacts :
   uv run python scripts/topology.py generate [--kind prod|lima] [--what inventory|run-params]
   uv run python scripts/topology.py status [--real [--hosts cp1 node1]]
   uv run python scripts/topology.py diff [--kind prod|lima --against PATH]
-  uv run python scripts/topology.py epreuves [--all] [--type unit|intég|chaos]   (P4)
   uv run python scripts/topology.py runs [--target atlas|storage-real|…]          (P4)
-  uv run python scripts/topology.py preview [--target …]            (calque pulumi preview)
-  uv run python scripts/topology.py destroy [--yes]                (calque pulumi destroy)
-  uv run python scripts/topology.py next [--target …] [--apply]                   (P5)
   uv run python scripts/topology.py metrics [--last]                               (P6)
+Usage — épreuves & réversibilité :
+  uv run python scripts/topology.py epreuves [--all] [--type unit|intég|chaos]   (P4)
   uv run python scripts/topology.py smoke [--namespace …]                          (P6)
   uv run python scripts/topology.py roundtrip --phase monitoring|gitops|…          (P6+)
 
@@ -443,7 +446,7 @@ def _ready_nodes() -> list[str]:
 
 
 def cmd_stack_refresh(args: argparse.Namespace) -> int:
-    """`stack refresh` : resynchronise l'état RÉEL de la stack active depuis le réel.
+    """`refresh` : resynchronise l'état RÉEL de la stack active depuis le réel.
 
     Calque `pulumi refresh` : lit les VMs Lima (`limactl`) + les nœuds k8s (`kubectl`)
     et CLASSE (classify_refresh, pur) l'état de la stack active : VMs présentes, VMs
@@ -576,9 +579,9 @@ def cmd_stack_ls(args: argparse.Namespace) -> int:
 
 
 def cmd_stack(args: argparse.Namespace) -> int:
-    """Routeur du groupe `stack` (new | ls | select | validate | refresh). Façade de dispatch.
+    """Routeur du groupe `stack` (new | ls | select | validate). Façade de dispatch.
 
-    Calque `pulumi stack`. argparse garantit `stack_cmd` ∈ {new, ls, select, validate, refresh}
+    Calque `pulumi stack`. argparse garantit `stack_cmd` ∈ {new, ls, select, validate}
     (sous-parser `required`) — on route vers la façade dédiée. Un `stack` sans verbe
     est une erreur d'usage (argparse l'arrête en amont avec le help du groupe)."""
     return _STACK_DISPATCH[args.stack_cmd](args)
@@ -1053,17 +1056,18 @@ def cmd_roundtrip(args: argparse.Namespace) -> int:
     return 0 if result.reversible else 1
 
 
-# Verbes du groupe `stack` (calque `pulumi stack` : ls | select | validate).
+# Verbes du groupe `stack` (calque `pulumi stack` : GESTION des stacks).
 _STACK_DISPATCH = {
     "new": cmd_stack_new,
     "ls": cmd_stack_ls,
     "select": cmd_stack_select,
     "validate": cmd_stack_validate,
-    "refresh": cmd_stack_refresh,
 }
 
 _DISPATCH = {
     "stack": cmd_stack,  # calque `pulumi stack` (new | ls | select | validate)
+    # Cycle de vie au TOP-LEVEL (fidèle à Pulumi : preview/refresh/destroy/up plats).
+    "refresh": cmd_stack_refresh,  # calque `pulumi refresh` (top-level chez Pulumi)
     "destroy": cmd_destroy,  # calque `pulumi destroy`
     "generate": cmd_generate,
     "diff": cmd_diff,
@@ -1123,7 +1127,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # une STACK (verbe du groupe), pas un projet.
     p_stack = sub.add_parser(
         "stack",
-        help="gère les stacks (new | ls | select | validate | refresh) — calque `pulumi stack`",
+        help="gère les stacks (new | ls | select | validate) — calque `pulumi stack`",
     )
     stack_sub = p_stack.add_subparsers(dest="stack_cmd", required=True)
 
@@ -1159,10 +1163,11 @@ def _build_parser() -> argparse.ArgumentParser:
     p_stack_val = stack_sub.add_parser("validate", help="valide le schéma d'une topologie")
     _add_file(p_stack_val)
 
-    p_stack_ref = stack_sub.add_parser(
+    # `refresh` est TOP-LEVEL (Pulumi a `pulumi refresh`, pas `pulumi stack refresh`).
+    p_refresh = sub.add_parser(
         "refresh", help="resynchronise l'état réel (VMs Lima + nœuds k8s) — calque `pulumi refresh`"
     )
-    _add_file(p_stack_ref)
+    _add_file(p_refresh)
 
     p_gen = sub.add_parser("generate", help="dérive un artefact (inventaire ou run-params)")
     _add_file(p_gen)

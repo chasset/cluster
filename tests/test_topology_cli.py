@@ -790,7 +790,7 @@ class Stack(unittest.TestCase):
 
 
 class StackRefresh(unittest.TestCase):
-    """`stack refresh` : lit le réel (stubé) et classe l'état. Read-only, sans réseau."""
+    """`refresh` : lit le réel (stubé) et classe l'état. Read-only, sans réseau."""
 
     def _stub(self, vms, ready):
         # Stub des helpers d'I/O réelle : aucun subprocess limactl/kubectl en test.
@@ -803,7 +803,7 @@ class StackRefresh(unittest.TestCase):
     def test_orphan_vms_flagged(self):
         # _EXAMPLE (socle, nœuds cp1+node1..4) ; un cluster réel cp9/cp8 = orphelins.
         self._stub(vms=["cp9", "cp8"], ready=[])
-        code, out, _ = _capture(["stack", "refresh", "-f", _EXAMPLE])
+        code, out, _ = _capture(["refresh", "-f", _EXAMPLE])
         self.assertEqual(code, 0)
         self.assertIn("ORPHELINES", out)
         self.assertIn("cp9", out)
@@ -811,14 +811,14 @@ class StackRefresh(unittest.TestCase):
 
     def test_empty_terrain(self):
         self._stub(vms=[], ready=[])
-        code, out, _ = _capture(["stack", "refresh", "-f", _EXAMPLE])
+        code, out, _ = _capture(["refresh", "-f", _EXAMPLE])
         self.assertEqual(code, 0)
         self.assertIn("terrain vierge", out)
 
     def test_declared_vm_present_not_orphan(self):
         # cp1 est déclaré par _EXAMPLE → présent, PAS orphelin.
         self._stub(vms=["cp1"], ready=["cp1"])
-        code, out, _ = _capture(["stack", "refresh", "-f", _EXAMPLE])
+        code, out, _ = _capture(["refresh", "-f", _EXAMPLE])
         self.assertEqual(code, 0)
         self.assertNotIn("ORPHELINES", out)
         self.assertIn("cp1", out)
