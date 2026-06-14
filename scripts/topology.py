@@ -835,12 +835,21 @@ def cmd_up(args: argparse.Namespace) -> int:
         print("montage annulé.", file=sys.stderr)
         return 2
 
+    # NODES_OVERRIDE : la TOPOLOGIE pilote les nœuds du banc (inversion de frontière,
+    # ADR 0056 — la stack active décide, le harnais exécute). On bâtit le csv "nom:rôle"
+    # dans l'ordre déclaré : un nœud `control` (même control+worker, le banc le détaint)
+    # → `:control` ; un worker pur → `:worker`. ha-3cp garde son override interne (3 CP).
+    nodes_override = ",".join(
+        f"{n.name}:{'control' if n.has_role('control') else 'worker'}" for n in topo.nodes
+    )
+
     # Délégation à run-phases.sh <chemin> : la séquence prouvée au banc (provisioning
     # VM + bootstrap + orchestration ha-3cp + apps), bash garde le moteur (ADR 0049).
-    print(f"→ montage du chemin `{target}` via run-phases.sh…")
+    print(f"→ montage du chemin `{target}` ({len(topo.nodes)} nœud(s)) via run-phases.sh…")
     rc = subprocess.run(  # noqa: S603 — chemin codé, target dérivé d'une topo validée
         ["bash", os.path.join(_ROOT, "test", "lima", "run-phases.sh"), target],
         check=False,
+        env={**os.environ, "NODES_OVERRIDE": nodes_override},
     ).returncode
     if rc != 0:
         print(f"échec du montage (run-phases.sh {target} rc={rc}).", file=sys.stderr)

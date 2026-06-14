@@ -792,11 +792,14 @@ class UpCommand(unittest.TestCase):
     """`up` : dérive le chemin → affiche le plan → confirme → délègue à run-phases.sh."""
 
     def _stub_runphases(self, rc=0):
-        # Capture l'appel à run-phases.sh (PAS de vrai montage en test).
+        # Capture l'appel à run-phases.sh (PAS de vrai montage en test). `self.env`
+        # garde l'environnement passé (pour vérifier NODES_OVERRIDE).
         calls = []
+        self.env = {}
 
         def _spy(cmd, *a, **k):
             calls.append(cmd)
+            self.env = k.get("env", {})
             return subprocess.CompletedProcess(args=cmd, returncode=rc)
 
         orig = cli.subprocess.run
@@ -819,6 +822,28 @@ class UpCommand(unittest.TestCase):
         code, _, _ = _capture(["up", "-f", _EXAMPLE, "--target", "atlas-ceph", "--yes"])
         self.assertEqual(code, 0)
         self.assertIn("atlas-ceph", calls[0])
+
+    def test_passes_nodes_override_from_topology(self):
+        # La TOPOLOGIE pilote les nœuds du banc : up passe NODES_OVERRIDE dérivé.
+        self._stub_runphases()
+        # _EXAMPLE (socle.example) = cp1 control + node1..4 workers.
+        _capture(["up", "-f", _EXAMPLE, "--yes"])
+        override = self.env.get("NODES_OVERRIDE", "")
+        self.assertIn("cp1:control", override)
+        self.assertIn("node1:worker", override)
+
+    def test_single_node_topology_yields_one_node(self):
+        # Une topo 1 nœud → NODES_OVERRIDE à UN seul nœud (la topologie décide).
+        topo_yaml = (
+            "catalog: {topology: solo, profile: base}\n"
+            "nodes:\n  - {name: cp1, roles: [control, worker]}\n"
+            "storage: {backend: local-path}\ntarget_kind: lima\n"
+        )
+        path = _tmp(topo_yaml)
+        self.addCleanup(os.unlink, path)
+        self._stub_runphases()
+        _capture(["up", "-f", path, "--yes"])
+        self.assertEqual(self.env.get("NODES_OVERRIDE"), "cp1:control")
 
     def test_refuses_without_yes_off_tty(self):
         calls = self._stub_runphases()

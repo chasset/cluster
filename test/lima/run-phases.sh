@@ -65,16 +65,27 @@ HERE=$(cd "$(dirname "$0")" && pwd)
 . "${HERE}/rollback-lib.sh"
 
 # ── Table des nœuds (noms génériques — ADR 0023) ─────────────────────────────
-# "nom:rôle". Topologie `multi-node-3` : 1 control-plane + 2 workers = quorum mon
-# Ceph (3 nœuds) + ×3 réplication. Tous nœuds de stockage (disques bruts attachés
-# à chacun). C'est la SEULE topologie du banc local (ADR 0040 : single-node
-# abandonné ; ha-3cp/multisite = cibles à outillage dédié, pas via ce harnais).
-NODES=(
-    "cp1:control"
-    "node1:worker"
-    "node2:worker"
-)
-CP=cp1 # nœud control-plane (kubeconfig + cni.sh)
+# "nom:rôle". Défaut `multi-node-3` : 1 control-plane + 2 workers (quorum mon Ceph
+# + ×3 réplication). SURCHARGEABLE par NODES_OVERRIDE (csv "nom:rôle,…") : c'est
+# ainsi que `topology.py up` PILOTE les nœuds depuis la topologie active (inversion
+# de frontière, ADR 0056 — la topologie décide, le harnais exécute). Le 1er nœud
+# control devient le CP primaire (kubeconfig + cni.sh).
+if [ -n "${NODES_OVERRIDE:-}" ]; then
+    IFS=',' read -r -a NODES <<< "${NODES_OVERRIDE}"
+else
+    NODES=(
+        "cp1:control"
+        "node1:worker"
+        "node2:worker"
+    )
+fi
+# CP = 1er nœud `control` de NODES (primaire). Dérivé, pas codé en dur (suit l'override).
+CP=""
+for _entry in "${NODES[@]}"; do
+    [ "${_entry##*:}" = control ] && { CP="${_entry%%:*}"; break; }
+done
+[ -n "${CP}" ] || CP="${NODES[0]%%:*}" # repli : 1er nœud si aucun rôle control explicite
+unset _entry
 # Port hôte du forward de l'API du control-plane (127.0.0.1:API_PORT → guest 6443).
 API_PORT=6443
 
