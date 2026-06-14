@@ -678,7 +678,7 @@ class Stack(unittest.TestCase):
         name = "zz-test-ctx-mono"
         target = self._catalog(name)
         self.addCleanup(lambda: os.path.exists(target) and os.unlink(target))
-        code, out, _ = _capture(["new", name, "--no-input"])
+        code, out, _ = _capture(["stack", "new", name, "--no-input"])
         self.assertEqual(code, 0)
         self.assertIn("créée", out)
         self.assertTrue(os.path.exists(target))
@@ -702,14 +702,14 @@ class Stack(unittest.TestCase):
             contextlib.redirect_stderr(io.StringIO()),
             _stdin(answers),
         ):
-            code = cli.main(["new", name])
+            code = cli.main(["stack", "new", name])
         self.assertEqual(code, 0)
         topo = load_topology(target)
         self.assertTrue(topo.is_ha_control_plane)
         self.assertEqual(len(topo.control_nodes), 3)
 
     def test_create_example_name_rejected_usage(self):
-        code, _, err = _capture(["new", "bad.example", "--no-input"])
+        code, _, err = _capture(["stack", "new", "bad.example", "--no-input"])
         self.assertEqual(code, 2)
         self.assertIn("ADR 0023", err)
 
@@ -717,8 +717,8 @@ class Stack(unittest.TestCase):
         name = "zz-test-ctx-dup"
         target = self._catalog(name)
         self.addCleanup(lambda: os.path.exists(target) and os.unlink(target))
-        self.assertEqual(_capture(["new", name, "--no-input"])[0], 0)
-        code, _, err = _capture(["new", name, "--no-input"])  # 2e sans --force
+        self.assertEqual(_capture(["stack", "new", name, "--no-input"])[0], 0)
+        code, _, err = _capture(["stack", "new", name, "--no-input"])  # 2e sans --force
         self.assertEqual(code, 2)
         self.assertIn("existe déjà", err)
 
@@ -726,7 +726,7 @@ class Stack(unittest.TestCase):
         name = "zz-test-ctx-activate"
         target = self._catalog(name)
         self.addCleanup(lambda: os.path.exists(target) and os.unlink(target))
-        code, out, _ = _capture(["new", name, "--no-input", "--activate"])
+        code, out, _ = _capture(["stack", "new", name, "--no-input", "--activate"])
         self.assertEqual(code, 0)
         self.assertTrue(os.path.islink(self._link))
         self.assertEqual(os.readlink(self._link), f"topologies/{name}.yaml")
@@ -737,7 +737,7 @@ class Stack(unittest.TestCase):
         name = "zz-test-ctx-act-existing"
         target = self._catalog(name)
         self.addCleanup(lambda: os.path.exists(target) and os.unlink(target))
-        _capture(["new", name, "--no-input"])  # sans activer
+        _capture(["stack", "new", name, "--no-input"])  # sans activer
         code, out, _ = _capture(["stack", "select", name])
         self.assertEqual(code, 0)
         self.assertEqual(os.readlink(self._link), f"topologies/{name}.yaml")

@@ -19,7 +19,7 @@ sous-commandes triviales n'en justifient aucune ; l'ADR 0056 §2 cite « typer/c
 comme illustration de style, pas comme exigence d'outillage.
 
 Usage :
-  uv run python scripts/topology.py new <nom> [--activate] [--no-input]   (calque pulumi new)
+  uv run python scripts/topology.py stack new <nom> [--activate] [--no-input]
   uv run python scripts/topology.py stack ls                              (calque pulumi stack)
   uv run python scripts/topology.py stack select <nom>
   uv run python scripts/topology.py stack validate [-f topology.yaml]
@@ -240,12 +240,13 @@ def _activate_symlink(target_rel: str) -> None:
     os.symlink(target_rel, link)
 
 
-def cmd_new(args: argparse.Namespace) -> int:
-    """`new <nom>` : crée une topologie dans le catalogue via un ASSISTANT (ADR 0056).
+def cmd_stack_new(args: argparse.Namespace) -> int:
+    """`stack new <nom>` : crée une topologie (stack) dans le catalogue via un ASSISTANT.
 
-    Commande de premier niveau, calquée sur `pulumi new` (scaffolde une nouvelle
-    stack). La GESTION des stacks existantes (lister, activer, valider) vit dans le
-    groupe `stack` (calque `pulumi stack`).
+    Verbe du groupe `stack` (on n'a pas de notion de « projet » Pulumi, donc pas de
+    `new` top-level ambigu — créer une STACK, pas un projet). Pose le minimum
+    décisionnel, écrit topologies/<nom>.yaml (réelle, gitignorée, ADR 0023/0056),
+    puis propose de l'activer.
 
     Pose le MINIMUM décisionnel (profil, backend, terrain, cible, nb de CP/workers,
     + mode LB si HA) dans les enums connus, construit un YAML minimal VALIDE
@@ -398,7 +399,7 @@ def cmd_stack_ls(args: argparse.Namespace) -> int:
     sans faire échouer la liste (code 0 toujours — informatif)."""
     entries = sorted(glob.glob(os.path.join(_CATALOG_DIR, "*.y*ml")))
     if not entries:
-        print("catalogue vide — `topology.py new <nom>` pour en créer une.")
+        print("catalogue vide — `topology.py stack new <nom>` pour en créer une.")
         return 0
     active_rel = _active_target_rel()
     active_base = os.path.basename(active_rel) if active_rel else None
@@ -418,9 +419,9 @@ def cmd_stack_ls(args: argparse.Namespace) -> int:
 
 
 def cmd_stack(args: argparse.Namespace) -> int:
-    """Routeur du groupe `stack` (ls | select | validate). Façade de dispatch.
+    """Routeur du groupe `stack` (new | ls | select | validate). Façade de dispatch.
 
-    Calque `pulumi stack`. argparse garantit `stack_cmd` ∈ {ls, select, validate}
+    Calque `pulumi stack`. argparse garantit `stack_cmd` ∈ {new, ls, select, validate}
     (sous-parser `required`) — on route vers la façade dédiée. Un `stack` sans verbe
     est une erreur d'usage (argparse l'arrête en amont avec le help du groupe)."""
     return _STACK_DISPATCH[args.stack_cmd](args)
@@ -879,14 +880,14 @@ def cmd_roundtrip(args: argparse.Namespace) -> int:
 
 # Verbes du groupe `stack` (calque `pulumi stack` : ls | select | validate).
 _STACK_DISPATCH = {
+    "new": cmd_stack_new,
     "ls": cmd_stack_ls,
     "select": cmd_stack_select,
     "validate": cmd_stack_validate,
 }
 
 _DISPATCH = {
-    "new": cmd_new,  # calque `pulumi new` (top-level)
-    "stack": cmd_stack,  # calque `pulumi stack`
+    "stack": cmd_stack,  # calque `pulumi stack` (new | ls | select | validate)
     "generate": cmd_generate,
     "diff": cmd_diff,
     "status": cmd_status,
@@ -940,30 +941,33 @@ def _build_parser() -> argparse.ArgumentParser:
     # exposé. La fonction default_target() de plan.py reste utilisée en interne
     # (stack ls/select, new).
 
-    # Calque Pulumi : `new` (top-level, scaffolde une stack) + groupe `stack`
-    # (gère les stacks existantes : ls | select | validate).
-    p_new = sub.add_parser(
-        "new", help="crée une topologie (stack) via un assistant — calque `pulumi new`"
+    # Groupe `stack` (calque `pulumi stack`) : new | ls | select | validate. Pas de
+    # `new` top-level — on n'a pas de notion de « projet » Pulumi, donc créer = créer
+    # une STACK (verbe du groupe), pas un projet.
+    p_stack = sub.add_parser(
+        "stack", help="gère les stacks (new | ls | select | validate) — calque `pulumi stack`"
     )
-    p_new.add_argument("name", help="nom de la topologie (→ topologies/<nom>.yaml, gitignorée)")
-    p_new.add_argument(
+    stack_sub = p_stack.add_subparsers(dest="stack_cmd", required=True)
+
+    p_stack_new = stack_sub.add_parser(
+        "new", help="crée une topologie (stack) dans le catalogue via un assistant"
+    )
+    p_stack_new.add_argument(
+        "name", help="nom de la topologie (→ topologies/<nom>.yaml, gitignorée)"
+    )
+    p_stack_new.add_argument(
         "--activate",
         action="store_true",
         help="activer sans demander (sinon la question est posée en fin d'assistant)",
     )
-    p_new.add_argument(
+    p_stack_new.add_argument(
         "--force", action="store_true", help="écraser topologies/<nom>.yaml s'il existe"
     )
-    p_new.add_argument(
+    p_stack_new.add_argument(
         "--no-input",
         action="store_true",
         help="non interactif : défauts + pas d'activation sauf --activate (CI)",
     )
-
-    p_stack = sub.add_parser(
-        "stack", help="gère les stacks (ls | select | validate) — calque `pulumi stack`"
-    )
-    stack_sub = p_stack.add_subparsers(dest="stack_cmd", required=True)
 
     stack_sub.add_parser("ls", help="liste le catalogue, marque l'active (★) + chemin dérivé")
 
