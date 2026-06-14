@@ -48,6 +48,15 @@ def required_profiles(profile: str) -> list[str]:
     return PROFILE_CHAIN[: idx + 1]
 
 
+def consumes_storage(profile: str) -> bool:
+    """Le profil pose-t-il une couche de STOCKAGE ? (brique `storage` ∈ `store`).
+
+    `base` = Kubernetes + CRI (containerd) + CNI (Cilium), SANS stockage (ADR 0039 :
+    `storage` est rattaché à `store`, pas à `base`). Un profil ≥ store consomme du
+    stockage. Sert à ne montrer le backend que là où il est ACTIF (preview/VOULU)."""
+    return "store" in required_profiles(profile)
+
+
 # ── Dimensions fines dérivées du backend de stockage (run-phases.sh) ────────
 # Le bash dérive ces valeurs de WITH_CEPH ; on les centralise comme source de
 # vérité unique de la dérivation (mêmes valeurs, mêmes clés).

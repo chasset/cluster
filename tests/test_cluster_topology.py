@@ -21,6 +21,7 @@ from cluster_topology.model import (  # noqa: E402
     topology_from_dict,
 )
 from cluster_topology.profile import (  # noqa: E402
+    consumes_storage,
     derive_osd_expected,
     derive_run_params,
     required_profiles,
@@ -271,6 +272,13 @@ class ProfileInclusion(unittest.TestCase):
     def test_unknown_profile_rejected(self):
         with self.assertRaises(TopologyError):
             required_profiles("mlops")
+
+    def test_consumes_storage(self):
+        # base = k8s+CRI+CNI nus, AUCUN stockage (ADR 0039 : storage ∈ store).
+        self.assertFalse(consumes_storage("base"))
+        self.assertTrue(consumes_storage("store"))
+        self.assertTrue(consumes_storage("obs"))
+        self.assertTrue(consumes_storage("dataops"))
 
 
 class StorageDerivationParity(unittest.TestCase):

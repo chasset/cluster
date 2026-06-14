@@ -331,6 +331,42 @@ runs:
         self.assertEqual(code, 0)
         self.assertIn("node1+worker", out)
 
+    def test_voulu_omits_storage_for_base_profile(self):
+        # VOULU : profil base = k8s+CRI+CNI nus → PAS de ligne stockage (ADR 0039).
+        topo_yaml = (
+            "catalog: {topology: b, profile: base}\n"
+            "nodes:\n  - {name: cp1, roles: [control]}\n"
+            "storage: {backend: ceph}\ntarget_kind: lima\n"  # backend déclaré mais inactif en base
+        )
+        path = _tmp(topo_yaml)
+        self.addCleanup(os.unlink, path)
+        code, out, _ = _capture(["preview", "-f", path])
+        self.assertEqual(code, 0)
+        voulu = out.split("RÉEL")[0]  # la section VOULU uniquement
+        self.assertIn("profil", voulu)
+        self.assertNotIn("stockage", voulu)  # base ne pose pas de stockage
+
+    def test_voulu_shows_storage_for_store_plus(self):
+        # VOULU : un profil store+ (dataops) consomme du stockage → backend affiché.
+        topo_yaml = (
+            "catalog: {topology: d, profile: dataops}\n"
+            "nodes:\n  - {name: cp1, roles: [control]}\n"
+            "storage: {backend: ceph}\ntarget_kind: lima\n"
+        )
+        path = _tmp(topo_yaml)
+        self.addCleanup(os.unlink, path)
+        code, out, _ = _capture(["preview", "-f", path, "--target", "atlas-ceph"])
+        voulu = out.split("RÉEL")[0]
+        self.assertIn("stockage : ceph", voulu)
+
+    def test_base_layer_label_mentions_cri(self):
+        # La couche base (PLAN) = Kubernetes + CRI containerd + CNI Cilium.
+        hist = _tmp(self._EMPTY_HIST)
+        self.addCleanup(os.unlink, hist)
+        code, out, _ = _capture(["preview", "-f", _EXAMPLE, "--target", "socle", "--history", hist])
+        self.assertEqual(code, 0)
+        self.assertIn("CRI containerd", out)
+
     def test_shows_full_sequence_with_labels(self):
         # Historique frais partiel → socle à-jour, queue à installer ; libellés MÉTIER.
         hist = _tmp(self._SOCLE_FRESH)

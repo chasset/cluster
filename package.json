@@ -20,7 +20,7 @@
     "lint:python": "uv run ruff check . && uv run ruff format --check .",
     "lint:docs-orphans": "uv run python scripts/check_md_orphans.py",
     "lint:contract": "uv run python scripts/check_contract.py",
-    "lint:topology-drift": "uv run python scripts/topology.py diff -f topologies/socle.example.yaml --kind prod",
+    "lint:topology-drift": "uv run python scripts/topology.py artifact diff -f topologies/socle.example.yaml --kind prod",
     "topology": "uv run python scripts/topology.py",
     "check:gouvernance": "uv run python scripts/check_gouvernance.py",
     "test:shell": "bats test/unit/",

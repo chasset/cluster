@@ -83,6 +83,7 @@ from cluster_topology import (  # noqa: E402
     build_topology_dict,
     catalog_entry,
     classify_refresh,
+    consumes_storage,
     default_target,
     derive_run_params,
     diff_phases,
@@ -727,9 +728,17 @@ def cmd_preview(args: argparse.Namespace) -> int:
         f"{'  [HA → VIP requise]' if topo.is_ha_control_plane else ''}"
     )
     print(f"  workers        : {workers_disp}")
+    profile = topo.catalog.get("profile", "base")
+    # Le STOCKAGE n'est affiché que si le profil le consomme (store+, ADR 0039) :
+    # `base` = Kubernetes + CRI + CNI nus, AUCUNE couche de stockage — montrer le
+    # backend pour base serait trompeur (il ne fait rien tant qu'on est en base).
+    storage_part = (
+        f"  ·  stockage : {topo.storage.get('backend', 'local-path')}"
+        if consumes_storage(profile)
+        else ""
+    )
     print(
-        f"  profil         : {topo.catalog.get('profile', 'base')}  ·  "
-        f"stockage : {topo.storage.get('backend', 'local-path')}  ·  "
+        f"  profil         : {profile}{storage_part}  ·  "
         f"exposition : {topo.exposition.get('mode', '—')}"
     )
 

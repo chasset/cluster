@@ -31,7 +31,7 @@ from cluster_topology.plan import (
     phase_label,
     suggest_next,
 )
-from cluster_topology.profile import derive_run_params
+from cluster_topology.profile import consumes_storage, derive_run_params
 from cluster_topology.refresh import RefreshState, classify_refresh
 from cluster_topology.roundtrip import RoundtripResult, run_roundtrip
 from cluster_topology.scaffold import (
@@ -53,6 +53,7 @@ __all__ = [
     "render_prod_inventory",
     "render_lima_inventory",
     "derive_run_params",
+    "consumes_storage",
     "Epreuve",
     "EPREUVES",
     "filter_epreuves",

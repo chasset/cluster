@@ -39,7 +39,9 @@ class PhaseSpec:
 PHASE_PLAYBOOK: dict[str, PhaseSpec] = {
     "up": PhaseSpec(None, "provision Lima (script, pas un play)", "créer les VMs"),
     "bootstrap": PhaseSpec(
-        None, "socle k8s complet (enchaînement de plays)", "Kubernetes + CNI Cilium"
+        None,
+        "socle k8s complet (enchaînement de plays)",
+        "Kubernetes + CRI containerd + CNI Cilium",
     ),
     "bootstrap-ha": PhaseSpec(
         None, "amorçage HA (kube-vip + init derrière la VIP)", "Kubernetes HA (kube-vip)"
