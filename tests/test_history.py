@@ -19,6 +19,7 @@ from cluster_topology.history import (  # noqa: E402
     age_days,
     freshness_verdict,
     last_run_for_target,
+    last_run_for_topology,
     latest_run,
     load_runs,
     seuil_for_target,
@@ -164,6 +165,26 @@ class TargetFiltering(unittest.TestCase):
         # latest_run = dernier EN ORDRE DE FICHIER (comme metro_last_date : tail -1
         # sur un fichier supposé chronologique). r3 est le dernier listé.
         self.assertEqual(latest_run(self.runs).id, "r3")
+
+
+class TopologyFiltering(unittest.TestCase):
+    """last_run_for_topology : match par NOM de stack, JAMAIS de retombée globale."""
+
+    def setUp(self):
+        self.path = _tmp(_FIXTURE)
+        self.addCleanup(os.unlink, self.path)
+        self.runs = load_runs(self.path)
+
+    def test_matches_exact_topology(self):
+        # Tous portent topologie multi-node-3 ; comme last_run_for_target, on retient
+        # le DERNIER en ordre de fichier (supposé chronologique) → r3.
+        run = last_run_for_topology(self.runs, "multi-node-3")
+        self.assertEqual(run.id, "r3")
+
+    def test_unknown_topology_is_none_not_global(self):
+        # Une stack jamais montée → None (PAS le dernier run global) : c'est ce qui
+        # empêche `preview` de mentir (bug « preview faux avec 1cp »).
+        self.assertIsNone(last_run_for_topology(self.runs, "1cp"))
 
 
 class Verdict(unittest.TestCase):

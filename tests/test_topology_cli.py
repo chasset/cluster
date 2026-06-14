@@ -311,8 +311,24 @@ class Preview(unittest.TestCase):
     """`preview` : plan COMPLET voulu→réel (toute la séquence + état), read-only."""
 
     _EMPTY_HIST = "runs: []\n"
-    # Socle Ceph frais joué → up/bootstrap/ceph/sc à-jour ; la queue reste à jouer.
+    # Socle Ceph frais joué SUR LA STACK _EXAMPLE (topologie: multi-node-4) → le
+    # match se fait par NOM de stack, donc la fixture doit porter ce nom.
     _SOCLE_FRESH = f"""\
+runs:
+  - id: r1
+    date: {dt_today()}
+    target: atlas-ceph
+    profil: ceph
+    topologie: multi-node-4
+    phases:
+      up: 1
+      bootstrap: 1
+      ceph: 1
+      sc: 1
+"""
+    # Run frais d'une AUTRE topologie (multi-node-3) → ne doit PAS être attribué à
+    # _EXAMPLE (multi-node-4). Régression du bug « preview faux avec 1cp ».
+    _OTHER_TOPO_FRESH = f"""\
 runs:
   - id: r1
     date: {dt_today()}
@@ -363,6 +379,19 @@ runs:
         self.addCleanup(os.unlink, hist)
         _capture(["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist])
         self.assertEqual(called, [])
+
+    def test_other_topology_run_not_attributed(self):
+        # RÉGRESSION (bug « preview faux avec 1cp ») : un run frais d'une AUTRE stack
+        # (multi-node-3) ne doit PAS rendre _EXAMPLE (multi-node-4) « à-jour ». Le
+        # match est par NOM de stack, sans retombée sur le dernier run global.
+        hist = _tmp(self._OTHER_TOPO_FRESH)
+        self.addCleanup(os.unlink, hist)
+        code, out, _ = _capture(
+            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
+        )
+        self.assertEqual(code, 0)
+        self.assertNotIn("rien à appliquer", out)  # NE doit PAS croire la stack à-jour
+        self.assertIn("à rejouer", out)  # aucun run de CETTE stack → tout à rejouer
 
     def test_incoherent_target_is_usage_error(self):
         # atlas sur backend ceph (incohérent) → erreur d'usage (code 2), comme `next`.

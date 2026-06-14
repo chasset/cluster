@@ -96,7 +96,11 @@ from cluster_topology import ha as _ha  # noqa: E402
 from cluster_topology import roundtrip as _roundtrip  # noqa: E402
 from cluster_topology import runner as _runner  # noqa: E402
 from cluster_topology import smoke as _smoke  # noqa: E402
-from cluster_topology.history import last_run_for_target, latest_run  # noqa: E402
+from cluster_topology.history import (  # noqa: E402
+    last_run_for_target,
+    last_run_for_topology,
+    latest_run,
+)
 
 _ROOT = os.path.join(os.path.dirname(__file__), "..")
 # Catalogue de topologies (ADR 0056 + 0023) : `topologies/` versionne les modèles
@@ -617,19 +621,22 @@ def cmd_preview(args: argparse.Namespace) -> int:
     runs = load_runs(args.history or _RUNS_HISTORY)
     now = int(dt.datetime.now(tz=dt.UTC).timestamp())
     target = args.target  # None → default_target le déduit
-    run = _run_for_target(runs, target)
-    freshness, _ = verdict_for_run(run, target, now)
-    done = set(run.phases) if run is not None else set()
     try:
         seq = expected_phase_sequence(topo, target)
     except PlanError as exc:
         raise _UsageError(str(exc)) from exc
     resolved_target = target or default_target(topo)
+    stack_name = topo.catalog.get("topology", "—")
+    # Le run de référence est celui de CETTE stack (match par nom, PAS de retombée
+    # sur le dernier run global) : une stack jamais montée (status: cible, aucun run
+    # à son nom) n'hérite pas du verdict d'une autre topologie — tout est à jouer.
+    run = last_run_for_topology(runs, stack_name)
+    freshness, _ = verdict_for_run(run, resolved_target, now)
+    done = set(run.phases) if run is not None else set()
     # Phases restant à appliquer (mêmes règles que `next` : rejeu si pas de run frais).
     a_appliquer = set(diff_phases(seq, done, freshness))
     rejeu = freshness in ("perime", "jamais")
 
-    stack_name = topo.catalog.get("topology", "—")
     print(f"stack : {stack_name}  →  chemin : {resolved_target}")
     for phase in seq:
         if phase in a_appliquer:
