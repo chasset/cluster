@@ -30,6 +30,18 @@ secrets/
 # génériques `*.example.yaml` restent versionnés.
 bootstrap/hosts.yaml
 
+# Catalogue de topologies (ADR 0023/0056) : les topologies RÉELLES
+# `topologies/*.yaml` sont NON versionnées ; seuls les modèles génériques
+# `*.example.*` (yaml, README…) restent versionnés.
+/topologies/*
+!/topologies/*.example.yaml
+!/topologies/*.example.*
+
+# topology.yaml (racine) = symlink d'activation vers une topo du catalogue —
+# repointé pour activer (`ln -sf topologies/<x>.example.yaml topology.yaml`),
+# JAMAIS versionné.
+/topology.yaml
+
 # Snapshots etcd rapatriés hors-nœud (etcd-fetch.yaml) — contiennent TOUS les
 # Secrets du cluster, ne JAMAIS versionner.
 etcd-snapshots/

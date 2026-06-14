@@ -86,8 +86,12 @@ from cluster_topology import smoke as _smoke  # noqa: E402
 from cluster_topology.history import last_run_for_target, latest_run  # noqa: E402
 
 _ROOT = os.path.join(os.path.dirname(__file__), "..")
+# Catalogue de topologies (ADR 0056 + 0023) : `topologies/` versionne les modèles
+# génériques `*.example.yaml` et abrite les topologies réelles gitignorées ;
+# `topology.yaml` (racine) est un SYMLINK gitignoré vers l'entrée activée.
+_CATALOG_DIR = os.path.join(_ROOT, "topologies")
 _DEFAULT_TOPOLOGY = os.path.join(_ROOT, "topology.yaml")
-_EXAMPLE_TOPOLOGY = os.path.join(_ROOT, "topology.example.yaml")
+_EXAMPLE_TOPOLOGY = os.path.join(_CATALOG_DIR, "socle.example.yaml")
 _PROD_INVENTORY = os.path.join(_ROOT, "bootstrap", "hosts.example.yaml")
 _STATE_SH = os.path.join(_ROOT, "bootstrap", "state.sh")
 _RUNS_HISTORY = os.path.join(_ROOT, "test", "lima", "runs-history.yaml")
@@ -98,17 +102,20 @@ _CHEMINS_NOMMES = ["atlas", "storage-real", "cluster-dataops"]
 def _resolve(path: str | None) -> str:
     """Chemin du topology.yaml à charger.
 
-    Source de vérité : `topology.yaml` (config locale gitignorée, ADR 0023). En
-    son absence on retombe sur `topology.example.yaml` (exemple générique
-    versionné) AVEC un avis explicite sur stderr — sinon un opérateur croirait
-    générer depuis sa topo réelle et obtiendrait l'exemple.
+    Source de vérité : `topology.yaml` (config locale gitignorée, ADR 0023), un
+    SYMLINK vers l'entrée activée du catalogue `topologies/<x>` — le repointer
+    active une autre topologie. Le catalogue `topologies/` versionne les modèles
+    génériques `*.example.yaml` et abrite les topologies réelles gitignorées.
+    En l'absence du symlink on retombe sur `topologies/socle.example.yaml`
+    (exemple générique versionné) AVEC un avis explicite sur stderr — sinon un
+    opérateur croirait générer depuis sa topo réelle et obtiendrait l'exemple.
     """
     if path is not None:
         return path
     if os.path.exists(_DEFAULT_TOPOLOGY):
         return _DEFAULT_TOPOLOGY
     print(
-        "topology.yaml absent — utilisation de topology.example.yaml "
+        "topology.yaml absent — utilisation de topologies/socle.example.yaml "
         "(exemple générique versionné, ADR 0023).",
         file=sys.stderr,
     )
@@ -593,7 +600,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "-f",
             "--file",
             default=None,
-            help="chemin du topology.yaml (défaut : topology.yaml, sinon topology.example.yaml)",
+            help="chemin de la topologie (défaut : symlink topology.yaml, "
+            "sinon topologies/socle.example.yaml)",
         )
         # --no-input accepté partout (uniformité CI) ; sans interactivité, no-op.
         p.add_argument("--no-input", action="store_true", help="mode non interactif (CI)")

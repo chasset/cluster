@@ -42,7 +42,7 @@ from cluster_topology import (  # noqa: E402
     render_prod_inventory,
 )
 
-_EXAMPLE = os.path.join(_ROOT, "topology.example.yaml")
+_EXAMPLE = os.path.join(_ROOT, "topologies", "socle.example.yaml")
 
 _INVALID_TOPO = """\
 catalog:
@@ -145,7 +145,7 @@ class Generate(unittest.TestCase):
 
 class Diff(unittest.TestCase):
     def test_prod_invariant_holds(self):
-        # topology.example.yaml régénère hosts.example.yaml à l'octet → code 0, vide.
+        # topologies/socle.example.yaml régénère hosts.example.yaml à l'octet → code 0, vide.
         code, out, _ = _capture(["diff", "-f", _EXAMPLE, "--kind", "prod"])
         self.assertEqual(code, 0)
         self.assertEqual(out, "")

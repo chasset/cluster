@@ -2,7 +2,7 @@
 
 unittest (stdlib). Deux niveaux :
   - fonctions PURES (dérivations control/worker, validation) sur des dicts injectés ;
-  - l'INVARIANT BYTE-IDENTIQUE (P1) : render(topology.example.yaml) ==
+  - l'INVARIANT BYTE-IDENTIQUE (P1) : render(topologies/socle.example.yaml) ==
     bootstrap/hosts.example.yaml, octet pour octet (ADR 0056 §3).
 
 Lancé par `python3 -m unittest discover tests` (cible `test:python` + CI).
@@ -155,7 +155,7 @@ class HaThreeCpExample(unittest.TestCase):
     expose la mécanique HA attendue (#250, ADR 0055/0056)."""
 
     def setUp(self):
-        self.topo = load_topology(os.path.join(_ROOT, "topology-ha-3cp.example.yaml"))
+        self.topo = load_topology(os.path.join(_ROOT, "topologies", "ha-3cp.example.yaml"))
 
     def test_three_hyperconverged_control_planes(self):
         # 3 CP hyperconvergés → 3 control, 0 worker pur (ils schedulent, ADR 0007).
@@ -183,7 +183,7 @@ class ByteExactInvariant(unittest.TestCase):
     """P1 : le profil prod générique régénère hosts.example.yaml à l'octet."""
 
     def test_prod_inventory_is_byte_identical(self):
-        topo = load_topology(os.path.join(_ROOT, "topology.example.yaml"))
+        topo = load_topology(os.path.join(_ROOT, "topologies", "socle.example.yaml"))
         generated = render_prod_inventory(topo)
         with open(os.path.join(_ROOT, "bootstrap", "hosts.example.yaml"), encoding="utf-8") as f:
             expected = f.read()
