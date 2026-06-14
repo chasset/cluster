@@ -17,9 +17,7 @@ from cluster_topology.refresh import classify_refresh  # noqa: E402
 class ClassifyRefresh(unittest.TestCase):
     def test_present_orphan_missing_split(self):
         # stack déclare node1,node2 ; le réel a node1 (présente) + cpX (orphelines).
-        st = classify_refresh(
-            "s", ["node1", "node2"], ["node1", "cp1", "cp2"], ["node1"]
-        )
+        st = classify_refresh("s", ["node1", "node2"], ["node1", "cp1", "cp2"], ["node1"])
         self.assertEqual(st.vms_present, ["node1"])
         self.assertEqual(st.vms_orphan, ["cp1", "cp2"])  # réelles mais hors stack
         self.assertEqual(st.vms_missing, ["node2"])  # déclarée, pas de VM

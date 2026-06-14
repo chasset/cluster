@@ -65,34 +65,55 @@ class Question:
 # demandés CONDITIONNELLEMENT par la façade selon control_planes (cf. QUESTIONS_HA).
 QUESTIONS = [
     Question(
-        "profile", "Profil applicatif", "base", VALID_PROFILES,
+        "profile",
+        "Profil applicatif",
+        "base",
+        VALID_PROFILES,
         "base ⊂ store ⊂ obs ⊂ dataops (inclusion cumulative, ADR 0039)",
     ),
     Question(
-        "backend", "Backend de stockage", "local-path", VALID_BACKENDS,
+        "backend",
+        "Backend de stockage",
+        "local-path",
+        VALID_BACKENDS,
         "local-path (léger) ou ceph (bloc + objet S3)",
     ),
     Question(
-        "terrain", "Terrain", "local", VALID_TERRAINS,
+        "terrain",
+        "Terrain",
+        "local",
+        VALID_TERRAINS,
         "local (banc Lima) | cloud | baremetal",
     ),
     Question(
-        "target_kind", "Cible d'exécution", "lima", VALID_TARGET_KINDS,
+        "target_kind",
+        "Cible d'exécution",
+        "lima",
+        VALID_TARGET_KINDS,
         "lima (banc) ou prod (inventaire SSH réel)",
     ),
     Question(
-        "control_planes", "Nombre de control-planes", "1", [],
+        "control_planes",
+        "Nombre de control-planes",
+        "1",
+        [],
         "1 = mono-CP ; ≥ 3 = HA (quorum etcd, exige une VIP)",
     ),
     Question(
-        "workers", "Nombre de workers", "2", [],
+        "workers",
+        "Nombre de workers",
+        "2",
+        [],
         "nœuds applicatifs (hors control-plane)",
     ),
 ]
 
 # Question additionnelle posée UNIQUEMENT si control_planes ≥ 2 (HA → LB requis).
 QUESTION_LB_MODE = Question(
-    "lb_mode", "Mode du load-balancer de control-plane (HA)", "kube-vip-arp", VALID_LB_MODES,
+    "lb_mode",
+    "Mode du load-balancer de control-plane (HA)",
+    "kube-vip-arp",
+    VALID_LB_MODES,
     "kube-vip-arp (L2, banc) | kube-vip-lb | external (LB du terrain)",
 )
 
@@ -218,8 +239,6 @@ def build_topology_dict(name: str, answers: dict[str, str]) -> dict:
         "target_kind": target_kind,
     }
     if n_cp >= 2:  # HA → un control_plane_lb (VIP) est EXIGÉ par le modèle (ADR 0047/0055)
-        lb_mode = _check_choice(
-            answers.get("lb_mode", "kube-vip-arp"), VALID_LB_MODES, "lb_mode"
-        )
+        lb_mode = _check_choice(answers.get("lb_mode", "kube-vip-arp"), VALID_LB_MODES, "lb_mode")
         topo["network"] = {"control_plane_lb": {"mode": lb_mode}}
     return topo

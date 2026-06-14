@@ -122,8 +122,15 @@ class WrittenFileRoundtrips(unittest.TestCase):
         import yaml
 
         data = build_topology_dict(
-            "rt", {"profile": "dataops", "backend": "ceph", "terrain": "baremetal",
-                   "target_kind": "prod", "control_planes": "1", "workers": "3"}
+            "rt",
+            {
+                "profile": "dataops",
+                "backend": "ceph",
+                "terrain": "baremetal",
+                "target_kind": "prod",
+                "control_planes": "1",
+                "workers": "3",
+            },
         )
         fd, path = tempfile.mkstemp(suffix=".yaml")
         try:

@@ -45,9 +45,7 @@ class PvcBound(unittest.TestCase):
         self.assertIn("timeout", r.detail)
 
     def test_none_phase_is_not_bound(self):
-        r = gate_pvc_bound(
-            "default", "x", read_phase=lambda ns, n: None, retries=2, sleep=_NOSLEEP
-        )
+        r = gate_pvc_bound("default", "x", read_phase=lambda ns, n: None, retries=2, sleep=_NOSLEEP)
         self.assertFalse(r.ok)
 
 

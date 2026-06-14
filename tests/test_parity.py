@@ -36,8 +36,16 @@ _ARMS = {
     "atlas": (
         "dataops",
         "local-path",
-        ["up", "bootstrap", "storage-simple", "metrics-server", "monitoring",
-         "gitops", "dataops", "gitops-seed"],
+        [
+            "up",
+            "bootstrap",
+            "storage-simple",
+            "metrics-server",
+            "monitoring",
+            "gitops",
+            "dataops",
+            "gitops-seed",
+        ],
     ),
     "storage-real": (
         "dataops",
@@ -52,8 +60,17 @@ _ARMS = {
     "atlas-ceph": (
         "dataops",
         "ceph",
-        ["up", "bootstrap", "ceph", "sc", "datalake", "monitoring", "gitops",
-         "dataops", "gitops-seed"],
+        [
+            "up",
+            "bootstrap",
+            "ceph",
+            "sc",
+            "datalake",
+            "monitoring",
+            "gitops",
+            "dataops",
+            "gitops-seed",
+        ],
     ),
 }
 
