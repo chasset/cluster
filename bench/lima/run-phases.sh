@@ -1621,18 +1621,18 @@ run_ha_3cp() {
 # sous-commande Python ha-3cp ; la CNI reste du bash, ADR 0049). Dérive la plage
 # LB-IPAM du /24 du primaire ; fetch le kubeconfig local après.
 phase_ha_cni() {
-    local vip_iface=$1 lb_prefix=$2
+    local vip_iface=$1
     apply_gwapi_crds_in_vm "${CP}" "${GWAPI_VERSION}"
-    # exposition.mode (ADR 0071) rend les CRs Gateway/LB-IPAM CONSÉQUENTS : seul le mode
-    # `gateway` les pose (CILIUM_EXPO_ENABLED=1) ; `hostport`/`none` ne les posent pas
-    # (l'exposition passe par hostPort sur les workloads, ou rien). EXPOSITION_MODE est
-    # passé par `topology.py up` (topo.exposition_mode) ; défaut `gateway` si absent.
-    local expo_enabled
-    expo_enabled=$([ "${EXPOSITION_MODE:-gateway}" = gateway ] && echo 1 || echo 0)
+    # Mode d'exposition UNIQUE (ADR 0020/0071 réécrit) : `gateway` en hostNetwork —
+    # l'Envoy du Gateway bind 80/443 sur l'IP du nœud, SANS LB-IPAM (le banc Lima n'a
+    # pas de plage L2 annonçable jetable). C'est le défaut. `none` n'arme aucune bordure.
+    # EXPOSITION_MODE vient de `topology.py up` (topo.exposition_mode, alias déjà résolus).
+    # LB-IPAM reste à 0 sur le banc (chemin prod optionnel, ADR 0071 §4).
+    local hostnet=1
+    [ "${EXPOSITION_MODE:-gateway}" = none ] && hostnet=0
     run_cni "${CP}" \
-        "CILIUM_EXPO_ENABLED=${expo_enabled}" \
-        "LB_IPAM_RANGE_START=${lb_prefix}.240" \
-        "LB_IPAM_RANGE_STOP=${lb_prefix}.250" \
+        "CILIUM_GATEWAY_HOSTNETWORK=${hostnet}" \
+        "CILIUM_LB_IPAM_ENABLED=0" \
         "L2_INTERFACE=${vip_iface}"
     fetch_kubeconfig_node "${CP}" "${KUBECONFIG_LOCAL}" "${API_PORT}" cluster-banc
 }
@@ -1839,8 +1839,9 @@ case "${1:-}" in
         record_if_fresh "${run_start}"
         ;;
     # ha-cni : rappel interne de la sous-commande Python ha-3cp (la CNI reste bash,
-    # ADR 0049). Args : <vip_iface> <lb_prefix>.
-    ha-cni) [ -n "${3:-}" ] || die "usage : ha-cni <vip_iface> <lb_prefix>"; phase_ha_cni "$2" "$3" ;;
+    # ADR 0049). Args : <vip_iface>. (Le préfixe LB-IPAM n'est plus requis : le
+    # Gateway s'expose en hostNetwork, ADR 0071 — plus de pool d'IP au banc.)
+    ha-cni) [ -n "${2:-}" ] || die "usage : ha-cni <vip_iface>"; phase_ha_cni "$2" ;;
     # facts — contrat machine : imprime CP_IP/L2_IFACE (+ VIP/VIP_IFACE si HA) que
     # topology.py consomme (inversion de frontière, ADR 0049/0056). Brique LUE par Python.
     facts) emit_facts ;;

@@ -40,6 +40,11 @@ spec:
           ports:
             - name: smtp
               containerPort: 1025
+              # hostPort : SMTP joignable sur NodeIP:1025 pour le relais postfix HÔTE
+              # (#131), qui tourne SUR le nœud hors réseau pods. Routé en eBPF par
+              # Cilium (kubeProxyReplacement) — pas de Service LoadBalancer ni LB-IPAM
+              # (ADR 0071). 1025 > 1023 → pas de capability NET_BIND_SERVICE requise.
+              hostPort: 1025
             - name: http
               containerPort: 8025
           env:
@@ -86,29 +91,13 @@ spec:
     - name: http
       port: 80
       targetPort: 8025 # UI 8025 → Service 80 (HTTP clair, TLS au Gateway)
----
 # Exposition SMTP pour les RELAIS HÔTE (issue #131). Le postfix des nœuds tourne
 # HORS du réseau pods : il ne peut joindre ni le Service ClusterIP ci-dessus ni
-# `*.svc.cluster.local`. On expose donc le SMTP par un Service type=LoadBalancer :
-# LB-IPAM (ADR 0020) lui attribue une IP du pool (banc : 192.168.67.240-250),
-# annoncée en ARP (L2, eth1) → JOIGNABLE depuis l'hôte sur le LAN. Le postfix
-# hôte pointe `MAIL_SMARTHOST=[<cette IP>]:1025`.
+# `*.svc.cluster.local`. On l'expose désormais par un **`hostPort: 1025`** sur le
+# pod (cf. le container ci-dessus) : le postfix, qui tourne SUR le nœud, joint le
+# SMTP sur `NodeIP:1025` — routé en eBPF par Cilium (ADR 0071), SANS Service
+# LoadBalancer ni LB-IPAM. `MAIL_SMARTHOST` devient `[<NodeIP>]:1025` (stable, plus
+# d'IP LB à relever après coup ; sur banc mono-CP = l'InternalIP du nœud).
 #
 # BANC UNIQUEMENT : en prod, le smarthost est un fournisseur SMTP externe
-# (Brevo/Mailgun/SES… vendeur-neutre, :587 + auth) — pas de LoadBalancer SMTP.
-# L'IP exacte dépend de l'attribution LB-IPAM : `kubectl -n mail get svc
-# mailpit-smtp -o wide` après déploiement, puis la reporter dans MAIL_SMARTHOST.
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: mailpit-smtp
-  namespace: mail
-spec:
-  type: LoadBalancer
-  selector:
-    app: mailpit
-  ports:
-    - name: smtp
-      port: 1025
-      targetPort: 1025
+# (Brevo/Mailgun/SES… vendeur-neutre, :587 + auth) — ni hostPort ni LoadBalancer.

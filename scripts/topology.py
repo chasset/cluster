@@ -1472,10 +1472,11 @@ def cmd_ha_3cp(args: argparse.Namespace) -> int:
         if rc != 0:
             raise _ha.HaError(f"réécriture de l'inventaire (control={control_hosts}) en échec")
 
-    # run_cni : la CNI reste portée par run-phases.sh (bash). On la rappelle via le
-    # sous-commande dédiée `ha-cni <vip-iface> <lb-prefix>` (cf. dispatch).
+    # run_cni : la CNI reste portée par run-phases.sh (bash). On la rappelle via la
+    # sous-commande dédiée `ha-cni <vip-iface>` (cf. dispatch). Le Gateway s'expose en
+    # hostNetwork (ADR 0071) → plus de préfixe LB-IPAM à passer.
     def run_cni():
-        rc = _runphases("ha-cni", args.vip_iface, args.cp_ip.rsplit(".", 1)[0])
+        rc = _runphases("ha-cni", args.vip_iface)
         if rc != 0:
             raise _ha.HaError(f"CNI (run-phases.sh ha-cni) en échec (rc={rc})")
 
@@ -1520,8 +1521,8 @@ def cmd_bootstrap_seq(args: argparse.Namespace) -> int:
     worker (control unique). L'inventaire, la dérivation de cp_ip/iface, la CNI
     (Cilium dans la VM) et le kubeconfig restent à run-phases.sh (briques bash, ADR
     0049) ; cette commande reçoit cp_ip/inventaire déjà dérivés du banc et rappelle
-    `ha-cni <iface> <lb-prefix>` pour la CNI. La logique (séquence, fail-fast) est
-    testée sans banc (tests/test_bootstrap.py)."""
+    `ha-cni <iface>` pour la CNI. La logique (séquence, fail-fast) est testée sans
+    banc (tests/test_bootstrap.py)."""
     private_data_dir = os.path.join(_ROOT, "bootstrap")
     inventory = (
         args.inventory
@@ -1547,20 +1548,17 @@ def cmd_bootstrap_seq(args: argparse.Namespace) -> int:
         )
 
     def run_cni() -> int:
-        # CNI (+ GW API CRDs + kubeconfig) : brique bash réutilisée (ha-cni <iface>
-        # <lb-prefix>). lb_prefix = le /24 du cp_ip (ex. 10.0.0.5 → 10.0.0). L'arm
-        # `ha-cni` dérive le CP du 1er nœud `control` de NODES (plus de `CP=cp1` codé) ;
-        # NODES vient de NODES_OVERRIDE, posé par `up` et hérité tout au long de la
-        # chaîne (up → run-phases.sh → bootstrap-seq → ici). On le passe EXPLICITEMENT
-        # pour ne pas dépendre d'un héritage d'env silencieux (et garantir node1, pas cp1).
-        lb_prefix = args.cp_ip.rsplit(".", 1)[0]
+        # CNI (+ GW API CRDs + kubeconfig) : brique bash réutilisée (ha-cni <iface>).
+        # Le Gateway s'expose en hostNetwork (ADR 0071) → plus de préfixe LB-IPAM.
+        # L'arm `ha-cni` dérive le CP du 1er nœud `control` de NODES (plus de `CP=cp1`
+        # codé) ; NODES vient de NODES_OVERRIDE, posé par `up` et hérité tout au long de
+        # la chaîne (up → run-phases.sh → bootstrap-seq → ici).
         return subprocess.run(  # noqa: S603 — chemin codé, arguments contrôlés
             [
                 "bash",
                 os.path.join(_ROOT, "bench", "lima", "run-phases.sh"),
                 "ha-cni",
                 args.l2_iface,
-                lb_prefix,
             ],
             check=False,
             env={**os.environ},
