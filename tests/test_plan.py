@@ -136,6 +136,32 @@ class TargetValidation(unittest.TestCase):
         # ADR 0068 : profile metrics → chemin `metrics` (socle + metrics-server seul).
         self.assertEqual(default_target(_topo(profile="metrics", backend="local-path")), "metrics")
 
+    def _topo_layers(self, layers, backend="local-path"):
+        return topology_from_dict(
+            {
+                "catalog": {"topology": "t"},
+                "layers": layers,
+                "nodes": [{"name": "cp1", "roles": ["control", "worker"]}],
+                "storage": {"backend": backend},
+                "target_kind": "lima",
+            }
+        )
+
+    def test_layers_dataops_derives_atlas(self):
+        # ADR 0069 : layers prime sur profile ; [dataops] → atlas (local-path).
+        self.assertEqual(default_target(self._topo_layers(["dataops"])), "atlas")
+        self.assertEqual(default_target(self._topo_layers(["dataops"], "ceph")), "atlas-ceph")
+
+    def test_layers_metrics_derives_metrics(self):
+        self.assertEqual(default_target(self._topo_layers(["metrics"])), "metrics")
+
+    def test_layers_empty_is_socle(self):
+        self.assertEqual(default_target(self._topo_layers([])), "socle")
+
+    def test_layers_non_prefix_falls_back_to_socle(self):
+        # [gitops, metrics] : pas de preset dédié → socle (l'arm `layers` montera, Lot B).
+        self.assertEqual(default_target(self._topo_layers(["gitops", "metrics"])), "socle")
+
     def test_metrics_sequence_is_socle_plus_metrics_server(self):
         seq = expected_phase_sequence(_topo(profile="metrics", backend="local-path"))
         self.assertEqual(seq, ["up", "bootstrap", "metrics-server"])

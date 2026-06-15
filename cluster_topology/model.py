@@ -50,6 +50,10 @@ class Topology:
     hardening: dict[str, Any] = field(default_factory=dict)
     resources: dict[str, Any] | None = None
     target_kind: str = "prod"
+    # `layers` (ADR 0069) : ENSEMBLE de couches déclaré au top-level, ordonné par le
+    # DAG (resolve_layers). Vide → rétrocompat : dérivé de `catalog.profile` (alias
+    # déprécié-doux). Voir la propriété `declared_layers`.
+    layers: list[str] = field(default_factory=list)
 
     # ── Dérivations pures (le cœur de la génération sans état) ──────────────
     @property
@@ -82,6 +86,18 @@ class Topology:
     def is_ha_control_plane(self) -> bool:
         """> 1 control-plane → exige un control_plane_lb (VIP), ADR 0047/0055."""
         return len(self.control_nodes) > 1
+
+    @property
+    def declared_layers(self) -> list[str]:
+        """Couches déclarées (ADR 0069). `layers` s'il est posé (il PRIME) ; sinon
+        rétrocompat : on dérive du `catalog.profile` (préfixe cumulatif, alias
+        déprécié-doux). `base` par défaut. La traduction profil→layers vit dans
+        `layers.layers_from_profile` (import LOCAL pour éviter un cycle model↔layers)."""
+        if self.layers:
+            return list(self.layers)
+        from cluster_topology.layers import layers_from_profile
+
+        return layers_from_profile(self.catalog.get("profile", "base"))
 
 
 def _parse_node(raw: dict[str, Any]) -> Node:
@@ -123,6 +139,7 @@ def topology_from_dict(data: dict[str, Any]) -> Topology:
         hardening=data.get("hardening", {}) or {},
         resources=data.get("resources"),
         target_kind=target_kind,
+        layers=list(data.get("layers") or []),  # ADR 0069 ; vide → dérivé du profil
     )
     # Cohérence HA : > 1 CP exige un control_plane_lb déclaré (ADR 0047/0055).
     lb = topo.network.get("control_plane_lb")

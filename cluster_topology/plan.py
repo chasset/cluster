@@ -159,25 +159,34 @@ def _hardening_requested(topo: Topology) -> bool:
 
 def default_target(topo: Topology) -> str:
     """Chemin nommé DÉDUIT de la topologie déclarée (ADR 0056 : une topologie se
-    déclare dans topology.yaml et l'outil en dérive le chemin — pas une commande
-    impérative à flags).
+    déclare, l'outil en dérive le chemin — pas une commande impérative à flags).
 
     HA D'ABORD : plus d'un control-plane (`is_ha_control_plane`) → `ha-3cp`, quel
-    que soit le profil applicatif (la HA est une propriété du CONTROL-PLANE,
-    orthogonale aux apps ; le banc ha-3cp prouve la mécanique en local-path).
-    Sinon : `dataops`+ceph → `atlas-ceph` ; `dataops`+local-path → `atlas` ;
-    `metrics` → `metrics` (palier fin, ADR 0068) ; un profil sans chemin propre
-    (`base`/`store`/`obs` non encore outillés) → `socle`. L'opérateur peut toujours
-    forcer `--target`.
-    """
+    que soit le reste (la HA est une propriété du CONTROL-PLANE, orthogonale aux
+    couches). Sinon on mappe l'ENSEMBLE de couches résolu (`declared_layers` →
+    resolve_layers, ADR 0069) sur le PRESET nommé correspondant — c'est ce que `up`
+    passe à run-phases.sh (parité bash, presets conservés). Un set sans preset
+    dédié sera monté par l'arm générique `layers` (Lot B) ; en attendant on retombe
+    sur le plus proche. `layers` absent → dérivé du profil (rétrocompat ADR 0039)."""
     if topo.is_ha_control_plane:
         return "ha-3cp"
-    profile = topo.catalog.get("profile", "base")
     backend = _backend_of(topo)
-    if profile == "dataops":
+    # On mappe sur le DÉCLARÉ (aliases/phases bruts, PUR — pas de resolve_layers qui
+    # shellerait le graphe) : le preset est une décision sur CE qui est demandé, pas
+    # sur la clôture. `base` est filtré (socle implicite). Les noms de phase comptent
+    # comme leur couche (gitops-seed ⇒ dataops+gitops déjà présents par construction).
+    layers = {layer for layer in topo.declared_layers if layer != "base"}
+    # dataops (toute la pile applicative) → atlas / atlas-ceph (le preset complet).
+    if "dataops" in layers:
         return "atlas-ceph" if backend == "ceph" else "atlas"
-    if profile == "metrics":
-        return "metrics"  # palier fin : socle + metrics-server (ADR 0068)
+    # metrics SEUL (palier fin, ADR 0068) → preset `metrics`.
+    if layers in ({"metrics"}, {"metrics-server"}):
+        return "metrics"
+    # base nu (rien de déclaré au-delà) → socle.
+    if not layers:
+        return "socle"
+    # Tout autre set (store/obs/paliers non-préfixe) : pas de preset dédié → l'arm
+    # générique `layers` (Lot B) le montera ; `socle` est le repli sûr d'ici là.
     return "socle"
 
 
