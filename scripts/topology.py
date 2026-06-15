@@ -813,6 +813,20 @@ def cmd_preview(args: argparse.Namespace) -> int:
     resolved_target = target or default_target(topo)
     stack_name = topo.catalog.get("topology", "—")
 
+    # ADR 0069 : `layers` explicite débordant le preset → la séquence VRAIE est celle
+    # des couches (resolve_layers), pas celle du preset de repli. PLAN reflète ce que
+    # `up` monterait réellement via l'arm `layers` (cohérence preview↔up).
+    if not target and topo.layers:
+        backend = topo.storage.get("backend", "local-path")
+        try:
+            resolved = resolve_layers(topo.declared_layers, backend)
+        except TopologyError as exc:
+            raise _UsageError(str(exc)) from exc
+        if resolved and not set(resolved).issubset(set(seq)):
+            socle = ["up", "bootstrap", "ceph", "sc"] if backend == "ceph" else ["up", "bootstrap"]
+            seq = socle + resolved
+            resolved_target = "layers"
+
     print(f"stack : {stack_name}  →  chemin : {resolved_target}")
 
     # ── VOULU (ex-`status`) : l'intention déclarée ───────────────────────────────
@@ -827,17 +841,23 @@ def cmd_preview(args: argparse.Namespace) -> int:
         f"{'  [HA → VIP requise]' if topo.is_ha_control_plane else ''}"
     )
     print(f"  workers        : {workers_disp}")
+    # Couches voulues : `layers` déclaré (ADR 0069) sinon le `profil` (rétrocompat).
     profile = topo.catalog.get("profile", "base")
-    # Le STOCKAGE n'est affiché que si le profil le consomme (store+, ADR 0039) :
-    # `base` = Kubernetes + CRI + CNI nus, AUCUNE couche de stockage — montrer le
-    # backend pour base serait trompeur (il ne fait rien tant qu'on est en base).
+    couches_label = ", ".join(topo.layers) if topo.layers else f"profil {profile}"
+    # Le STOCKAGE n'est affiché que s'il est CONSOMMÉ par une vraie couche applicative.
+    # Profil scalaire : `consumes_storage(profile)` (le profil décide — `base` = nus,
+    # même backend ceph déclaré, ADR 0039). Layers : une couche storage-simple/datalake
+    # l'est (ceph/sc seuls = socle ceph, pas une consommation applicative → ignorés).
+    consomme_stockage = (
+        any(p in ("storage-simple", "datalake") for p in seq)
+        if topo.layers
+        else consumes_storage(profile)
+    )
     storage_part = (
-        f"  ·  stockage : {topo.storage.get('backend', 'local-path')}"
-        if consumes_storage(profile)
-        else ""
+        f"  ·  stockage : {topo.storage.get('backend', 'local-path')}" if consomme_stockage else ""
     )
     print(
-        f"  profil         : {profile}{storage_part}  ·  "
+        f"  couches        : {couches_label}{storage_part}  ·  "
         f"exposition : {topo.exposition.get('mode', '—')}"
     )
 
