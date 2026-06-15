@@ -5,9 +5,10 @@
 Proposed (2026-06-15)
 
 Inverse de `generate` ([ADR 0056](0056-modele-declaratif-topologies.md)) ;
-réutilise les sondes de `preview` et le DAG des couches
-([ADR 0069](0069-topology-layers-dag-grain-phase.md)) ; frontière bash/Python de
-l'[ADR 0049](0049-doctrine-choix-outil-par-action.md).
+réutilise les sondes de `preview`, le DAG des couches
+([ADR 0069](0069-topology-layers-dag-grain-phase.md)) et la classification de
+santé existante (`bootstrap/lib/health-classify.sh`, `bootstrap/state.sh`) ;
+frontière bash/Python de l'[ADR 0049](0049-doctrine-choix-outil-par-action.md).
 
 ## Contexte
 
@@ -48,7 +49,7 @@ d'être affichée.
 **Ajouter une commande `cluster discover` qui sonde un cluster réel (via le
 kubeconfig / un accès SSH au nœud) et émet un `topology.yaml` reconstruit.**
 C'est l'INVERSE de `generate` (generate : déclaration → infra ; discover : infra
-→ déclaration). Cinq points.
+→ déclaration). Six points.
 
 ### 1. Reconstruction COMPLÈTE (nœuds/rôles + layers + backend + exposition)
 
@@ -68,6 +69,30 @@ C'est l'INVERSE de `generate` (generate : déclaration → infra ; discover : in
   `gateway` ; `hostPort` sur les workloads → `hostport` ; sinon `none` (ADR
   0071). Inverse de la dérivation `exposition_mode`.
 
+#### Taxonomie des ressources sondées (par famille)
+
+Un cluster Kubernetes gère bien plus que `nodes`/`pods` ; `discover` parcourt
+les **familles de `kind` suivantes**, chacune mappée à une dimension de la
+topologie ou — à défaut — énumérée comme inconnue (§2) :
+
+| Famille          | `kind` sondés                                                           | Sert à                                                 |
+| ---------------- | ----------------------------------------------------------------------- | ------------------------------------------------------ |
+| **Cluster**      | `Node`                                                                  | nœuds & rôles (labels/taints control-plane)            |
+| **Workloads**    | `Deployment`, `StatefulSet`, `DaemonSet`, `Job`, `CronJob`              | couches montées (mappées `_LAYER_SIGNAL`) ou inconnues |
+| **Organisation** | `Namespace`                                                             | regroupement ; un ns hors catalogue → `unknown`        |
+| **Réseau**       | `Service`, `Ingress`, `Gateway`/`HTTPRoute`, `Cilium*` (LBPool/L2/CNP)  | mode d'exposition + policies réseau                    |
+| **Stockage**     | `StorageClass`, `PersistentVolumeClaim`, CRs `Ceph*`/CNPG `Cluster`     | backend (ceph vs local-path) + volumes                 |
+| **Config**       | `ConfigMap`, `Secret`                                                   | (non reconstruit : signalé en présence/compte seul)    |
+| **RBAC / sécu**  | `ServiceAccount`, `Role`/`ClusterRole`(+Bindings), labels PSA           | durcissement constaté (informatif)                     |
+| **Extension**    | **`CustomResourceDefinition`** (le PIVOT), `HPA`, `PodDisruptionBudget` | identifie les **opérateurs/plateformes** installés     |
+
+Le **pivot, ce sont les CRDs** : la présence d'une CRD
+`cilium.io`/`ceph.rook.io`/
+`postgresql.cnpg.io`/`argoproj.io`/`gateway.networking.k8s.io` est le signal le
+plus fiable de « telle plateforme tourne » — plus robuste qu'un nom de
+Deployment (qui peut varier). `discover` croise donc CRDs **et** workloads pour
+mapper une couche ; ce qui ne matche aucun catalogue tombe en `unknown` (§2).
+
 ### 2. L'INCONNU est détecté et signalé, jamais ignoré
 
 Principe non négociable : ce que le **catalogue ne connaît pas** (un namespace,
@@ -85,7 +110,30 @@ connues) est **listé explicitement** dans la sortie — sous un bloc `unknown:`
 La distinction est binaire et tracée : **connu → mappé** (nœud/layer/backend/
 exposition) ; **inconnu → énuméré** (ns/kind/nom + version si lisible).
 
-### 3. Accès : kubeconfig d'abord, SSH pour ce que l'API ne dit pas
+### 3. Bilan de SANTÉ du cluster (pas seulement sa déclaration)
+
+Pendant qu'il sonde tout le réel, `discover` constate aussi l'**ÉTAT** et émet
+un **bilan de santé** — la déclaration reconstruite (§1) dit _ce qui est là_, le
+bilan dit _si ça va_. Il agrège, sans rien réinventer, les primitives de santé
+existantes (`bootstrap/lib/health-classify.sh`, `cluster_topology/gates.py`) :
+
+- **nœuds** : Ready / NotReady (classification `health-classify.sh`,
+  `classify_nodes_ready`) ;
+- **workloads** : pods Running vs CrashLoopBackOff / Pending / ImagePullBackOff
+  (par couche mappée — un layer « présent » mais en CrashLoop est signalé
+  DÉGRADÉ, pas sain) ;
+- **stockage** : PVC `Bound` vs `Pending` (`gate_pvc_bound`, `gates.py`) ; OSD
+  up en backend ceph (`gate_osds_up`) ;
+- **CR d'opérateur** : `.status` des CRs gérés (CephCluster HEALTH_OK, CNPG
+  Cluster ready) — la santé se lit sur le `.status` du CR, pas par un exec
+  (mémoire `[[k8s-exec-vs-k8s-info-gate]]`).
+
+Sortie : un verdict par dimension (`sain` / `dégradé` / `absent`) + le détail
+des anomalies. Read-only (aucune mutation), code 0 informatif. Cohérent avec
+`bootstrap/state.sh` (couche santé existante) : `discover` en est la **vue
+agrégée et portable**, pas un second outil de diagnostic.
+
+### 4. Accès : kubeconfig d'abord, SSH pour ce que l'API ne dit pas
 
 La plupart des sondes passent par le **kubeconfig** (`kubectl get` — déjà le
 canal de `preview`). L'**accès SSH** (au sens ADR 0048 / `access.sh`) sert ce
@@ -96,7 +144,7 @@ le reste `inconnu/non-sondé`** (pas d'invention). C'est un outil DÉFENSIF sur
 SON cluster (accès légitime), pas un scanner hostile — distinct de l'offensif
 (ADR 0025).
 
-### 4. Sortie : un `topology.yaml` repris par le reste de l'outil
+### 5. Sortie : un `topology.yaml` repris par le reste de l'outil
 
 `discover` émet un `topology.yaml` **valide** (qui passe `stack validate`,
 ADR 0056) sur stdout ou `-o <fichier>`. Boucle vertueuse : `discover` →
@@ -105,7 +153,7 @@ les valeurs **génériques** quand c'est une dimension d'instance (IP/plages →
 `.example`-style, ADR 0023) — on ne fige pas une IP réelle dans un fichier
 potentiellement versionné.
 
-### 5. Façade fine, sondes réutilisées (ADR 0049/0017)
+### 6. Façade fine, sondes réutilisées (ADR 0049/0017)
 
 `cmd_discover` est une **façade** : elle ORCHESTRE les sondes (kubectl/SSH =
 bash irréductible, ADR 0049) et assemble un dict de topologie via la **logique
