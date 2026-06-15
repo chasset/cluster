@@ -1029,6 +1029,54 @@ class Access(unittest.TestCase):
         self.assertIn("kubeconfig du banc absent", err)
 
 
+class Scale(unittest.TestCase):
+    """`scale` : PLAN par défaut, --apply exécute, refuse ArgoCD. Pas de vrai cluster."""
+
+    def _stub(self, *, ready, argocd=False, scale_rc=0):
+        import subprocess as sp
+
+        cli._ready_nodes = lambda: ready
+        self.addCleanup(setattr, cli, "_ready_nodes", cli._ready_nodes)
+
+        def _fake_kubectl(*args, **k):
+            if "scale" in args:
+                return sp.CompletedProcess(args=args, returncode=scale_rc, stdout="", stderr="boom")
+            # _argocd_managed : managed-by label
+            return sp.CompletedProcess(
+                args=args, returncode=0, stdout=("argocd" if argocd else ""), stderr=""
+            )
+
+        orig = cli._kubectl
+        cli._kubectl = _fake_kubectl
+        self.addCleanup(setattr, cli, "_kubectl", orig)
+
+    def test_plan_by_default(self):
+        self._stub(ready=["n1", "n2"])
+        code, out, _ = _capture(["scale"])
+        self.assertEqual(code, 0)
+        self.assertIn("2 nœud(s) Ready", out)
+        self.assertIn("→ 2 replica(s)", out)
+        self.assertIn("PLAN (rien appliqué)", out)
+
+    def test_refuses_unreachable_bench(self):
+        self._stub(ready=[])
+        code, _, err = _capture(["scale"])
+        self.assertEqual(code, 2)  # _UsageError
+        self.assertIn("injoignable", err)
+
+    def test_skips_argocd_managed(self):
+        self._stub(ready=["n1"], argocd=True)
+        code, out, _ = _capture(["scale", "--apply"])
+        self.assertEqual(code, 0)
+        self.assertIn("ArgoCD", out)  # workloads managés → ⊘ skipped
+
+    def test_apply_failure_propagates(self):
+        self._stub(ready=["n1"], scale_rc=1)
+        code, _, err = _capture(["scale", "--apply"])
+        self.assertEqual(code, 1)
+        self.assertIn("échec", err)
+
+
 class Dispatch(unittest.TestCase):
     def test_unknown_command_is_usage(self):
         with self.assertRaises(SystemExit) as ctx:

@@ -108,6 +108,7 @@ from cluster_topology import bootstrap as _bootstrap  # noqa: E402
 from cluster_topology import ha as _ha  # noqa: E402
 from cluster_topology import roundtrip as _roundtrip  # noqa: E402
 from cluster_topology import runner as _runner  # noqa: E402
+from cluster_topology import scale as _scale  # noqa: E402
 from cluster_topology import smoke as _smoke  # noqa: E402
 from cluster_topology.history import (  # noqa: E402
     last_run_for_target,
@@ -867,6 +868,87 @@ def cmd_access(args: argparse.Namespace) -> int:
     ).returncode
 
 
+def _kubectl(*args: str, timeout: int = _REFRESH_TIMEOUT_S):
+    """Lance `kubectl <args>` sur le banc (kubeconfig en repli), borné. Renvoie le
+    CompletedProcess (rc/stdout) ou None si injoignable — l'appelant décide."""
+    kubeconfig = os.environ.get("KUBECONFIG") or (
+        _BENCH_KUBECONFIG if os.path.exists(_BENCH_KUBECONFIG) else None
+    )
+    try:
+        return subprocess.run(  # noqa: S603 — argv contrôlé (table de workloads)
+            ["kubectl", *args, "--request-timeout=5s"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={**os.environ, **({"KUBECONFIG": kubeconfig} if kubeconfig else {})},
+            timeout=timeout,
+        )
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
+def _argocd_managed(name: str, namespace: str) -> bool:
+    """Le Deployment est-il réconcilié par ArgoCD ? (label app.kubernetes.io/managed-by).
+
+    Un workload managé ne se scale PAS en impératif (sync l'écrase — ADR 0046)."""
+    out = _kubectl(
+        "get",
+        "deployment",
+        name,
+        "-n",
+        namespace,
+        "-o",
+        "jsonpath={.metadata.labels.app\\.kubernetes\\.io/managed-by}",
+    )
+    return out is not None and out.returncode == 0 and out.stdout.strip() == "argocd"
+
+
+def cmd_scale(args: argparse.Namespace) -> int:
+    """`scale` : ajuste les replicas des workloads stateless au nombre de nœuds (ADR 0072).
+
+    Capacité RUNTIME : lit les nœuds Ready, dérive une cible par workload de
+    l'allowlist (`scale.plan_scale` — pur), et l'applique avec `--apply`. Sans
+    `--apply` : affiche le PLAN (read-only, comme `preview`). REFUSE un workload
+    managé par ArgoCD (un scale impératif serait écrasé au sync — ADR 0046). Code 0
+    si tout est appliqué/à-jour ; 1 si un `kubectl scale` échoue ; 2 si banc
+    injoignable (usage)."""
+    ready = _ready_nodes()
+    if not ready:
+        raise _UsageError(
+            "banc injoignable (aucun nœud Ready) — monter le cluster d'abord (`cluster up`)"
+        )
+    # Capacité d'exécution = nœuds Ready (le banc détaint les control → schedulables).
+    workers_ready = len(ready)
+    # Détecter les workloads managés par ArgoCD (refusés). On ne sonde QUE l'allowlist.
+    managed = frozenset(
+        wl.name for wl in _scale.SCALABLE_WORKLOADS if _argocd_managed(wl.name, wl.namespace)
+    )
+    plans = _scale.plan_scale(workers_ready, argocd_managed=managed)
+
+    print(f"scale — {workers_ready} nœud(s) Ready → cible de replicas :")
+    rc = 0
+    for plan in plans:
+        wl = plan.workload
+        if plan.skipped:
+            print(f"  ⊘ {wl.name:<10} (ns {wl.namespace}) — {plan.skipped}")
+            continue
+        if not args.apply:
+            print(f"  + {wl.name:<10} (ns {wl.namespace}) → {plan.target} replica(s)")
+            continue
+        out = _kubectl(
+            "scale", "deployment", wl.name, "-n", wl.namespace, f"--replicas={plan.target}"
+        )
+        if out is not None and out.returncode == 0:
+            print(f"  ✓ {wl.name:<10} → {plan.target} replica(s)")
+        else:
+            detail = (out.stderr.strip() if out else "kubectl injoignable") or "échec"
+            print(f"  ✗ {wl.name:<10} → échec : {detail}", file=sys.stderr)
+            rc = 1
+    if not args.apply:
+        print("→ PLAN (rien appliqué) — `cluster scale --apply` pour exécuter.")
+    return rc
+
+
 def cmd_preview(args: argparse.Namespace) -> int:
     """`preview` : LA vue complète d'une stack — VOULU + RÉEL + PLAN (calque `pulumi preview`).
 
@@ -1450,6 +1532,7 @@ _DISPATCH = {
     "preview": cmd_preview,  # calque `pulumi preview`
     "env": cmd_env,  # imprime `export KUBECONFIG=<banc>` à eval dans le shell
     "access": cmd_access,  # accès dev (URLs + secrets) — délègue à access.sh (ADR 0048)
+    "scale": cmd_scale,  # ajuste les replicas au nb de nœuds Ready (ADR 0072, runtime)
     "up": cmd_up,  # calque `pulumi up` : monte TOUTE la séquence (délègue à run-phases.sh)
     "next": cmd_next,  # applique la PROCHAINE couche (1er drift, granularité fine)
     "destroy": cmd_destroy,  # calque `pulumi destroy`
@@ -1649,6 +1732,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-hosts",
         action="store_true",
         help="ne touche pas /etc/hosts (forwards + secrets seuls)",
+    )
+
+    p_scale = sub.add_parser(
+        "scale",
+        help="ajuster les replicas des services au nombre de nœuds (PLAN ; --apply exécute)",
+    )
+    p_scale.add_argument(
+        "--apply", action="store_true", help="applique le scaling (sinon : affiche le PLAN seul)"
     )
 
     p_destroy = sub.add_parser(
