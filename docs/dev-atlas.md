@@ -15,10 +15,10 @@ endroit.
 
 ```bash
 # 1. Monter le banc (topologie multi-node-3, chemin atlas, profil léger)
-test/lima/run-phases.sh atlas
+bench/lima/run-phases.sh atlas
 
 # 2. Tout brancher : URLs cliquables + secrets regroupés + ../atlas/.env.cluster.local
-test/lima/access.sh
+bench/lima/access.sh
 ```
 
 Puis travaillez dans `atlas` et `git push` (le webhook Gitea → Argo CD
@@ -50,17 +50,17 @@ Source **machine-lisible** de ce que le socle expose
 ## Commandes utiles (banc Lima)
 
 ```bash
-test/lima/run-phases.sh atlas      # monter le socle complet (GitOps + DataOps)
-test/lima/run-phases.sh status     # état du banc (VMs, nœuds, phases, UIs)
-test/lima/access.sh                # URLs + secrets + .env atlas
-test/lima/access.sh --stop         # arrêter les tunnels + retirer le bloc /etc/hosts
-test/lima/run-phases.sh down       # détruire le banc
+bench/lima/run-phases.sh atlas      # monter le socle complet (GitOps + DataOps)
+bench/lima/run-phases.sh status     # état du banc (VMs, nœuds, phases, UIs)
+bench/lima/access.sh                # URLs + secrets + .env atlas
+bench/lima/access.sh --stop         # arrêter les tunnels + retirer le bloc /etc/hosts
+bench/lima/run-phases.sh down       # détruire le banc
 ```
 
-- Harnais du banc : [`test/lima/`](../test/lima/) · validations :
-  [`test/lima/RESULTS.md`](../test/lima/RESULTS.md)
+- Harnais du banc : [`bench/lima/`](../bench/lima/) · validations :
+  [`bench/lima/RESULTS.md`](../bench/lima/RESULTS.md)
 - Init du dépôt Gitea (org/repo + webhook) :
-  [`test/lima/gitea-init.sh`](../test/lima/gitea-init.sh)
+  [`bench/lima/gitea-init.sh`](../bench/lima/gitea-init.sh)
 
 ## Décisions qui vous concernent (ADR)
 

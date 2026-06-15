@@ -74,11 +74,11 @@ Les deux sont poussées dans le **registry interne**
 
 Accepted (2026-06-05). **Validation banc en suivi** (#130/#148) : la chaîne
 DataOps assemblée (`monitoring → CNPG → Dagster → Marquez`) est validée par le
-harnais reproductible `test/lima/run-phases.sh dataops-chain`, qui prouve e2e
+harnais reproductible `bench/lima/run-phases.sh dataops-chain`, qui prouve e2e
 l'ingestion d'un événement OpenLineage émis par un **vrai run Dagster** (sensor
 `openlineage-dagster`) et visible dans Marquez. Ce harnais **clôt l'épopée de
 validation systémique #148** une fois le run consigné dans
-[`test/lima/RESULTS.md`](../../test/lima/RESULTS.md).
+[`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md).
 
 ## Conséquences
 

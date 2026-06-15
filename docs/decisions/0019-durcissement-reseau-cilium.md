@@ -108,7 +108,7 @@ Accepted (2026-06-02).
 WireGuard actif `Encryption: Wireguard (3/3 nodes)`, interface `cilium_wg0` avec
 2 peers par nœud, `hubble observe` retourne les flux réels, Ceph `HEALTH_OK`
 après reconvergence. Scénario reproductible :
-[`test/scenarios/14-cilium-encryption-hubble.sh`](../../test/scenarios/14-cilium-encryption-hubble.sh).
+[`bench/scenarios/14-cilium-encryption-hubble.sh`](../../bench/scenarios/14-cilium-encryption-hubble.sh).
 
 ## À revoir
 

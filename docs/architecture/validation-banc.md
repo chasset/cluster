@@ -3,8 +3,8 @@
 Cette page donne une **vue d'évolution** des campagnes de test sur le banc
 multi-nœuds : ce qui a été validé, quand, et avec quels écarts (_findings_)
 corrigés. Le **détail brut** de chaque campagne (logs, symptômes, correctifs)
-reste dans le journal [`test/RESULTS.md`](../../test/RESULTS.md) ; cette page en
-est la synthèse navigable.
+reste dans le journal [`bench/RESULTS.md`](../../bench/RESULTS.md) ; cette page
+en est la synthèse navigable.
 
 > **Le banc.** 3 VM Debian 13 **arm64** (Apple Silicon + VirtualBox), réseau
 > privé `192.168.67.0/24`, topologie 1 control-plane + 2 workers. Il **exerce
@@ -40,7 +40,7 @@ sont comptés par gravité : 🔴 bloquant · 🟠 moyen · 🟢 bénin.
 | #11 | 2026-06-03 | **Argo CD** GitOps (ADR 0022)                        | ✅      | 🔴×2      |
 
 > Les Runs #1 et #4 sont consignés dans les tableaux de tête de
-> [`RESULTS.md`](../../test/RESULTS.md) (avant la numérotation `## Run`).
+> [`RESULTS.md`](../../bench/RESULTS.md) (avant la numérotation `## Run`).
 
 ## Lecture de l'évolution
 
@@ -85,7 +85,7 @@ Ceux qui illustrent le mieux la valeur du banc — invisibles au lint :
 > le déploiement réel reste une action humaine, tracée étape par étape.
 >
 > **Chaîne DataOps assemblée.** Le harnais
-> `test/lima/run-phases.sh dataops-chain` déploie et vérifie
+> `bench/lima/run-phases.sh dataops-chain` déploie et vérifie
 > `monitoring → CNPG → Dagster → Marquez` de bout en bout (#148). Pour la carte
 > d'accès et les actions vérifiables par brique (URL navigateur / commande
 > console), voir [La chaîne DataOps de bout en bout](chaine-dataops.md).

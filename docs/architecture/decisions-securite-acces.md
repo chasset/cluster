@@ -211,7 +211,7 @@ attaque_. Et l'inventaire des détecteurs hôte
 ([`bootstrap/security/`](../../bootstrap/security/)) révélait un trou : fail2ban
 et auditd **détectent** et **réagissent**, mais n'**alertent** quasi pas en
 temps réel. ADR 0025 répond par deux familles de scénarios
-([`test/scenarios/`](../../test/scenarios/) 16-22), **réservées à un banc
+([`bench/scenarios/`](../../bench/scenarios/) 16-22), **réservées à un banc
 jetable** par des garde-fous codés :
 
 - **attaques contrôlées** — brute-force SSH → **fail2ban bannit** (16), pod

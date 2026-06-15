@@ -99,12 +99,12 @@ docs:
     pnpm docs:dev
 
 # ─── Banc de test (Lima — seul banc local, ADR 0038) ────────────────────────
-# Orchestrateur à gates : voir test/lima/run-phases.sh.
+# Orchestrateur à gates : voir bench/lima/run-phases.sh.
 
 # Banc multi-nœuds Lima, phase par phase ou tout : `just bench all` / `just bench ceph`.
 bench phase="all":
-    test/lima/run-phases.sh {{ phase }}
+    bench/lima/run-phases.sh {{ phase }}
 
 # Détruit les VMs du banc Lima.
 bench-destroy:
-    test/lima/run-phases.sh down
+    bench/lima/run-phases.sh down

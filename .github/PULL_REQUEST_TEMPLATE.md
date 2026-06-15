@@ -8,7 +8,7 @@ Merci de votre contribution ! Quelques rappels (ADR 0037 — merge commit) :
   - 1 PR = 1 type/scope cohérent. Les docs/tests qui servent la feature peuvent
     l'accompagner ; deux features distinctes = deux PR.
 - Toute modification d'infra réseau/stockage doit passer par le banc
-  (test/lima/) avant la prod — cf. SAFEGUARDS.md.
+  (bench/lima/) avant la prod — cf. SAFEGUARDS.md.
 -->
 
 ## Quoi & pourquoi

@@ -9,7 +9,7 @@ jamais la convergence ni un état réconcilié.
 Paliers P0-P2 (plan-modele-declaratif) : modéliser (`topologies/socle.example.yaml`) ;
 générer les DEUX inventaires BYTE-IDENTIQUES à l'existant — prod
 (`bootstrap/hosts.example.yaml`) et banc Lima (sortie de `write_inventory`,
-test/lima/lib.sh) ; DÉRIVER le profil (inclusion cumulative ADR 0039 + faisceau
+bench/lima/lib.sh) ; DÉRIVER le profil (inclusion cumulative ADR 0039 + faisceau
 `-e` à parité bash : `derive_run_params`, ceph_osd_expected, etc.). La logique
 (chargement, dérivation, rendu) est pure et testée (tests/test_cluster_topology.py,
 ADR 0017). La FAÇADE CLI/CI qui expose cette surface (generate/validate/status/

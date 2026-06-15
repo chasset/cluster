@@ -11,7 +11,7 @@
 # convergent par Ansible/kubectl, jamais par une `Application` Argo CD.
 #
 # L'INIT du dépôt Gitea (org + repo + seed atlas + webhook → Argo CD) est une
-# étape de DONNÉES post-bootstrap, portée par le harnais test/lima/ (ADR 0044) —
+# étape de DONNÉES post-bootstrap, portée par le harnais bench/lima/ (ADR 0044) —
 # hors de ce playbook.
 #
 # HÔTE D'EXÉCUTION k8s (`dataops_k8s_host`, défaut localhost) : comme dataops.yaml,

@@ -36,7 +36,7 @@ Ce dépôt est un **catalogue de topologies d'infrastructure** générique. Donc
     fondateur et les issues. Un coup d'œil suffit à situer la mise en œuvre ;
   - une section **« Suivi »** : paliers (cases à cocher), **issues rattachées**
     (`#NNN`, créées OU **préexistantes adoptées**), renvoi aux runs de preuve
-    ([`RESULTS.md`](../../test/lima/RESULTS.md)).
+    ([`RESULTS.md`](../../bench/lima/RESULTS.md)).
 
   Le plan est le **tableau de bord** de la décision. **Jamais de
   paliers/checklist dans l'ADR** — ils vivent ici (l'ADR est immuable, le

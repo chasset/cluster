@@ -2,7 +2,7 @@
 
 unittest stdlib. Couvre le filtrage par profil/backend/nœuds/offensif ET deux
 garde-fous de PARITÉ anti-dérive (ADR 0058) :
-  - catalogue ↔ glob test/scenarios/NN-*.sh (le code couvre exactement les 29) ;
+  - catalogue ↔ glob bench/scenarios/NN-*.sh (le code couvre exactement les 29) ;
   - classification offensive ↔ run-all.sh (`is_destructive`/`needs_ssh`).
 """
 
@@ -22,7 +22,7 @@ from cluster_topology.epreuves import (  # noqa: E402
 from cluster_topology.model import topology_from_dict  # noqa: E402
 
 _ROOT = os.path.join(os.path.dirname(__file__), "..")
-_SCENARIOS_DIR = os.path.join(_ROOT, "test", "scenarios")
+_SCENARIOS_DIR = os.path.join(_ROOT, "bench", "scenarios")
 
 
 def _topo(profile="dataops", backend="ceph", nodes=None, kind="prod"):
@@ -44,7 +44,7 @@ def _topo(profile="dataops", backend="ceph", nodes=None, kind="prod"):
 class Catalogue(unittest.TestCase):
     def test_couvre_les_scenarios_du_glob(self):
         # Garde-fou anti-dérive : EPREUVES doit couvrir EXACTEMENT les fichiers
-        # test/scenarios/NN-*.sh (ajouter un scénario 31 force une entrée ici).
+        # bench/scenarios/NN-*.sh (ajouter un scénario 31 force une entrée ici).
         on_disk = {
             re.match(r"(\d{2})-", f).group(1)
             for f in os.listdir(_SCENARIOS_DIR)
@@ -115,7 +115,7 @@ class Filtrage(unittest.TestCase):
 
 
 class ParityRunAll(unittest.TestCase):
-    """Parité de la classification offensive avec test/scenarios/run-all.sh."""
+    """Parité de la classification offensive avec bench/scenarios/run-all.sh."""
 
     def test_offensifs_correspondent_a_run_all(self):
         # run-all.sh : terrains offensifs (BANC=1) = 17 18 20 21 (offensif côté

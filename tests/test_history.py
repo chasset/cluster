@@ -3,7 +3,7 @@
 unittest stdlib. Le test CRITIQUE est la PARITÉ Python↔bash : age_days /
 freshness_verdict / seuil_for_target doivent rendre le MÊME verdict que
 metro_age_days / metro_freshness_verdict / metro_seuil_for_target (metrology.sh),
-sur la même table de cas que test/unit/metrology.bats — sinon l'outil Python
+sur la même table de cas que bench/unit/metrology.bats — sinon l'outil Python
 diverge silencieusement du garde-fou de fraîcheur (check-freshness.sh).
 """
 
@@ -27,7 +27,7 @@ from cluster_topology.history import (  # noqa: E402
 )
 
 _ROOT = os.path.join(os.path.dirname(__file__), "..")
-_REAL_HISTORY = os.path.join(_ROOT, "test", "lima", "runs-history.yaml")
+_REAL_HISTORY = os.path.join(_ROOT, "bench", "lima", "runs-history.yaml")
 
 # Un mini-historique fixture AVEC champ target (le format à venir), pour tester le
 # repli +hardening et le filtrage par chemin sans dépendre de l'historique réel.

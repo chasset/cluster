@@ -1,6 +1,6 @@
 """Exposition des métriques DÉJÀ consignées (P6, ADR 0056 §8.8).
 
-L'outil **LIT et EXPOSE** les métriques que `test/lima/metrology.sh` échantillonne
+L'outil **LIT et EXPOSE** les métriques que `bench/lima/metrology.sh` échantillonne
 et écrit dans `runs-history.yaml` (durée totale, durées par phase, `cpu_core_s`,
 `ram_peak_mib`, `ram_mean_mib`) — il **ne les réinvente pas** et n'en mesure
 aucune de neuf (mesurer = le banc, via metrology.sh). Module PUR : il met en forme

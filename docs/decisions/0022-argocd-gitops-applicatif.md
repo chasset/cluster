@@ -120,7 +120,7 @@ Accepted (2026-06-03).
   d'infra ni `argocd` lui-même (anti-circularité ; pas de self-management).
 - **Default-deny préservé** (0019) : `platform/network-policies/argocd/`
   (default-deny + allow-dns + server-ingress + repo/apiserver-egress).
-- **Validation banc** (`test/multi-node`) : une `Application` de test passe
+- **Validation banc** (`bench/multi-node`) : une `Application` de test passe
   **`Synced/Healthy`** ; l'UI répond en HTTPS via le Gateway (cert CA interne,
   root importé) ; le CLI `--grpc-web` fonctionne à travers la `HTTPRoute`.
 

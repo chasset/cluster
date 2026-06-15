@@ -86,9 +86,9 @@ pre-push:
           ':!:platform/dagster/values.bench.yaml' \
           ':!:platform/marquez/marquez.yaml' \
           ':!:platform/marquez/values.bench.yaml' \
-          ':!:test/*/inventory.yaml' \
+          ':!:bench/*/inventory.yaml' \
           ':!:docs/architecture/registre-drifts.yaml' \
-          ':!:test/lima/runs-history.yaml' \
+          ':!:bench/lima/runs-history.yaml' \
           ':!:contract/*.example.yaml' \
           ':!:topologies/*.example.yaml' \
           | xargs -0 -r kubeconform \

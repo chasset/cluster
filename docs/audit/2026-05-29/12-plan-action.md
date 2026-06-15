@@ -82,8 +82,8 @@ récupération. Un seul incident peut être irréversible.
 | 34  | Parité lint : `jscpd` en pre-push, `lint:k8s`/`lint:ansible` dans `pnpm lint`, factoriser les exclusions kubeconform, corriger l'incompat `.yamllint`/ansible-lint | [03](03-lint-format.md)                                 |
 | 35  | markdownlint + lychee (link-checker) en CI                                                                                                                         | [03](03-lint-format.md)                                 |
 | 36  | Aligner ADR 0005 et le code (hold containerd) ; figer le patch K8s ; épingler les actions GitHub                                                                   | [05](05-reproductibilite.md)                            |
-| 37  | Compléter la table `bootstrap/README.md` ; ajouter la table `test/`+`docs/` au README racine                                                                       | [01](01-bonnes-pratiques.md), [04](04-documentation.md) |
-| 38  | Factoriser `bootstrap/lib/ssh-report.sh` ; `test/scenarios/lib.sh` ; lever la collision `SSH_OPTS`                                                                 | [10](10-dispersion-cli.md)                              |
+| 37  | Compléter la table `bootstrap/README.md` ; ajouter la table `bench/`+`docs/` au README racine                                                                      | [01](01-bonnes-pratiques.md), [04](04-documentation.md) |
+| 38  | Factoriser `bootstrap/lib/ssh-report.sh` ; `bench/scenarios/lib.sh` ; lever la collision `SSH_OPTS`                                                                | [10](10-dispersion-cli.md)                              |
 
 ## Décisions à formaliser en ADR (transmissibilité / bus-factor)
 

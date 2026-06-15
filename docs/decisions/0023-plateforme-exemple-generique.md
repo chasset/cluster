@@ -24,7 +24,7 @@ particularités, et sans qu'elles laissent supposer que le dépôt est _sa_
 plateforme à lui.
 
 Il existe **déjà** l'amorce du bon patron, et la **preuve par l'exemple** : le
-banc Lima `test/lima/` **sélectionne** sa topologie en pointant son propre
+banc Lima `bench/lima/` **sélectionne** sa topologie en pointant son propre
 `inventory.yaml` (gitignoré) et en exportant des variables (`CP_IP`,
 `CEPH_BLOCK_DEVICE`…) — un « stack select » artisanal. S'y ajoutent les
 variables optionnelles de surcharge (`control_plane_ip`, `kubelet_node_ip`), les
@@ -49,7 +49,7 @@ Distinguer honnêtement ce qui est **réalisé et validé** de ce qui est **vis�
 | Topologie                               | Statut                       | Où                                                                                                |
 | --------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------- |
 | Mono-nœud (onboarding, sans Ceph)       | **abandonnée** (ADR 0040)    | — (trop dégradée pour être un témoin fiable)                                                      |
-| Multi-nœuds 3 VM (Ceph, réseau privé)   | **réalisée** (validée banc)  | [`test/lima/`](../../test/lima/)                                                                  |
+| Multi-nœuds 3 VM (Ceph, réseau privé)   | **réalisée** (validée banc)  | [`bench/lima/`](../../bench/lima/)                                                                |
 | Bare-metal 4 nœuds hyperconvergé        | **réalisée** (cible de prod) | `bootstrap/` + `storage/ceph/`                                                                    |
 | Réseau local Docker (dev zéro-matériel) | **en ligne de mire**         | — (à créer)                                                                                       |
 | HA multi-control-plane                  | **en ligne de mire**         | contredit l'[ADR 0002](0002-control-plane-unique-avec-endpoint.md) (SPOF assumé) — chantier dédié |
@@ -146,7 +146,7 @@ protocole. Critère : _« cette valeur changerait-elle d'un déploiement à l'au
 
 - **Le banc Vagrant (`192.168.67.0/24`) reste tel quel** : c'est un exemple
   **fonctionnel, public et reproductible**, pas l'infrastructure de l'auteur.
-- **L'honnêteté des validations banc est préservée** : `test/RESULTS.md`
+- **L'honnêteté des validations banc est préservée** : `bench/RESULTS.md`
   consigne des exécutions réelles (qui utilisent littéralement `192.168.67.x`) ;
   on ne **réécrit pas** cet historique. Seules les références à la **production
   réelle** sont génériquées.

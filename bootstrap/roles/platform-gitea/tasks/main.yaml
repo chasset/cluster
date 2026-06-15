@@ -9,7 +9,7 @@
 # INFRA, pas applicatif : Gitea doit converger AVANT qu'Argo CD réconcilie
 # (anti-bootstrap-circulaire, ADR 0022) — d'où Ansible, pas une `Application`.
 # L'init du dépôt (org + repo + seed atlas + webhook) est une étape de DONNÉES
-# post-bootstrap, hors de ce rôle (cf. harnais test/lima/, ADR 0044).
+# post-bootstrap, hors de ce rôle (cf. harnais bench/lima/, ADR 0044).
 - name: Deploy Gitea (git intra-banc air-gapped)
   tags: gitea
   run_once: true

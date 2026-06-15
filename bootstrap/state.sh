@@ -124,12 +124,12 @@ mark() {
 
 section() { printf '\n%s── %s ──%s\n' "$B" "$1" "$N"; }
 
-# Fonctions PURES de classification (testées par bats — test/unit/state-classify.bats).
+# Fonctions PURES de classification (testées par bats — bench/unit/state-classify.bats).
 # shellcheck source=lib/state-classify.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/lib/state-classify.sh"
 
 # Lib PARTAGÉE du HEALTHCHECK cluster (verdicts kubectl + garde-fou de cible
-# ADR 0053). Testée par test/unit/health-classify.bats.
+# ADR 0053). Testée par bench/unit/health-classify.bats.
 # shellcheck source=lib/health-classify.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/lib/health-classify.sh"
 

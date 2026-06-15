@@ -60,7 +60,8 @@ une arête directe).
 
 ## Ce qui en est sorti
 
-- `component_deps` (`test/lima/rollback-lib.sh`) : **5 arêtes `→ sc`** ajoutées.
+- `component_deps` (`bench/lima/rollback-lib.sh`) : **5 arêtes `→ sc`**
+  ajoutées.
 - `phase_closure` / `phase_involves_storage` / `phase_of_component` ajoutés à la
   lib (projection du graphe atomique sur les phases) — **source unique**.
 - `roundtrip.py` : `_DEPENDENTS`, `_MOUNT_ORDER`, `_STORAGE_LAYERS`

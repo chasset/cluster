@@ -23,15 +23,15 @@ contient pas** tes vrais hôtes : ils vivent en config locale **gitignorée**.
 | ------------------------ | ---------------------------------------------------------------------------- |
 | Hôtes **prod**           | `bootstrap/hosts.yaml` (gitignoré ; copié de `bootstrap/hosts.example.yaml`) |
 | Hôtes **banc Lima**      | les VMs réelles — `limactl list` (noms `cp1`, `node1`…)                      |
-| `kubeconfig` du **banc** | `test/lima/.work/kubeconfig` (généré par `run-phases.sh`)                    |
+| `kubeconfig` du **banc** | `bench/lima/.work/kubeconfig` (généré par `run-phases.sh`)                   |
 
 **Le plus simple — laisse `env.sh` dériver ton contexte et t'imprimer les
 commandes exactes à copier** (hôtes courants + invocation `state.sh` par nœud +
 export du kubeconfig), sans rien deviner :
 
 ```bash
-test/lima/env.sh                    # auto-détecte (banc Lima ou prod)
-eval "$(test/lima/env.sh export)"   # exporte KUBECONFIG du banc dans ton shell
+bench/lima/env.sh                    # auto-détecte (banc Lima ou prod)
+eval "$(bench/lima/env.sh export)"   # exporte KUBECONFIG du banc dans ton shell
 ```
 
 Exemple de ce qu'il imprime sur un banc Lima à 3 nœuds :
@@ -45,20 +45,20 @@ Le banc Lima est l'environnement de validation e2e
 ([ADR 0034](decisions/0034-validation-e2e-from-scratch.md)). Tout passe par un
 **orchestrateur unique** :
 
-| Pour…                                               | Commande                                                         | Détails                                                                                  |
-| --------------------------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Monter le banc par étapes (gate par phase)          | `test/lima/run-phases.sh <phase>`                                | [test/lima/README.md](../test/lima/README.md)                                            |
-| Monter un **chemin nommé** complet                  | `test/lima/run-phases.sh socle\|atlas\|atlas-ceph\|storage-real` | [ADR 0045](decisions/0045-chemins-installation-banc-couches.md)                          |
-| Voir l'état du banc (VMs, nœuds, phases, UIs)       | `test/lima/run-phases.sh status`                                 | lecture seule                                                                            |
-| (Ré)exporter le kubeconfig du banc                  | `test/lima/run-phases.sh kubeconfig`                             |                                                                                          |
-| Détruire le banc (VMs + disques)                    | `test/lima/run-phases.sh down`                                   | destructif                                                                               |
-| Prouver une **reprise après faute** (arrêt injecté) | `BANC_JETABLE=1 test/lima/run-phases.sh bootstrap-fault`         | [ADR 0050](decisions/0050-modele-reprise-role-ansible.md) — **destructif**, banc jetable |
+| Pour…                                               | Commande                                                          | Détails                                                                                  |
+| --------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Monter le banc par étapes (gate par phase)          | `bench/lima/run-phases.sh <phase>`                                | [bench/lima/README.md](../bench/lima/README.md)                                          |
+| Monter un **chemin nommé** complet                  | `bench/lima/run-phases.sh socle\|atlas\|atlas-ceph\|storage-real` | [ADR 0045](decisions/0045-chemins-installation-banc-couches.md)                          |
+| Voir l'état du banc (VMs, nœuds, phases, UIs)       | `bench/lima/run-phases.sh status`                                 | lecture seule                                                                            |
+| (Ré)exporter le kubeconfig du banc                  | `bench/lima/run-phases.sh kubeconfig`                             |                                                                                          |
+| Détruire le banc (VMs + disques)                    | `bench/lima/run-phases.sh down`                                   | destructif                                                                               |
+| Prouver une **reprise après faute** (arrêt injecté) | `BANC_JETABLE=1 bench/lima/run-phases.sh bootstrap-fault`         | [ADR 0050](decisions/0050-modele-reprise-role-ansible.md) — **destructif**, banc jetable |
 
 ## Accès développeur
 
 | Pour…                                                                                         | Commande                                                                    | Détails                                               |
 | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Rendre le banc consommable depuis l'hôte (URLs `*.cluster.lan` cliquables + secrets + `.env`) | `test/lima/access.sh`                                                       | [ADR 0048](decisions/0048-acces-local-developpeur.md) |
+| Rendre le banc consommable depuis l'hôte (URLs `*.cluster.lan` cliquables + secrets + `.env`) | `bench/lima/access.sh`                                                      | [ADR 0048](decisions/0048-acces-local-developpeur.md) |
 | Premier accès SSH à des nœuds Debian fraîchement installés (poule/œuf avant Ansible)          | `bootstrap/first-access.sh`                                                 | prérequis d'Ansible                                   |
 | Identifiants / gestion du dashboard Kubernetes                                                | `platform/k8s-dashboard/manage.sh`, `platform/k8s-dashboard/credentials.sh` |                                                       |
 
@@ -69,11 +69,11 @@ shell ([ADR 0049](decisions/0049-doctrine-choix-outil-par-action.md)).
 
 | Pour…                                                                 | Commande                              | Détails                                                                                                             |
 | --------------------------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| **Dériver ton contexte** (hôtes courants + commandes prêtes à copier) | `test/lima/env.sh`                    | banc Lima ou prod ; voir « Prérequis & contexte » ci-dessus                                                         |
+| **Dériver ton contexte** (hôtes courants + commandes prêtes à copier) | `bench/lima/env.sh`                   | banc Lima ou prod ; voir « Prérequis & contexte » ci-dessus                                                         |
 | État des **nœuds + composantes cluster** (drift + prochaine étape)    | `bootstrap/state.sh <hôte…>`          | SSH + kubectl ; hôtes **requis** (cf. `env.sh`) ; verdicts purs testés (`state-classify.sh` + `health-classify.sh`) |
 | Tableau de bord du **durcissement** (preuves observables par hôte)    | `bootstrap/security/report.sh`        | [bootstrap/security/](../bootstrap/security/README.md)                                                              |
 | Vérifier l'**épinglage des images** par digest d'index multi-arch     | `scripts/audit-image-digests.sh`      | invariant [ADR 0006](decisions/0006-matrice-de-versions-et-politique-de-bump.md)                                    |
-| Vérifier la **fraîcheur des preuves** de banc (par chemin)            | `test/lima/check-freshness.sh`        | [ADR 0042](decisions/0042-fraicheur-preuves-banc.md)                                                                |
+| Vérifier la **fraîcheur des preuves** de banc (par chemin)            | `bench/lima/check-freshness.sh`       | [ADR 0042](decisions/0042-fraicheur-preuves-banc.md)                                                                |
 | Détecter les pages Markdown **orphelines**                            | `python3 scripts/check_md_orphans.py` | [ADR 0029](decisions/0029-markdown-atteignable-doc.md)                                                              |
 
 > **Garde-fou de cible (`EXPECT_CLUSTER`)** — les couches **cluster** de
@@ -87,13 +87,13 @@ shell ([ADR 0049](decisions/0049-doctrine-choix-outil-par-action.md)).
 
 ## Tests end-to-end
 
-| Pour…                                                                     | Commande                                             | Détails                                                 |
-| ------------------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------- |
-| Lancer **tous** les scénarios e2e (PASS/FAIL récapitulé)                  | `test/scenarios/run-all.sh`                          | [test/scenarios/README.md](../test/scenarios/README.md) |
-| Lancer **un** scénario (résilience, sécurité active, DataOps, GitOps, UI) | `test/scenarios/NN-*.sh`                             | scénarios 01→29                                         |
-| Smoke S3 réel (PUT/GET/DELETE) sur le RGW Ceph                            | `storage/ceph/storageClass/datalake/smoke-test.sh`   |                                                         |
-| Tests des **fonctions pures** (bash)                                      | `pnpm test:shell` (bats)                             | `test/unit/`                                            |
-| Spike de latence Cluster Mesh (jetable)                                   | `test/spikes/clustermesh-latency/{up,probe,down}.sh` |                                                         |
+| Pour…                                                                     | Commande                                              | Détails                                                   |
+| ------------------------------------------------------------------------- | ----------------------------------------------------- | --------------------------------------------------------- |
+| Lancer **tous** les scénarios e2e (PASS/FAIL récapitulé)                  | `bench/scenarios/run-all.sh`                          | [bench/scenarios/README.md](../bench/scenarios/README.md) |
+| Lancer **un** scénario (résilience, sécurité active, DataOps, GitOps, UI) | `bench/scenarios/NN-*.sh`                             | scénarios 01→29                                           |
+| Smoke S3 réel (PUT/GET/DELETE) sur le RGW Ceph                            | `storage/ceph/storageClass/datalake/smoke-test.sh`    |                                                           |
+| Tests des **fonctions pures** (bash)                                      | `pnpm test:shell` (bats)                              | `bench/unit/`                                             |
+| Spike de latence Cluster Mesh (jetable)                                   | `bench/spikes/clustermesh-latency/{up,probe,down}.sh` |                                                           |
 
 ## Convergence hors Ansible (cas particuliers assumés)
 
@@ -104,7 +104,7 @@ Ces actes ne passent **pas** par Ansible, par nécessité
 | ---------------------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | Poser Cilium (CNI) dans la VM                  | `bootstrap/cni.sh` (joué par l'orchestrateur) | tourne **dans** la VM, sans le dépôt                                                          |
 | Wipe destructif des disques avant rebuild Ceph | `storage/ceph/cleanup.sh`                     | destructif, lancé **consciemment**                                                            |
-| Seed du dépôt Gitea (org/repo/workflow)        | `test/lima/gitea-init.sh`                     | **données**, pas convergence ([ADR 0044](decisions/0044-topologie-deploiement-banc-atlas.md)) |
+| Seed du dépôt Gitea (org/repo/workflow)        | `bench/lima/gitea-init.sh`                    | **données**, pas convergence ([ADR 0044](decisions/0044-topologie-deploiement-banc-atlas.md)) |
 | Anonymiser un `.env` en `.env-example`         | `python3 bootstrap/security/blur_env.py`      | texte/regex pur → Python                                                                      |
 
 ## Validation avant de pousser

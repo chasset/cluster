@@ -10,7 +10,7 @@
 #
 # Les noms ci-dessous (cp1, node1…) sont des exemples ; `ansible_host` est
 # optionnel (utile quand le nom n'est pas résolvable). Sur le banc multi-node,
-# c'est `test/multi-node/inventory.yaml` (gitignoré) qui fait foi.
+# c'est `bench/multi-node/inventory.yaml` (gitignoré) qui fait foi.
 
 cloud:
   children:

@@ -30,8 +30,8 @@ réécrire en Go ou Python « pour faire mieux », à perte.
 - **Fonctions pures → couvertes par bats-core.** La logique de décision isolable
   (classification, comptage, parsing) est extraite dans des libs sourçables
   ([`bootstrap/lib/`](../../bootstrap/lib/)) et testée par bats
-  ([`test/unit/`](../../test/unit/)). shellcheck valide la syntaxe ; bats valide
-  le **comportement**.
+  ([`bench/unit/`](../../bench/unit/)). shellcheck valide la syntaxe ; bats
+  valide le **comportement**.
 - **python3 toléré, pas imposé.** Pour une tâche où bash deviendrait illisible
   (manipulation de données complexes, calculs), python3 (présent partout) est
   acceptable — mais reste l'exception, pas la règle.
@@ -52,7 +52,7 @@ retirer** de ce qui précède (bash + jq + bats restent le cœur d'orchestration
   (`set -euo pipefail`, shellcheck 0 warning). Inchangé.
 - **Tout code scripté est testé (non-régression).** La logique isolable est
   couverte par des tests : **bats** pour les fonctions bash pures
-  (`test/unit/`), **un cadre de test Python** (au choix : `pytest` ou la
+  (`bench/unit/`), **un cadre de test Python** (au choix : `pytest` ou la
   `unittest` stdlib) pour les scripts Python. Un script de logique sans test
   n'est pas mergeable.
 - **Outillage Python = `uv` + `ruff`.** Environnement reproductible

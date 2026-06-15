@@ -288,7 +288,7 @@ La leçon est double. D'abord, **le compteur de drifts qui se tarit run après r
 _est_ la courbe de fiabilisation** : la répétition n'est pas un aveu de
 faiblesse, c'est le processus. Ensuite, **la connaissance capitalise** — les
 pièges d'un chantier servent de spécification au suivant. Le détail daté de
-chaque campagne vit dans le [journal des runs](../test/lima/RESULTS.md).
+chaque campagne vit dans le [journal des runs](../bench/lima/RESULTS.md).
 
 ## Résultats
 

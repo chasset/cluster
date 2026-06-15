@@ -65,7 +65,7 @@ pas. Les sections avancées sont signalées.
 
 ## Avant de toucher la production
 
-- **Tout se valide d'abord sur le banc** Lima ([`test/`](../test/)) — voir
+- **Tout se valide d'abord sur le banc** Lima ([`bench/`](../bench/)) — voir
   [SAFEGUARDS.md](../SAFEGUARDS.md) pour les garde-fous (hooks, CI, banc).
 - **L'état d'avancement** se lit dans les plans de mise en œuvre
   ([`docs/plans/`](plans/), ADR 0057) et les passages d'audit datés

@@ -37,7 +37,7 @@
       target_kind={{ target_kind | default('(absent)') }} mais l'intention est
       {{ lookup('env', 'EXPECTED_TARGET_KIND') | default('prod', true) }}.
       Vérifier le `-i` : prod = bootstrap/hosts.yaml (target_kind: prod) ; banc =
-      test/lima/.work/inventory.yaml (target_kind: lima, EXPECTED_TARGET_KIND=lima).
+      bench/lima/.work/inventory.yaml (target_kind: lima, EXPECTED_TARGET_KIND=lima).
     success_msg: >-
       Cible confirmée : target_kind={{ target_kind | default('(localhost)') }}.
     quiet: true

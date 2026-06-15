@@ -4,8 +4,8 @@
 
 Le terrain cloud ARM ([ADR 0031](0031-terrain-cloud-arm.md)) doit créer et
 détruire de vraies VM à la demande (free tier monté/démonté souvent). Les fronts
-de provisioning locaux existants — Vagrant (`test/multi-node/`,
-`test/single-node/`) et Lima (`test/lima/`) — ne couvrent pas le cloud, et
+de provisioning locaux existants — Vagrant (`bench/multi-node/`,
+`bench/single-node/`) et Lima (`bench/lima/`) — ne couvrent pas le cloud, et
 provisionner des VM cloud **en CLI impérative** est fragile : pas d'idempotence,
 pas de `destroy` fiable → risque de VM orphelines qui **coûtent** ou saturent un
 quota free tier.
@@ -56,7 +56,7 @@ terrain cloud**.
 ## Hors périmètre — le provisioning local reste Lima/Vagrant
 
 OpenTofu **ne remplace pas** Vagrant ni Lima pour les bancs **locaux**
-(`test/single-node/`, `test/multi-node/`, `test/lima/`). Raisons :
+(`bench/single-node/`, `bench/multi-node/`, `bench/lima/`). Raisons :
 
 - Lima et Vagrant **sont déjà déclaratifs** (`Vagrantfile`, template Lima) et
   jetables (`vagrant destroy`, `limactl delete`) : les emballer dans du HCL

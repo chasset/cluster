@@ -6,7 +6,7 @@ Accepted (2026-06-13)
 
 ## Contexte
 
-Le harnais de banc (`test/lima/run-phases.sh`, `rollback-lib.sh`, scénarios)
+Le harnais de banc (`bench/lima/run-phases.sh`, `rollback-lib.sh`, scénarios)
 pilote son comportement par des **variables d'environnement**. En préparant la
 commande `roundtrip` (détruire une couche → reconstruire → vérifier), une
 question est apparue : **pourquoi la reconstruction d'une couche a-t-elle encore

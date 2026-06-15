@@ -56,9 +56,9 @@ docker buildx build --platform linux/arm64 \
 
 > **Banc Lima.** Les pré-requis transverses (CRDs Gateway API exigées par
 > cert-manager, et containerd configuré pour tirer le registry HTTP
-> `registry:80`) sont posés par `test/lima/run-phases.sh platform-prereqs`.
+> `registry:80`) sont posés par `bench/lima/run-phases.sh platform-prereqs`.
 > Validé e2e sur arm64 (run `K8sRunLauncher` → Job K8s, storage dans Postgres) —
-> cf. [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md) (#144).
+> cf. [`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md) (#144).
 
 ## Déploiement — ordre
 

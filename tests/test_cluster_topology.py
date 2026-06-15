@@ -230,7 +230,7 @@ class LimaInventoryByteExact(unittest.TestCase):
     """P1, côté banc : render_lima_inventory == sortie de `write_inventory`.
 
     Fixtures golden vérifiées byte-pour-byte contre la VRAIE sortie de
-    `write_inventory` (test/lima/lib.sh) avec un HOME fixe `/H`. Si la séquence
+    `write_inventory` (bench/lima/lib.sh) avec un HOME fixe `/H`. Si la séquence
     d'echo de write_inventory change, ce test casse → garde-fou de parité.
     """
 
@@ -315,7 +315,7 @@ class ProfileInclusion(unittest.TestCase):
 class StorageDerivationParity(unittest.TestCase):
     """P2 : les paramètres dérivés du backend == les `-e` que run-phases.sh calcule.
 
-    Valeurs de référence LUES dans test/lima/run-phases.sh (dataops/monitoring/
+    Valeurs de référence LUES dans bench/lima/run-phases.sh (dataops/monitoring/
     gitops, branche `if WITH_CEPH`). Si le bash change ces valeurs, ce test casse
     → garde-fou de parité de la dérivation.
     """

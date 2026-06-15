@@ -19,8 +19,8 @@ l'opérateur Rook 1.19 (Ceph Tentacle 20.2.1).
 > ansible-playbook -i ./hosts.yaml ../../bootstrap/ceph-datalake.yaml      # CephObjectStore RGW (S3)
 > ```
 >
-> Sur le banc, c'est `test/lima/run-phases.sh ceph|sc|datalake` qui les joue (et
-> **prouve leur idempotence** par rejeu, ADR 0052). Les `kubectl` ci-dessous
+> Sur le banc, c'est `bench/lima/run-phases.sh ceph|sc|datalake` qui les joue
+> (et **prouve leur idempotence** par rejeu, ADR 0052). Les `kubectl` ci-dessous
 > restent la **référence manuelle** : compréhension de la séquence, opération
 > (capacité, clefs), dépannage (finalizers) et **désinstallation** — actes de
 > diagnostic/opération qui ne relèvent pas de la convergence (ADR 0049).
@@ -250,7 +250,7 @@ kubectl -n rook-ceph patch cephobjectstore datalake --type merge \
   -p '{"metadata":{"finalizers":null}}'
 ```
 
-Constaté sur banc (Run #7, cf. [test/RESULTS.md](../../test/RESULTS.md) #19).
+Constaté sur banc (Run #7, cf. [bench/RESULTS.md](../../bench/RESULTS.md) #19).
 
 ### Pools, storage classes, cluster
 

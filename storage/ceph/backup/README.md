@@ -88,6 +88,6 @@ Puis re-pointer l'application sur `<pvc>-restored` (ou copier les données).
 ## À valider sur le banc
 
 Scénario dédié à ajouter (esprit du
-[`09-etcd-restore.sh`](../../../test/scenarios/09-etcd-restore.sh)) : écrire une
-donnée → snapshot → supprimer/corrompre → restaurer via `dataSource` → vérifier
-le retour de la donnée.
+[`09-etcd-restore.sh`](../../../bench/scenarios/09-etcd-restore.sh)) : écrire
+une donnée → snapshot → supprimer/corrompre → restaurer via `dataSource` →
+vérifier le retour de la donnée.

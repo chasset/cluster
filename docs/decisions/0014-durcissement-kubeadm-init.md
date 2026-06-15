@@ -79,7 +79,7 @@ Mise en œuvre :
 - montée dans le static pod de l'API server via `apiServer.extraVolumes`.
 
 **Validé sur banc** (RESULTS Run #8, scénario
-[`15-etcd-encryption-audit.sh`](../../test/scenarios/15-etcd-encryption-audit.sh))
+[`15-etcd-encryption-audit.sh`](../../bench/scenarios/15-etcd-encryption-audit.sh))
 : la valeur brute d'un Secret lue dans etcd via `etcdctl` commence par
 `k8s:enc:secretbox:v1:key1:` (et non en clair).
 

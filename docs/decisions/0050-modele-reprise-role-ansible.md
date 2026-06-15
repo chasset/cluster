@@ -65,7 +65,7 @@ marqueur `creates:` entre deux runs), **jamais** par une variable `inject_fault`
 lue par le rôle de production. Un rôle prod n'embarque aucun hook de test (ADR
 0046 : le banc ne pollue pas le code prod). Le harnais : injecte → vérifie la
 compensation (`kubeadm reset` passé, `/etc/kubernetes` propre) → relance le
-**même** chemin → exige un run **vert**. Consigné dans `test/RESULTS.md`
+**même** chemin → exige un run **vert**. Consigné dans `bench/RESULTS.md`
 (honnêteté des Runs).
 
 ## Statut

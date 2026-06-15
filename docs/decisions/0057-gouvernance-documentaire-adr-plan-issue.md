@@ -146,7 +146,7 @@ décision que l'ADR n'a pas actée). Acter d'abord (`Accepted`), implémenter
 ensuite. Le **passage `Accepted`** est précisément le signal qui fait passer le
 plan de `Brouillon` à `Actif`.
 
-**Exception bornée** : un **prototype jetable** (spike, `test/spikes/`) peut
+**Exception bornée** : un **prototype jetable** (spike, `bench/spikes/`) peut
 précéder l'acceptation pour _éclairer_ la décision — mais il ne s'agit pas d'une
 mise en œuvre du plan (pas de PR sur le chemin de production, pas de palier
 coché). Le spike informe l'ADR ; il ne l'implémente pas.

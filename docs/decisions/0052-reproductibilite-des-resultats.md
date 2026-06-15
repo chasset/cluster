@@ -79,7 +79,7 @@ testées hors cluster) pour que le test soit déterministe.
 
 Tout résultat consigné porte le **commit exact** qui l'a produit. Sans
 provenance vérifiable, un résultat n'est pas reproductible : on ne sait pas
-_quel_ code relancer. `test/lima/runs-history.yaml` porte déjà `commit:` par
+_quel_ code relancer. `bench/lima/runs-history.yaml` porte déjà `commit:` par
 entrée ; `RESULTS.md` date et situe ses runs. La fraîcheur
 ([ADR 0042](0042-fraicheur-preuves-banc.md)) en est le pendant temporel : un
 résultat reproductible mais **périmé** (le code a divergé depuis) doit être
@@ -99,9 +99,9 @@ dans la sortie — le `rescue` a joué), puis le **re-jeu du même chemin nommé
 ([ADR 0045](0045-chemins-installation-banc-couches.md)) **réussit**. Tout écart
 invalide la preuve (faute non prise, demi-état laissé sans compensation, reprise
 insuffisante). C'est le pendant, pour la reprise, du gate `run_ansible_phase` :
-la fonction pure `classify_compensation` (`test/lima/bootstrap-fault-assert.sh`,
-testée hors banc) rend ce verdict, comme `classify_idempotence` rend celui de la
-règle 2.
+la fonction pure `classify_compensation`
+(`bench/lima/bootstrap-fault-assert.sh`, testée hors banc) rend ce verdict,
+comme `classify_idempotence` rend celui de la règle 2.
 
 ## Statut
 

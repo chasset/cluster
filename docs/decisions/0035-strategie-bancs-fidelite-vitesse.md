@@ -65,13 +65,13 @@ Accepted.
 - **Gain** : une boucle d'itération courte (~5–11 min, fidèle à la prod) pour le
   travail quotidien sur une brique, sans renoncer à la preuve complète avant de
   conclure. Le choix du banc devient explicite (table « quel banc pour quoi »,
-  [`test/README.md`](../../test/README.md)).
+  [`bench/README.md`](../../bench/README.md)).
 - **Prix à payer** : `local-path` ne couvre pas le stockage résilient ni la
   chaîne DataOps — un changement validé en local-path **doit** repasser sur le
   banc Ceph avant d'être déclaré validé (ADR 0034). Risque assumé : croire à
   tort qu'un « vert en local-path » suffit.
 - **Non-régression** : aucune nouvelle dépendance ni nouvel outil — les deux
-  profils existent déjà dans `test/lima/run-phases.sh` (`storage-simple` vs
+  profils existent déjà dans `bench/lima/run-phases.sh` (`storage-simple` vs
   `WITH_CEPH=1`). Cet ADR formalise l'usage, il n'ajoute pas de code.
 - **Évolution** : les terrains futurs (cloud, x86, HA —
   [ADR 0031](0031-terrain-cloud-arm.md)) s'inscrivent sur le même axe ; un banc

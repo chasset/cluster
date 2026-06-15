@@ -166,7 +166,7 @@ kube-vip pour le CP).
   1. rôle/manifeste **kube-vip** épinglé par digest d'index multi-arch
      ([ADR 0006](0006-matrice-de-versions-et-politique-de-bump.md)), valeurs
      génériques ([ADR 0023](0023-plateforme-exemple-generique.md)) ;
-  2. banc Lima **6 VMs** (3 CP dédiés + 3 workers) dans `test/lima/` via un
+  2. banc Lima **6 VMs** (3 CP dédiés + 3 workers) dans `bench/lima/` via un
      **chemin nommé codé**
      ([ADR 0045](0045-chemins-installation-banc-couches.md)/[0046](0046-corriger-le-code-pas-l-etat.md))
      ;

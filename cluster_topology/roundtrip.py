@@ -42,8 +42,8 @@ import sys
 from dataclasses import dataclass, field
 
 _REPO = os.path.join(os.path.dirname(__file__), "..")
-_RUN_PHASES = os.path.join(_REPO, "test", "lima", "run-phases.sh")
-_ROLLBACK_LIB = os.path.join(_REPO, "test", "lima", "rollback-lib.sh")
+_RUN_PHASES = os.path.join(_REPO, "bench", "lima", "run-phases.sh")
+_ROLLBACK_LIB = os.path.join(_REPO, "bench", "lima", "rollback-lib.sh")
 
 # Phases qui ont un rollback défini (rollback_known_phase, rollback-lib.sh).
 KNOWN_PHASES = (

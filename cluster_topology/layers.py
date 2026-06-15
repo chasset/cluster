@@ -32,7 +32,7 @@ import subprocess
 from cluster_topology.model import TopologyError
 
 _REPO = os.path.join(os.path.dirname(__file__), "..")
-_ROLLBACK_LIB = os.path.join(_REPO, "test", "lima", "rollback-lib.sh")
+_ROLLBACK_LIB = os.path.join(_REPO, "bench", "lima", "rollback-lib.sh")
 
 # Alias de profil → phases qu'il apporte (projection de PROFILE_BRICKS, ADR 0039/0068).
 # `store` se projette en `storage`, jeton ABSTRAIT que le graphe atomique résout par

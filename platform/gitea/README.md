@@ -24,7 +24,7 @@ pas par une `Application` Argo CD.
 L'**initialisation du dépôt** (créer l'organisation + le dépôt, seed/push du
 contenu atlas, enregistrer le webhook Gitea → Argo CD) est une étape de
 **données**, **post-bootstrap**, portée par le harnais de banc
-([`test/lima/`](../../test/lima/)) — hors de cette brique.
+([`bench/lima/`](../../bench/lima/)) — hors de cette brique.
 
 ## Manifestes
 

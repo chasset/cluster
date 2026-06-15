@@ -21,7 +21,7 @@ from check_md_orphans import (  # noqa: E402
 
 class SidebarLinkToFile(unittest.TestCase):
     def setUp(self):
-        self.files = {"README.md", "docs/demarrage.md", "test/README.md", "bootstrap/RUNBOOK.md"}
+        self.files = {"README.md", "docs/demarrage.md", "bench/README.md", "bootstrap/RUNBOOK.md"}
 
     def test_root_maps_to_readme(self):
         self.assertEqual(sidebar_link_to_file("/", self.files), "README.md")
@@ -30,7 +30,7 @@ class SidebarLinkToFile(unittest.TestCase):
         self.assertEqual(sidebar_link_to_file("/docs/demarrage", self.files), "docs/demarrage.md")
 
     def test_dir_link_maps_to_readme(self):
-        self.assertEqual(sidebar_link_to_file("/test/", self.files), "test/README.md")
+        self.assertEqual(sidebar_link_to_file("/bench/", self.files), "bench/README.md")
 
     def test_strips_anchor(self):
         self.assertEqual(

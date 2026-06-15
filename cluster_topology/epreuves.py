@@ -1,6 +1,6 @@
 """Catalogue d'épreuves + filtrage par la topologie (palier P4, ADR 0056 §8.6).
 
-Un *scénario* (`test/scenarios/NN-*.sh`) est une **épreuve** passée à un banc
+Un *scénario* (`bench/scenarios/NN-*.sh`) est une **épreuve** passée à un banc
 déjà monté — il **requiert** une catégorie, une topologie (mono/multi/agnostique)
 et un terrain (SSH hôte, offensif…). L'outil **FILTRE** ce catalogue selon
 l'intention déclarée (`topology.yaml` : profil, backend, nombre de nœuds,
@@ -9,7 +9,7 @@ de P5 / ansible-runner) : la frontière du palier est *décrire et filtrer*.
 
 `EPREUVES` est le **miroir machine** de la table prose
 `docs/architecture/matrice-catalogue.md §2` ; la classification destructif /
-SSH / offensif reprend `test/scenarios/run-all.sh` (`is_destructive`,
+SSH / offensif reprend `bench/scenarios/run-all.sh` (`is_destructive`,
 `needs_ssh`, terrains offensifs ADR 0025). Un test de parité
 (tests/test_epreuves.py) casse si l'un dérive de l'autre.
 

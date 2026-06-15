@@ -13,20 +13,20 @@ Ce plan est le **comment** ; la décision (le **pourquoi**) est dans l'ADR.
 
 ## Principe d'architecture
 
-Un dispatch `rollback <phase>` dans `test/lima/run-phases.sh`, symétrique du
+Un dispatch `rollback <phase>` dans `bench/lima/run-phases.sh`, symétrique du
 dispatch de montage. Chaque phase a une **fonction de rollback** qui efface son
 périmètre déclaré. Au plus près du style existant (`phase_*`, `vm_sh`, helpers
 `KUBECTL`), garde `BANC_JETABLE=1` (comme `phase_bootstrap_fault`).
 
 ```bash
 # Symétrie :
-test/lima/run-phases.sh ceph              # monte
-BANC_JETABLE=1 test/lima/run-phases.sh rollback ceph   # défait (destructif)
+bench/lima/run-phases.sh ceph              # monte
+BANC_JETABLE=1 bench/lima/run-phases.sh rollback ceph   # défait (destructif)
 ```
 
 ## Primitives partagées (à écrire une fois)
 
-Dans `test/lima/lib.sh` (ou un `rollback-lib.sh` dédié) :
+Dans `bench/lima/lib.sh` (ou un `rollback-lib.sh` dédié) :
 
 - `k8s_force_delete_ns NS…` — `kubectl delete ns NS --wait=false` puis, si
   bloqué sur finalizers, patch `metadata.finalizers=null` sur le ns ET les
@@ -74,7 +74,7 @@ Pour chaque phase, un **cycle prouvé sur banc** :
 - « État propre » = un prédicat (réutiliser `state.sh`/healthcheck) qui confirme
   **zéro trace** : ns absent, CRD absents, PVC absentes, disques propres
   (`lsblk` node-side pour Ceph).
-- Consigner dans `test/lima/RESULTS.md` (un cycle par phase). La phase Ceph est
+- Consigner dans `bench/lima/RESULTS.md` (un cycle par phase). La phase Ceph est
   le **pilote** (la plus complexe : CRD + CR + OSD + disques + finalizers) — la
   prouver d'abord, puis décliner aux autres.
 
@@ -100,15 +100,15 @@ jamais contourné. Un lot = une PR, re-prouvée par cycle banc avant le suivant.
 
 Issue de pilotage : [#274](https://github.com/univ-lehavre/cluster/issues/274).
 
-| Lot                                   | État                                                                                                          |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| 1. Socle (primitives + dispatch)      | ✅ fait — `test/lima/rollback-lib.sh`, dispatch `run-phases.sh`, `test/unit/rollback.bats` (commit `c6d2bd9`) |
-| 2. Pilote Ceph                        | ✅ fait — `phase_rollback ceph` + node-side `cleanup.sh` (commit `236815f`)                                   |
-| 3. Phases stockage (`sc`, `datalake`) | ✅ fait — couvertes par `rollback-lib.sh`                                                                     |
-| 4. Phases plateforme                  | ✅ fait — `monitoring`/`dataops`/`gitops`/`gitops-seed`/`metrics-server`                                      |
-| 5. Garde-fou d'ordre aval             | ✅ fait — `classify_downstream_block`                                                                         |
-| 6. Doc (`docs/outils.md` + RUNBOOK)   | 🔲 reste — catalogue `rollback <phase>` non encore documenté                                                  |
-| Preuve par cycle banc (`RESULTS.md`)  | 🔲 reste — cycle monte→rollback→remonte par phase non consigné (ADR 0034/0052)                                |
+| Lot                                   | État                                                                                                            |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1. Socle (primitives + dispatch)      | ✅ fait — `bench/lima/rollback-lib.sh`, dispatch `run-phases.sh`, `bench/unit/rollback.bats` (commit `c6d2bd9`) |
+| 2. Pilote Ceph                        | ✅ fait — `phase_rollback ceph` + node-side `cleanup.sh` (commit `236815f`)                                     |
+| 3. Phases stockage (`sc`, `datalake`) | ✅ fait — couvertes par `rollback-lib.sh`                                                                       |
+| 4. Phases plateforme                  | ✅ fait — `monitoring`/`dataops`/`gitops`/`gitops-seed`/`metrics-server`                                        |
+| 5. Garde-fou d'ordre aval             | ✅ fait — `classify_downstream_block`                                                                           |
+| 6. Doc (`docs/outils.md` + RUNBOOK)   | 🔲 reste — catalogue `rollback <phase>` non encore documenté                                                    |
+| Preuve par cycle banc (`RESULTS.md`)  | 🔲 reste — cycle monte→rollback→remonte par phase non consigné (ADR 0034/0052)                                  |
 
 **Achèvement** : lots 1-5 livrés sur `main` ; restent le lot 6 (doc) et la
 consignation des cycles de preuve. Fermer #274 une fois ces deux derniers faits.

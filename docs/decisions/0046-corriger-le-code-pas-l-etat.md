@@ -35,7 +35,7 @@ DIAGNOSTIC, jamais au correctif durable.**
 1. **`kubectl patch`/`apply`/`create` manuel = diagnostic ou déblocage
    EXPLORATOIRE seulement.** Dès que la cause est comprise, le correctif repart
    **dans le code versionné** (manifeste `platform/`, rôle `bootstrap/roles/`,
-   harnais `test/lima/`), puis est **re-prouvé par un run** (ADR 0034). Un fix
+   harnais `bench/lima/`), puis est **re-prouvé par un run** (ADR 0034). Un fix
    qui ne vit que dans l'état du cluster n'est pas un fix.
 2. **Le banc se monte par un CHEMIN nommé codé**
    (`socle`/`atlas`/`storage-real`/ `cluster-dataops`/`atlas-ceph`,

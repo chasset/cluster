@@ -4,7 +4,7 @@
 0063 G3). Ce test le PROUVE au lieu de l'affirmer : pour chaque chemin nommé, on
 compare la séquence dérivée par Python à la séquence ORDONNÉE attendue de l'arm bash
 correspondant (table de référence figée ci-dessous, transcrite des arms
-test/lima/run-phases.sh).
+bench/lima/run-phases.sh).
 
 Garde-fou anti-dérive pendant l'inversion de frontière (topology.py devient l'entrée) :
 tant que les arms agrégés existent, ce test garantit que le plan AFFICHÉ par `up`/

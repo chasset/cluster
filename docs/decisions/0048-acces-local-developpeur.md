@@ -37,7 +37,7 @@ l'appui** :
 
 ## Décision
 
-**Un script unique — [`test/lima/access.sh`](../../test/lima/access.sh) — rend
+**Un script unique — [`bench/lima/access.sh`](../../bench/lima/access.sh) — rend
 le banc consommable depuis l'hôte en une commande, sans reboot, sans sudo
 réseau, sans dépendance nouvelle. Le développeur ne fait que `git push` côté
 `atlas`.**
@@ -64,12 +64,12 @@ Le script, en lisant le **contrat** comme source de vérité
    Patron versionné générique : `contract/atlas.env.cluster.example` (ADR
    [0023](0023-plateforme-exemple-generique.md)).
 
-Exposé aussi comme **phase** `test/lima/run-phases.sh access` (le chemin `atlas`
-renvoie vers elle). Conforme à [ADR 0046](0046-corriger-le-code-pas-l-etat.md) :
-l'état (Gateways, hosts, forwards) est posé par du **code reproductible**, pas
-par des gestes manuels. La couche d'entrée reste **Gateway API Cilium**
-inchangée (ADR 0020) — le sur-mesure est entièrement **côté hôte** et
-**banc-only**.
+Exposé aussi comme **phase** `bench/lima/run-phases.sh access` (le chemin
+`atlas` renvoie vers elle). Conforme à
+[ADR 0046](0046-corriger-le-code-pas-l-etat.md) : l'état (Gateways, hosts,
+forwards) est posé par du **code reproductible**, pas par des gestes manuels. La
+couche d'entrée reste **Gateway API Cilium** inchangée (ADR 0020) — le
+sur-mesure est entièrement **côté hôte** et **banc-only**.
 
 ## Statut
 

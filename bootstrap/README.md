@@ -29,24 +29,69 @@ les libs manquent, ces playbooks **échouent tôt** avec un rappel `uv sync`
 
 ## Contenu
 
-| Fichier                                              | Rôle                                                                                |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| [`hosts.example.yaml`](hosts.example.yaml)           | Modèle d'inventaire générique (le `hosts.yaml` réel n'est pas versionné — ADR 0023) |
-| [`checks.yaml`](checks.yaml)                         | Vérifications préalables                                                            |
-| [`cri.yaml`](cri.yaml)                               | Installation de la runtime conteneur                                                |
-| [`kubeadm.yaml`](kubeadm.yaml)                       | Installation des paquets kubeadm/kubelet/kubectl                                    |
-| [`control-planes.yaml`](control-planes.yaml)         | Configuration des nœuds control plane                                               |
-| [`initialisation.yaml`](initialisation.yaml)         | Initialisation du cluster avec `kubeadm init`                                       |
-| [`cni.sh`](cni.sh)                                   | Installation du CNI Cilium (à lancer sur le control plane)                          |
-| [`join-workers.yaml`](join-workers.yaml)             | Ajout des nœuds workers                                                             |
-| [`os-upgrade.yaml`](os-upgrade.yaml)                 | Mise à jour OS de l'ensemble du parc                                                |
-| [`k8s-upgrade.yaml`](k8s-upgrade.yaml)               | Upgrade Kubernetes in-place, séquencé (ADR 0015)                                    |
-| [`etcd-backup.yaml`](etcd-backup.yaml)               | Sauvegarde etcd horaire (timer systemd) — control plane                             |
-| [`etcd-fetch.yaml`](etcd-fetch.yaml)                 | Copie hors-nœud du dernier snapshot etcd (audit P1 #3)                              |
-| [`audit-log-baseline.yaml`](audit-log-baseline.yaml) | Initialise le journal d'audit-log sur des nœuds existants                           |
-| [`rollback.yaml`](rollback.yaml)                     | Rollback du bootstrap K8s (DESTRUCTIF — `-e confirm=yes`)                           |
-| [`gitops.yaml`](gitops.yaml)                         | Socle GitOps : Gitea (forge intra-banc) + Argo CD (moteur) — ADR 0022/0044          |
-| [`roles/`](roles/)                                   | Rôles Ansible utilisés par les playbooks                                            |
+Index **par phase** (lisibilité — ADR 0070). L'ordre canonique d'exécution vit
+dans le [`RUNBOOK.md`](RUNBOOK.md) et le DAG des couches
+([ADR 0069](../docs/decisions/0069-topology-layers-dag-grain-phase.md)) ; ce
+tableau regroupe les playbooks par rôle, il ne prescrit pas la séquence.
+
+### Installation (socle k8s)
+
+| Fichier                                      | Rôle                                                                                |
+| -------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`hosts.example.yaml`](hosts.example.yaml)   | Modèle d'inventaire générique (le `hosts.yaml` réel n'est pas versionné — ADR 0023) |
+| [`checks.yaml`](checks.yaml)                 | Vérifications préalables                                                            |
+| [`cri.yaml`](cri.yaml)                       | Installation de la runtime conteneur                                                |
+| [`kubeadm.yaml`](kubeadm.yaml)               | Installation des paquets kubeadm/kubelet/kubectl                                    |
+| [`control-planes.yaml`](control-planes.yaml) | Configuration des nœuds control plane                                               |
+| [`initialisation.yaml`](initialisation.yaml) | Initialisation du cluster avec `kubeadm init`                                       |
+| [`cni.sh`](cni.sh)                           | Installation du CNI Cilium (à lancer sur le control plane)                          |
+
+### Extension HA / join
+
+| Fichier                                              | Rôle                                                            |
+| ---------------------------------------------------- | --------------------------------------------------------------- |
+| [`kube-vip.yaml`](kube-vip.yaml)                     | VIP de l'API control plane (kube-vip) — topologie HA (ADR 0047) |
+| [`join-control-plane.yaml`](join-control-plane.yaml) | Promotion d'un nœud en control plane supplémentaire (etcd 2/3)  |
+| [`join-workers.yaml`](join-workers.yaml)             | Ajout des nœuds workers                                         |
+
+### Storage & platform
+
+| Fichier                                                | Rôle                                                              |
+| ------------------------------------------------------ | ----------------------------------------------------------------- |
+| [`local-path.yaml`](local-path.yaml)                   | StorageClass local-path (profil léger sans Ceph)                  |
+| [`ceph-checks.yaml`](ceph-checks.yaml)                 | Vérifications préalables Rook-Ceph (devices, prérequis)           |
+| [`ceph-cluster.yaml`](ceph-cluster.yaml)               | Déploiement du cluster Rook-Ceph                                  |
+| [`ceph-storageclasses.yaml`](ceph-storageclasses.yaml) | StorageClasses bloc/CephFS (ADR 0001)                             |
+| [`ceph-datalake.yaml`](ceph-datalake.yaml)             | Datalake S3 (RGW, erasure coding 2+1 — ADR 0004)                  |
+| [`metrics-server.yaml`](metrics-server.yaml)           | metrics-server (`kubectl top`, HPA — ADR 0016/0068)               |
+| [`monitoring.yaml`](monitoring.yaml)                   | Pile d'observabilité (Prometheus/Grafana/Loki)                    |
+| [`gitops.yaml`](gitops.yaml)                           | Socle GitOps : Gitea (forge intra-banc) + Argo CD — ADR 0022/0044 |
+| [`dataops.yaml`](dataops.yaml)                         | Chaîne DataOps (Dagster, Marquez — ADR 0026/0028)                 |
+| [`cnpg-secrets.yaml`](cnpg-secrets.yaml)               | Secrets CloudNativePG (PostgreSQL managé — ADR 0024)              |
+
+### Ops & maintenance
+
+| Fichier                                              | Rôle                                                      |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| [`os-upgrade.yaml`](os-upgrade.yaml)                 | Mise à jour OS de l'ensemble du parc                      |
+| [`k8s-upgrade.yaml`](k8s-upgrade.yaml)               | Upgrade Kubernetes in-place, séquencé (ADR 0015)          |
+| [`etcd-backup.yaml`](etcd-backup.yaml)               | Sauvegarde etcd horaire (timer systemd) — control plane   |
+| [`etcd-fetch.yaml`](etcd-fetch.yaml)                 | Copie hors-nœud du dernier snapshot etcd (audit P1 #3)    |
+| [`audit-log-baseline.yaml`](audit-log-baseline.yaml) | Initialise le journal d'audit-log sur des nœuds existants |
+| [`rollback.yaml`](rollback.yaml)                     | Rollback du bootstrap K8s (DESTRUCTIF — `-e confirm=yes`) |
+| [`state.sh`](state.sh)                               | Classification d'état d'un nœud/hôte (couche bootstrap)   |
+| [`roles/`](roles/)                                   | Rôles Ansible utilisés par les playbooks                  |
+
+## Les quatre « topology » du dépôt
+
+Quatre objets portent le mot _topology_, à ne pas confondre :
+
+- **`cluster_topology/`** — le paquet Python (logique pure : chargement,
+  dérivation, rendu d'une topologie).
+- **`scripts/topology.py`** — la façade CLI (l'outil `cluster`).
+- **`topologies/`** — le catalogue de données (les `*.example.yaml`).
+- **`topology.yaml`** — le symlink d'activation (gitignoré) qui désigne la
+  topologie active du déploiement courant.
 
 ## Procédure complète
 

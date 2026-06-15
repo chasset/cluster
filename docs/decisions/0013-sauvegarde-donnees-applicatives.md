@@ -4,7 +4,7 @@
 
 Seul **etcd** est sauvegardé (rôle
 [`etcd-backup`](../../bootstrap/roles/etcd-backup/), restauration prouvée par
-[`test/scenarios/09-etcd-restore.sh`](../../test/scenarios/09-etcd-restore.sh)).
+[`bench/scenarios/09-etcd-restore.sh`](../../bench/scenarios/09-etcd-restore.sh)).
 Les **données applicatives** — PVC bloc (MySQL/WordPress, registry, RStudio) et
 buckets S3 du datalake — ne le sont pas.
 

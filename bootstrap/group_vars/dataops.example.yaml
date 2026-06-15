@@ -9,7 +9,7 @@
 # dans un group_vars d'inventaire **non versionné**.
 #
 # Usage : copier les lignes utiles dans le group_vars de l'inventaire de banc
-# (ex. test/lima/.work/group_vars/all.yaml, gitignoré), PAS dans bootstrap/.
+# (ex. bench/lima/.work/group_vars/all.yaml, gitignoré), PAS dans bootstrap/.
 # Ce `.example` documente les variables surchargeables ; il n'est pas chargé tel
 # quel (suffixe .example).
 

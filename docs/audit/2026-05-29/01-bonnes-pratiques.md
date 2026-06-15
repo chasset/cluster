@@ -3,7 +3,7 @@
 **Note : 4,2 / 5**
 
 Organisation IaC mature : séparation claire des préoccupations (`bootstrap/`
-Ansible, `storage/ceph/`, `platform/`, `apps/`, `test/`, `docs/`), rôles
+Ansible, `storage/ceph/`, `platform/`, `apps/`, `bench/`, `docs/`), rôles
 structurés `tasks/handlers/templates`, modules FQCN systématiques, garde-fous
 d'idempotence (`changed_when: false`, `failed_when`, `creates`, assertions de
 pré-requis), handlers câblés via `notify`, tags opt-in côté sécurité. Gestion
@@ -69,7 +69,7 @@ sous-arbre `git subtree` `bootstrap/security/`.
 ### Suggestion — Table de structure du `README` incomplète
 
 - **Fichier** : `README.md:16-21`
-- **Constat** : `test/` et `docs/` (deux répertoires de premier niveau
+- **Constat** : `bench/` et `docs/` (deux répertoires de premier niveau
   significatifs) sont absents de la table « Structure ».
 - **Recommandation** : ajouter les deux lignes manquantes.
 

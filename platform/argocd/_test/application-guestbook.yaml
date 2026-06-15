@@ -1,5 +1,5 @@
 # Application de TEST (ADR 0022) — valide la réconciliation Healthy/Synced sur
-# le banc test/multi-node, PUIS À SUPPRIMER (ne pas laisser en prod).
+# le banc bench/multi-node, PUIS À SUPPRIMER (ne pas laisser en prod).
 # Smoke-test zéro-dépendance : projet "default", repo public guestbook.
 #
 # Validation (humaine, sur banc) :

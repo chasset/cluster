@@ -14,7 +14,7 @@ if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
 # ── Surcharges multi-cluster (optionnelles) — ADR 0027 ─────────────────────
 # PROD / mono-cluster : variables vides → comportement INCHANGÉ (podCIDR
 # 10.244.0.0/16, aucune identité de cluster posée). Une topologie fédérée
-# (Cilium Cluster Mesh, spike test/spikes/clustermesh-latency) les renseigne
+# (Cilium Cluster Mesh, spike bench/spikes/clustermesh-latency) les renseigne
 # par site : cluster.id (1-255) + cluster.name UNIQUES et podCIDR DISJOINTS
 # entre clusters — exigences non-négociables du mesh.
 CILIUM_POD_CIDR="${CILIUM_POD_CIDR:-10.244.0.0/16}"
