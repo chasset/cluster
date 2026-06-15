@@ -228,6 +228,30 @@ def diff_phases(expected: list[str], done: set[str], freshness: str) -> list[str
     return [p for p in expected if p not in done]
 
 
+def observed_done_phases(
+    declared_nodes: list[str], real_vms: list[str], ready_nodes: list[str]
+) -> set[str]:
+    """Phases du socle PROUVÉES faites par l'ÉTAT RÉEL (pas par l'historique).
+
+    L'historique peut manquer (run non consigné, run sous un ancien label de
+    topologie) alors que le cluster TOURNE : PLAN doit alors refléter le RÉEL, pas
+    mentir « à installer » (ADR 0052/0056 §7 — le réel prime sur l'absence de trace).
+
+    - `up` (créer les VMs) : faite si TOUTES les VMs déclarées existent (rien à créer).
+    - `bootstrap` (k8s + CRI + CNI) : faite si AU MOINS un nœud est Ready (l'API
+      répond, la CNI tourne) — un cluster Ready ne se « réinstalle » pas.
+
+    PUR (listes en entrée, set en sortie) : testable sans cluster. Ne couvre QUE les
+    phases observables côté infra (up/bootstrap) ; les couches applicatives
+    (storage/monitoring/…) gardent le verdict par historique (état runtime non lu ici)."""
+    done: set[str] = set()
+    if declared_nodes and all(n in real_vms for n in declared_nodes):
+        done.add("up")
+    if ready_nodes:
+        done.add("bootstrap")
+    return done
+
+
 @dataclass
 class Suggestion:
     """Verdict « que faire ensuite ». `phase` None = rien à lancer (à jour)."""

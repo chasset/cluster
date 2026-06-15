@@ -19,6 +19,7 @@ from cluster_topology.plan import (  # noqa: E402
     default_target,
     diff_phases,
     expected_phase_sequence,
+    observed_done_phases,
     phase_label,
     suggest_next,
 )
@@ -192,6 +193,29 @@ class DiffPhases(unittest.TestCase):
 
     def test_jamais_replays_whole_sequence(self):
         self.assertEqual(diff_phases(self.SEQ, set(), "jamais"), self.SEQ)
+
+
+class ObservedDonePhases(unittest.TestCase):
+    """Le RÉEL prime : un cluster qui tourne marque up/bootstrap faits (ADR 0052/0056)."""
+
+    def test_vm_present_marks_up_done(self):
+        # Toutes les VMs déclarées existent → 'up' fait, même sans nœud Ready.
+        done = observed_done_phases(["node1"], real_vms=["node1"], ready_nodes=[])
+        self.assertIn("up", done)
+        self.assertNotIn("bootstrap", done)
+
+    def test_node_ready_marks_bootstrap_done(self):
+        # Au moins un nœud Ready → 'bootstrap' fait (k8s + CNI tournent).
+        done = observed_done_phases(["node1"], real_vms=["node1"], ready_nodes=["lima-node1"])
+        self.assertEqual(done, {"up", "bootstrap"})
+
+    def test_missing_vm_leaves_up_to_do(self):
+        # Une VM déclarée absente → 'up' PAS fait (il reste à créer).
+        done = observed_done_phases(["node1", "node2"], real_vms=["node1"], ready_nodes=[])
+        self.assertNotIn("up", done)
+
+    def test_no_node_no_vm_is_empty(self):
+        self.assertEqual(observed_done_phases(["node1"], real_vms=[], ready_nodes=[]), set())
 
 
 class SuggestNext(unittest.TestCase):

@@ -95,6 +95,7 @@ from cluster_topology import (  # noqa: E402
     load_runs,
     load_topology,
     metrics_of,
+    observed_done_phases,
     phase_label,
     plan_init,
     render_lima_inventory,
@@ -798,6 +799,10 @@ def cmd_preview(args: argparse.Namespace) -> int:
     freshness, _ = verdict_for_run(run, resolved_target, now)
     done = set(run.phases) if run is not None else set()
     a_appliquer = set(diff_phases(seq, done, freshness))
+    # Le RÉEL PRIME sur l'absence de trace (ADR 0052/0056 §7) : un cluster qui TOURNE
+    # ne « s'installe » pas, même si l'historique ne le matche pas (run non consigné /
+    # ancien label de topologie). On retire les phases socle observées faites du RÉEL.
+    a_appliquer -= observed_done_phases(declared, real.vms_present, real.nodes_ready)
     # jamais monté ≠ rejeu : `jamais` (aucun run de la stack) → « à installer » (inédit) ;
     # `perime` (run existant mais plus frais) → « à rejouer ».
     rejeu = freshness == "perime"

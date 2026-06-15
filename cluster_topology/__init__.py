@@ -36,6 +36,7 @@ from cluster_topology.plan import (
     default_target,
     diff_phases,
     expected_phase_sequence,
+    observed_done_phases,
     phase_label,
     suggest_next,
 )
@@ -80,6 +81,7 @@ __all__ = [
     "default_target",
     "diff_phases",
     "expected_phase_sequence",
+    "observed_done_phases",
     "phase_label",
     "suggest_next",
     "RunMetrics",
