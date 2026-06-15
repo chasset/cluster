@@ -88,3 +88,4 @@ Format léger inspiré de Michael Nygard :
 | 0066 | [Rollback atomique : composants + graphe de dépendances unique](0066-rollback-atomique-graphe-composants.md)                         | Accepted           |
 | 0067 | [Workflows multi-agents consignés : 4ᵉ trace empirique](0067-workflows-consignes-4e-trace-empirique.md)                              | Accepted           |
 | 0068 | [Profil `metrics` : palier fin entre `base` et `store`](0068-profil-metrics-palier-fin.md)                                           | Accepted           |
+| 0069 | [`topology.layers` : déclaration explicite des couches (DAG, grain phase)](0069-topology-layers-dag-grain-phase.md)                  | Accepted           |

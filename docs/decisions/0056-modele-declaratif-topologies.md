@@ -454,6 +454,11 @@ structure le delta à coder (VIP, rôle kube-vip, groupe `control` multi-CP).
 
 ## Conséquences
 
+> **Amendé par [ADR 0069](0069-topology-layers-dag-grain-phase.md)** : la
+> déclaration des couches passe du profil scalaire (chaîne totale) à
+> `topology.layers` (ensemble ordonné par le DAG de dépendances réelles) —
+> `layers` est la forme explicite du graphe de dépendances que ce modèle décrit.
+
 - **Source unique de vérité** : une topologie se lit/écrit en un endroit ; fin
   de la double déclaration `NODES` ↔ inventaire et des `-e` épars.
 - **Topologies cibles enfin encodables** : `multi-node-4`, `ha-3cp` deviennent

@@ -93,6 +93,11 @@ désormais `metrics-server` au palier `metrics`, dont `obs`/`dataops` héritent.
   factorisation commune (un mécanisme générique « profil → tail cumulatif »
   plutôt que des targets nommés un à un).
 
+> **Amendé par [ADR 0069](0069-topology-layers-dag-grain-phase.md)** : le
+> mécanisme générique anticipé ci-dessus EST `topology.layers` (DAG, grain
+> phase). `metrics` y devient une couche du DAG (`metrics-server → [bootstrap]`,
+> sans dépendance stockage) plutôt qu'un palier de la chaîne scalaire.
+
 ## Alternatives écartées
 
 - **`metrics-server` en add-on orthogonal** (hors chaîne, ex.

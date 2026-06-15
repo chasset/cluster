@@ -48,6 +48,12 @@ Un **profil** = une combinaison cohérente et cumulative de briques (chaque
 profil inclut les précédents), pas une brique isolée. Reflète les paliers réels
 du banc (`run-phases.sh`).
 
+> **Amendé par [ADR 0069](0069-topology-layers-dag-grain-phase.md)** : un profil
+> est désormais un cas particulier (un **préfixe** de la chaîne) de
+> `topology.layers`, qui déclare un **ensemble** de couches ordonné par le DAG
+> de dépendances réelles (et non par la chaîne totale). `profile` reste un alias
+> rétrocompatible.
+
 | Code      | Contenu (cumulatif)                                           | Phase banc                                |
 | --------- | ------------------------------------------------------------- | ----------------------------------------- |
 | `base`    | socle : k8s + Cilium (+WireGuard)                             | `bootstrap`                               |
