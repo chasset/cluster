@@ -16,6 +16,16 @@ ADR 0017). La FAÇADE CLI/CI qui expose cette surface (generate/validate/status/
 diff) relève de P3 et vit dans `scripts/topology.py` (façade fine, hors paquet).
 """
 
+from cluster_topology.discover import (
+    DiscoverResult,
+    Unknown,
+    assemble,
+    classify_health,
+    classify_namespaces,
+    detect_backend,
+    detect_exposition,
+    detect_platforms,
+)
 from cluster_topology.epreuves import EPREUVES, Epreuve, filter_epreuves
 from cluster_topology.facts import parse_facts
 from cluster_topology.gates import (
@@ -67,6 +77,14 @@ __all__ = [
     "Epreuve",
     "EPREUVES",
     "filter_epreuves",
+    "DiscoverResult",
+    "Unknown",
+    "assemble",
+    "classify_health",
+    "classify_namespaces",
+    "detect_backend",
+    "detect_exposition",
+    "detect_platforms",
     "parse_facts",
     "GateError",
     "GateResult",

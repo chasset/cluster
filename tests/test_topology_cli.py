@@ -18,6 +18,8 @@ import sys
 import tempfile
 import unittest
 
+import yaml
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 _ROOT = os.path.join(os.path.dirname(__file__), "..")
@@ -1075,6 +1077,68 @@ class Scale(unittest.TestCase):
         code, _, err = _capture(["scale", "--apply"])
         self.assertEqual(code, 1)
         self.assertIn("échec", err)
+
+
+class Discover(unittest.TestCase):
+    """`discover` : reconstruit un topology.yaml depuis le réel sondé. Pas de cluster.
+
+    On stub les sondes I/O (kubectl) de la façade ; la logique pure est testée à part
+    (test_discover). Ici on couvre le dispatch, l'émission YAML, l'inconnu, les codes."""
+
+    def _stub_cluster(self):
+        cli._ready_nodes = lambda: ["node1"]
+        cli._discover_node_roles = lambda: [{"name": "node1", "roles": ["control", "worker"]}]
+        cli._discover_namespaces = lambda: ["kube-system", "argocd", "gitea", "squat-ns"]
+        cli._discover_crd_groups = lambda: ["applications.argoproj.io"]
+        cli._discover_sc_provisioners = lambda: ["rancher.io/local-path"]
+        cli._discover_gateways_present = lambda: False
+        cli._discover_health = lambda: []
+        for name in (
+            "_ready_nodes",
+            "_discover_node_roles",
+            "_discover_namespaces",
+            "_discover_crd_groups",
+            "_discover_sc_provisioners",
+            "_discover_gateways_present",
+            "_discover_health",
+        ):
+            self.addCleanup(setattr, cli, name, getattr(cli, name))
+
+    def test_refuses_unreachable_bench(self):
+        cli._ready_nodes = lambda: []
+        self.addCleanup(setattr, cli, "_ready_nodes", cli._ready_nodes)
+        code, _, err = _capture(["discover"])
+        self.assertEqual(code, 2)  # _UsageError
+        self.assertIn("injoignable", err)
+
+    def test_emits_valid_topology_on_stdout(self):
+        self._stub_cluster()
+        code, out, _ = _capture(["discover"])
+        self.assertEqual(code, 0)
+        # le YAML reconstruit (parsable, couche gitops, backend local-path)
+        topo = yaml.safe_load(out)
+        self.assertEqual(topo["layers"], ["gitops"])
+        self.assertEqual(topo["storage"]["backend"], "local-path")
+
+    def test_unknown_reported_on_stderr(self):
+        self._stub_cluster()
+        code, _, err = _capture(["discover"])
+        self.assertEqual(code, 0)
+        self.assertIn("squat-ns", err)  # ns hors catalogue signalé (ADR 0074 §2)
+
+    def test_writes_to_output_with_unknown_comment(self):
+        self._stub_cluster()
+        path = tempfile.mktemp(suffix=".yaml")
+        self.addCleanup(lambda: os.path.exists(path) and os.unlink(path))
+        code, out, _ = _capture(["discover", "-o", path])
+        self.assertEqual(code, 0)
+        self.assertIn(path, out)
+        with open(path, encoding="utf-8") as f:
+            content = f.read()
+        # YAML valide + inconnu en commentaire tracé dans le fichier
+        self.assertIn("layers:", content)
+        self.assertIn("# ", content)
+        self.assertIn("squat-ns", content)
 
 
 class Dispatch(unittest.TestCase):
