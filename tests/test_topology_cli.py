@@ -969,6 +969,45 @@ class Destroy(unittest.TestCase):
         self.assertIn("échec", err)
 
 
+class Access(unittest.TestCase):
+    """`access` : délègue à run-phases.sh access (access.sh). Pas de vrai banc en test."""
+
+    def _stub(self, *, bench=True, rc=0):
+        calls = []
+
+        def _spy(cmd, *a, **k):
+            calls.append(cmd)
+            return subprocess.CompletedProcess(args=cmd, returncode=rc)
+
+        orig_run, orig_exists = cli.subprocess.run, cli.os.path.exists
+        cli.subprocess.run = _spy
+        # bench présent ⇒ le garde-fou kubeconfig passe ; absent ⇒ il lève.
+        cli.os.path.exists = lambda p: bench if p == cli._BENCH_KUBECONFIG else orig_exists(p)
+        self.addCleanup(setattr, cli.subprocess, "run", orig_run)
+        self.addCleanup(setattr, cli.os.path, "exists", orig_exists)
+        return calls
+
+    def test_delegates_to_access_arm_with_options(self):
+        calls = self._stub()
+        code, _, _ = _capture(["access", "--print-hosts"])
+        self.assertEqual(code, 0)
+        # run-phases.sh access --print-hosts (le flag est reconstruit et transmis).
+        self.assertIn("access", calls[0])
+        self.assertIn("--print-hosts", calls[0])
+        self.assertNotIn("--stop", calls[0])  # seuls les flags posés sont transmis
+
+    def test_propagates_access_exit_code(self):
+        self._stub(rc=2)
+        code, _, _ = _capture(["access", "--stop"])
+        self.assertEqual(code, 2)
+
+    def test_refuses_without_bench(self):
+        self._stub(bench=False)
+        code, _, err = _capture(["access"])
+        self.assertEqual(code, 2)  # _UsageError → code 2
+        self.assertIn("kubeconfig du banc absent", err)
+
+
 class Dispatch(unittest.TestCase):
     def test_unknown_command_is_usage(self):
         with self.assertRaises(SystemExit) as ctx:

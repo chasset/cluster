@@ -814,6 +814,37 @@ def cmd_env(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_access(args: argparse.Namespace) -> int:
+    """`access` : ouvre l'accès développeur au banc (URLs + secrets) — délègue à access.sh.
+
+    Façade fine (ADR 0049/0017) : l'orchestration (Gateways, forwards SSH, /etc/hosts
+    `*.cluster.lan`, secrets/tokens LUS du cluster, `.env` atlas) vit dans
+    `test/lima/access.sh` (ADR 0048), du bash irréductible (limactl/ssh). On délègue
+    via l'arm `run-phases.sh access`, en passant les options telles quelles
+    (`--stop` / `--print-hosts` / `--no-hosts`). Code 0/1 = celui de access.sh ; 2 si
+    le banc n'a pas de kubeconfig (socle non monté)."""
+    if not os.path.exists(_BENCH_KUBECONFIG):
+        raise _UsageError(
+            f"kubeconfig du banc absent ({_BENCH_KUBECONFIG}) — monter le cluster d'abord "
+            "(`cluster up`)"
+        )
+    # Reconstruit les flags d'access.sh depuis les options parsées (un set fixe, sûr).
+    flags = [
+        flag
+        for flag, on in (
+            ("--stop", args.stop),
+            ("--print-hosts", args.print_hosts),
+            ("--no-hosts", args.no_hosts),
+        )
+        if on
+    ]
+    runphases = os.path.join(_ROOT, "test", "lima", "run-phases.sh")
+    return subprocess.run(  # noqa: S603 — chemin codé, flags d'un set fixe
+        ["bash", runphases, "access", *flags],
+        check=False,
+    ).returncode
+
+
 def cmd_preview(args: argparse.Namespace) -> int:
     """`preview` : LA vue complète d'une stack — VOULU + RÉEL + PLAN (calque `pulumi preview`).
 
@@ -1396,6 +1427,7 @@ _DISPATCH = {
     # orchestration de TOUTE la séquence — reste à coder).
     "preview": cmd_preview,  # calque `pulumi preview`
     "env": cmd_env,  # imprime `export KUBECONFIG=<banc>` à eval dans le shell
+    "access": cmd_access,  # accès dev (URLs + secrets) — délègue à access.sh (ADR 0048)
     "up": cmd_up,  # calque `pulumi up` : monte TOUTE la séquence (délègue à run-phases.sh)
     "next": cmd_next,  # applique la PROCHAINE couche (1er drift, granularité fine)
     "destroy": cmd_destroy,  # calque `pulumi destroy`
@@ -1579,6 +1611,22 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_env.add_argument(
         "--force", action="store_true", help="imprime le banc même si KUBECONFIG est déjà défini"
+    )
+
+    p_access = sub.add_parser(
+        "access",
+        help="ouvrir l'accès dev : URLs des services + identifiants (--stop pour fermer)",
+    )
+    # Options déclarées explicitement (apparaissent dans `cluster access --help` ;
+    # argparse.REMAINDER ne capture pas les `--flags` en tête — limite connue).
+    p_access.add_argument("--stop", action="store_true", help="ferme les forwards SSH ouverts")
+    p_access.add_argument(
+        "--print-hosts", action="store_true", help="imprime le bloc /etc/hosts à coller"
+    )
+    p_access.add_argument(
+        "--no-hosts",
+        action="store_true",
+        help="ne touche pas /etc/hosts (forwards + secrets seuls)",
     )
 
     p_destroy = sub.add_parser(
