@@ -154,11 +154,14 @@ class Validation(unittest.TestCase):
 
 
 class Exposition(unittest.TestCase):
-    """exposition.mode (ADR 0020/0071) : enum validé, alias lb-ipam→gateway, défaut terrain."""
+    """exposition.mode (ADR 0020/0071 réécrit) : mode UNIQUE `gateway` (en hostNetwork),
+    `none` conservé, alias `lb-ipam`/`hostport` → `gateway`, défaut GLOBAL gateway."""
 
-    def test_default_lima_is_hostport(self):
+    def test_default_lima_is_gateway(self):
+        # Renversement (ADR 0071) : gateway-hostNetwork reproductible partout, donc
+        # le banc Lima n'a plus de défaut `hostport` propre — gateway par défaut.
         t = topology_from_dict(_base(target_kind="lima"))
-        self.assertEqual(t.exposition_mode, "hostport")
+        self.assertEqual(t.exposition_mode, "gateway")
 
     def test_default_prod_is_gateway(self):
         t = topology_from_dict(_base(target_kind="prod"))
@@ -168,10 +171,13 @@ class Exposition(unittest.TestCase):
         t = topology_from_dict(_base(exposition={"mode": "lb-ipam"}))
         self.assertEqual(t.exposition_mode, "gateway")
 
-    def test_hostport_and_none_accepted(self):
-        self.assertEqual(
-            topology_from_dict(_base(exposition={"mode": "hostport"})).exposition_mode, "hostport"
-        )
+    def test_hostport_alias_resolves_to_gateway(self):
+        # `hostport` (« 80/443 sur l'IP de l'hôte ») est ABSORBÉ par gateway-hostNetwork :
+        # alias déprécié-doux, pour ne pas casser les topology.yaml existants (ADR 0071).
+        t = topology_from_dict(_base(exposition={"mode": "hostport"}))
+        self.assertEqual(t.exposition_mode, "gateway")
+
+    def test_none_accepted(self):
         self.assertEqual(
             topology_from_dict(_base(exposition={"mode": "none"})).exposition_mode, "none"
         )

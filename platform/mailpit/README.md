@@ -10,10 +10,10 @@ Addon **autonome** (namespace `mail`) — transverse : sert le monitoring K8s
 
 ## Fichiers
 
-| Fichier        | Rôle                                                                                                        |
-| -------------- | ----------------------------------------------------------------------------------------------------------- |
-| `mailpit.yaml` | Deployment + Service ClusterIP (SMTP `1025`, UI `80`→`8025`) + Service LoadBalancer SMTP (accès hôte, #131) |
-| `gateway.yaml` | exposition de l'UI (Gateway Cilium + TLS interne)                                                           |
+| Fichier        | Rôle                                                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `mailpit.yaml` | Deployment (SMTP `1025` en `hostPort` pour le relais hôte #131, UI `8025`) + Service ClusterIP (SMTP `1025`, UI `80`→`8025`) |
+| `gateway.yaml` | exposition de l'UI (Gateway Cilium + TLS interne)                                                                            |
 
 ## Déploiement
 
@@ -47,21 +47,22 @@ un **puits de test** :
 
 Le postfix des nœuds (alertes fail2ban/auditd/smartd) tourne **hors du réseau
 pods** : il ne peut joindre ni le Service ClusterIP `mailpit.mail.svc:1025` ni
-le DNS `*.svc.cluster.local`. D'où le **second Service `mailpit-smtp` de type
-`LoadBalancer`** : LB-IPAM
-([ADR 0020](../../docs/decisions/0020-exposition-reseau-tout-cilium.md)) lui
-donne une IP du pool (banc `192.168.67.240-250`), annoncée en ARP (L2, `eth1`) →
-**joignable depuis l'hôte sur le LAN**.
+le DNS `*.svc.cluster.local`. D'où un **`hostPort: 1025`** sur le pod mailpit
+([ADR 0071](../../docs/decisions/0071-exposition-gateway-hostnetwork.md)) : le
+postfix, qui tourne **sur le nœud**, joint le SMTP sur `NodeIP:1025` — routé en
+eBPF par Cilium, **sans Service LoadBalancer ni LB-IPAM**.
 
 ```bash
-kubectl -n mail get svc mailpit-smtp -o wide   # relever l'EXTERNAL-IP attribuée
-# puis pointer le postfix hôte : MAIL_SMARTHOST=[<EXTERNAL-IP>]:1025
+# IP du nœud (banc mono-CP = InternalIP du control-plane) :
+kubectl get nodes -l node-role.kubernetes.io/control-plane \
+  -o 'jsonpath={.items[0].status.addresses[?(@.type=="InternalIP")].address}'
+# puis pointer le postfix hôte : MAIL_SMARTHOST=[<NodeIP>]:1025
 #   (cf. bootstrap/security/.env-example + rôle alert)
 ```
 
 **Banc uniquement** : en prod, le smarthost postfix est le **même fournisseur
-SMTP externe** qu'Alertmanager (vendeur-neutre, `:587` + auth) — pas de
-LoadBalancer SMTP.
+SMTP externe** qu'Alertmanager (vendeur-neutre, `:587` + auth) — ni `hostPort`
+ni LoadBalancer SMTP.
 
 ## Adaptations
 

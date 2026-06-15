@@ -1,0 +1,49 @@
+# code: language=yaml
+#
+# topology.yaml — EXEMPLE d'une VM publique mono-NIC exposée en `gateway`
+# (hostNetwork), valeurs génériques (ADR 0023).
+#
+# `exposition.mode: gateway` est le mode d'exposition UNIQUE (ADR 0020/0071) : la
+# bordure L7 Cilium (Gateway API) est exposée en **hostNetwork** — l'Envoy du
+# Gateway bind les **ports standards 80/443 directement sur l'IP du nœud**
+# (`gatewayAPI.hostNetwork.enabled`, routage eBPF par `kubeProxyReplacement`, déjà
+# actif), y compris les ports privilégiés < 1024. Le service répond sur
+# `IP_publique:443` **sans plage LB-IPAM à réserver ni interface L2 annonçable**
+# (le coût d'entrée historique du Gateway).
+#
+# Vs un simple `hostPort` sur le pod : on GARDE ici la bordure L7 — routage
+# host/path (`HTTPRoute`), multiplexage de plusieurs services sur 443 par hostname
+# (SNI), terminaison TLS par cert-manager (ADR 0021). `hostport` et `lb-ipam` sont
+# des alias historiques de `gateway` (ADR 0071) — ce fichier emploie le nom
+# canonique.
+#
+# Le chemin LB-IPAM + L2 (IP virtuelle annoncée sur le LAN) reste une OPTION de prod
+# quand l'admin réseau fournit une plage dédiée ; il n'est plus le défaut.
+#
+# Ce fichier est VERSIONNÉ (exemple générique) ; le `topology.yaml` réel (symlink
+# d'activation) reste gitignoré.
+
+catalog:
+  arch: x86 # arm64 | x86
+  terrain: cloud # local | cloud | baremetal — VM publique mono-NIC
+  topology: edge-public # nom de la stack
+  status: cible # buildé | cible | spike
+
+# ─── exposition : Gateway en hostNetwork, 80/443 sur l'IP du nœud (ADR 0020/0071)
+exposition:
+  mode: gateway # gateway | none (alias historiques lb-ipam, hostport → gateway)
+
+# ─── layers : les couches voulues (ADR 0069). Ici un point d'entrée web simple.
+layers: [gitops]
+
+# ─── nodes : un nœud public (control hyperconvergé) exposant 80/443.
+nodes:
+  - name: node1
+    roles:
+      - control
+      - worker
+
+storage:
+  backend: local-path
+
+target_kind: prod # cible un déploiement réel (pas le banc Lima)

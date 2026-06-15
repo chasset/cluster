@@ -56,6 +56,16 @@ misconfigurations:
     paths:
       - 'apps/rstudio/deployment.yaml'
 
+  # ── mailpit SMTP : hostPort 1025 assumé (banc-only, ADR 0071) ─────────────
+  # Le relais postfix HÔTE (#131) tourne SUR le nœud, hors réseau pods — il joint
+  # le SMTP sur NodeIP:1025 via un hostPort routé en eBPF (Cilium), au lieu d'un
+  # Service LoadBalancer + LB-IPAM. Exception RÉELLE et tracée (le L7 passe par le
+  # Gateway ; ce hostPort L4 est le seul, banc-only, prod = SMTP externe). 1025 est
+  # non privilégié → aucune capability ajoutée. Cf. ADR 0071 §amendement state.sh.
+  - id: KSV-0024 # hostPort 1025 (relais postfix hôte, banc-only — ADR 0071)
+    paths:
+      - 'platform/mailpit/mailpit.yaml'
+
   # ── cert-manager vendored (bundle officiel v1.20.2) — RBAC inhérent ───────
   # Manifeste amont appliqué tel quel (épinglé par digest, cf. ADR 0021). Le
   # RBAC de cert-manager EST sa fonction : le durcir casserait l'émission.

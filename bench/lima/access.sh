@@ -118,16 +118,35 @@ svc_exists() { "${KUBECTL[@]}" -n "$1" get svc "$2" -o name > /dev/null 2>&1; }
 # <brique> = namespace, sauf grafana (chart kube-prometheus-stack).
 brique_for() { [ "$1" = monitoring ] && echo kube-prometheus-stack || echo "$1"; }
 
-# IP LoadBalancer du Gateway d'un namespace (Service cilium-gateway-<ns>). Vide si
-# absent/pas encore programmé. `|| true` : sous `set -e`, un kubectl non-zéro
-# (hoquet d'API juste après l'apply du Gateway) tuerait `lb_ip=$(gateway_lb_ip)`.
-gateway_lb_ip() {
-    local ns=$1
-    # `-o jsonpath=<expr>` COLLÉ (un seul argument) : séparés, kubectl prend
-    # l'expression pour un nom de service (« services {…} not found »).
-    "${KUBECTL[@]}" -n "${ns}" get svc \
-        -o 'jsonpath={range .items[?(@.spec.type=="LoadBalancer")]}{.status.loadBalancer.ingress[0].ip}{end}' \
+# IP du nœud servant le Gateway en hostNetwork (ADR 0071 : plus de Service LB —
+# l'Envoy bind 80/443 sur l'IP du nœud). Banc mono-CP : l'InternalIP du
+# control-plane. Vide si introuvable. `|| true` : sous `set -e`, un kubectl
+# non-zéro (hoquet d'API) ne doit pas tuer `node_ip=$(gateway_node_ip)`.
+gateway_node_ip() {
+    "${KUBECTL[@]}" get nodes \
+        -l node-role.kubernetes.io/control-plane \
+        -o 'jsonpath={.items[0].status.addresses[?(@.type=="InternalIP")].address}' \
         2> /dev/null || true
+}
+
+# Gate L7 : l'Envoy du Gateway répond-il sur node_ip:443 pour ce hostname ? On
+# envoie le SNI/Host attendu et on accepte TOUT code HTTP (même 404/503) — ce qui
+# compte, c'est qu'Envoy ACCEPTE la connexion TLS et ROUTE (data path vivant). Un
+# échec de CONNEXION (rc 7 → code 000) = pas prêt. On ne lit JAMAIS .status du
+# Gateway (#42786 : `Programmed: False` persistant en hostNetwork malgré data path
+# OK ; ADR 0071 §6) — on gate sur le comportement réel.
+gate_gateway_l7() {
+    local node_ip=$1 host=$2 attempts=0 code
+    while [ "${attempts}" -lt 30 ]; do
+        # --resolve épingle le SNI/Host sur node_ip:443 (pas de DNS requis) ; -k :
+        # CA interne (cert-manager, ADR 0021) hors du trust store local.
+        code=$(curl -sk -o /dev/null -w '%{http_code}' --max-time 3 \
+            --resolve "${host}:443:${node_ip}" "https://${host}/" 2> /dev/null || echo "")
+        [ -n "${code}" ] && [ "${code}" != "000" ] && return 0
+        attempts=$((attempts + 1))
+        sleep 2
+    done
+    return 1
 }
 
 # Pose les Gateways des UI dont le Service existe (idempotent).
@@ -149,10 +168,10 @@ apply_gateways() {
 # script — si on ne ferme pas stdin/out/err, un `| tail` en aval reste bloqué
 # (le pipe ne se ferme jamais). On détache donc explicitement les 3 flux.
 open_forward() {
-    local lport=$1 lb_ip=$2
+    local lport=$1 node_ip=$2
     pkill -f "ssh.*-L 127.0.0.1:${lport}:" 2> /dev/null || true
     ssh -F "${SSH_CFG}" -o ControlMaster=no -o ControlPath=none -fN \
-        -L "127.0.0.1:${lport}:${lb_ip}:443" "lima-${CP}" < /dev/null > /dev/null 2>&1
+        -L "127.0.0.1:${lport}:${node_ip}:443" "lima-${CP}" < /dev/null > /dev/null 2>&1
 }
 
 # Pour chaque UI : lit l'IP LB → ouvre un forward sur BASE_PORT+index. Mémorise
@@ -166,28 +185,26 @@ open_forward() {
 declare -a UI_PORTS=()
 start_forwards() {
     [ -f "${SSH_CFG}" ] || die "config SSH Lima absente : ${SSH_CFG} (banc démarré ?)"
-    log "Ouverture des forwards SSH (un par Gateway, port hôte dédié)"
+    log "Ouverture des forwards SSH (un par Gateway, vers l'IP du nœud:443)"
     UI_PORTS=()
+    local node_ip
+    node_ip=$(gateway_node_ip)
+    [ -n "${node_ip}" ] || die "pas d'IP nœud control-plane (banc démarré ?)"
     local rows
     read_lines rows < <(ui_rows)
-    local i=0 row hostname ns svc layer auth lb_ip lport tries
+    local i=0 row hostname ns svc layer auth lport
     for row in "${rows[@]}"; do
         IFS=$'\t' read -r hostname ns svc layer auth <<< "${row}"
-        # L'IP LB peut tarder quelques secondes après l'apply du Gateway → retry.
-        lb_ip=""; tries=0
-        while [ -z "${lb_ip}" ] && [ "${tries}" -lt 10 ]; do
-            lb_ip=$(gateway_lb_ip "${ns}")
-            [ -n "${lb_ip}" ] && break
-            tries=$((tries + 1))
-            sleep 1
-        done
-        if [ -z "${lb_ip}" ]; then
-            warn "${hostname} : pas d'IP LB (Gateway absent/non programmé) — ignoré"
+        # Gate L7 RÉEL (contourne #42786 : Programmed:False persistant en hostNetwork
+        # alors que le data path marche) — on NE gate PAS sur .status (ADR 0071 §6).
+        if ! gate_gateway_l7 "${node_ip}" "${hostname}"; then
+            warn "${hostname} : Gateway non joignable en L7 (curl) — ignoré"
+            i=$((i + 1))
             continue
         fi
         lport=$(host_port_for "${i}")
-        if open_forward "${lport}" "${lb_ip}"; then
-            ok "${hostname} → 127.0.0.1:${lport} (LB ${lb_ip})"
+        if open_forward "${lport}" "${node_ip}"; then
+            ok "${hostname} → 127.0.0.1:${lport} (nœud ${node_ip}:443)"
             UI_PORTS+=("${hostname}:${lport}")
         else
             warn "${hostname} : forward SSH échoué"

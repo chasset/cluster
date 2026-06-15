@@ -106,14 +106,19 @@ référence versionnée des CRs d'exposition Cilium,
 d'exemple générique `hubble.cluster.lan` (placeholder `.lan`, ADR 0023/0021).
 
 **Le Service `hubble-ui` reste ClusterIP.** L'unique point d'entrée externe est
-le `Service type=LoadBalancer` **du Gateway** — exception déjà tracée en couche
-7b de [`bootstrap/state.sh`](../../bootstrap/state.sh) (allowlist par label
+le **Gateway** — exception déjà tracée en couche 7b de
+[`bootstrap/state.sh`](../../bootstrap/state.sh) (allowlist par label
 `gateway.networking.k8s.io/gateway-name`,
 [state.sh L808-811](../../bootstrap/state.sh)). Aucune nouvelle exception à
-ajouter : le Gateway hubble-ui est couvert par l'allowlist existante. Le
-principe #25 (« services applicatifs en ClusterIP, exposition **uniquement** par
-la bordure Gateway ») demeure intact — c'est exactement ce que 0019 voulait
-préserver, désormais garanti **par la bordure 0020 au lieu de l'absence d'UI**.
+ajouter : le Gateway hubble-ui est couvert par l'allowlist existante.
+
+> **Note (ADR 0071)** : depuis l'exposition du Gateway en **hostNetwork**, ce
+> Gateway n'a **plus** de `Service type=LoadBalancer` — l'Envoy bind 80/443 sur
+> l'IP du nœud. Le patron HTTPRoute/TLS ci-dessus est inchangé ; seul le point
+> d'entrée passe d'une IP LoadBalancer à l'IP du nœud. Le principe #25 («
+> services applicatifs en ClusterIP, exposition **uniquement** par la bordure
+> Gateway ») demeure intact — c'est exactement ce que 0019 voulait préserver,
+> désormais garanti **par la bordure 0020 au lieu de l'absence d'UI**.
 
 ### 3. Activation : opt-in (désactivé par défaut), piloté par l'intention
 
