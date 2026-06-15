@@ -2,7 +2,7 @@
 
 ## Statut
 
-Proposed (2026-06-15)
+Accepted (2026-06-15)
 
 Inverse de `generate` ([ADR 0056](0056-modele-declaratif-topologies.md)) ;
 réutilise les sondes de `preview`, le DAG des couches
@@ -65,9 +65,11 @@ C'est l'INVERSE de `generate` (generate : déclaration → infra ; discover : in
   présentes**.
 - **backend de stockage** : présence d'une StorageClass `rook-ceph-*` → `ceph` ;
   `local-path` → `local-path` (sonde `kubectl get storageclass`).
-- **exposition** : présence de CRs `Gateway`/`CiliumLoadBalancerIPPool` →
-  `gateway` ; `hostPort` sur les workloads → `hostport` ; sinon `none` (ADR
-  0071). Inverse de la dérivation `exposition_mode`.
+- **exposition** : présence d'un `Gateway` (ou de la CRD
+  `gateway.networking.k8s.io`) → `gateway` ; sinon `none`. Depuis le mode
+  d'exposition UNIQUE (`gateway` via hostNetwork, ADR 0020/0071), il n'y a plus
+  de mode `hostport` distinct à reconstruire. Inverse de la dérivation
+  `exposition_mode`.
 
 #### Taxonomie des ressources sondées (par famille)
 

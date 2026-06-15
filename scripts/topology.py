@@ -105,6 +105,7 @@ from cluster_topology import (  # noqa: E402
     verdict_for_run,
 )
 from cluster_topology import bootstrap as _bootstrap  # noqa: E402
+from cluster_topology import discover as _discover  # noqa: E402
 from cluster_topology import ha as _ha  # noqa: E402
 from cluster_topology import roundtrip as _roundtrip  # noqa: E402
 from cluster_topology import runner as _runner  # noqa: E402
@@ -533,6 +534,77 @@ def _observed_layers(phases: list[str]) -> set[str]:
     return done
 
 
+# ── Sondes de `discover` (ADR 0074) : I/O kubectl irréductible (ADR 0049). Lisent
+#    le réel et le RÉDUISENT à des structures simples ; toute la logique (mapping,
+#    backend, exposition, santé) est PURE dans cluster_topology/discover.py.
+
+
+def _discover_node_roles() -> list[dict]:
+    """Nœuds + rôles dérivés des labels (`kubectl get nodes`, ADR 0074 §1).
+
+    Étend `_ready_nodes()` (qui ne lit que Ready) par la lecture des rôles : un nœud
+    portant le label `node-role.kubernetes.io/control-plane` est `control` ; sinon
+    `worker` ; un control PAS détaint (schedulable) est hyperconvergé (control+worker)."""
+    out = _kubectl("get", "nodes", "-o", "json")
+    if out is None or out.returncode != 0:
+        return []
+    try:
+        data = json.loads(out.stdout)
+    except (ValueError, KeyError):
+        return []
+    nodes: list[dict] = []
+    for item in data.get("items", []):
+        name = item.get("metadata", {}).get("name", "")
+        labels = item.get("metadata", {}).get("labels", {})
+        is_cp = "node-role.kubernetes.io/control-plane" in labels
+        # un control schedulable (pas de taint NoSchedule control-plane) porte aussi des
+        # workloads → hyperconvergé (control + worker), comme ha-3cp (ADR 0055).
+        taints = item.get("spec", {}).get("taints") or []
+        cp_tainted = any(t.get("key") == "node-role.kubernetes.io/control-plane" for t in taints)
+        if is_cp and cp_tainted:
+            roles = ["control"]
+        elif is_cp:
+            roles = ["control", "worker"]
+        else:
+            roles = ["worker"]
+        if name:
+            nodes.append({"name": name, "roles": roles})
+    return nodes
+
+
+def _discover_namespaces() -> list[str]:
+    """Noms des namespaces du cluster (`kubectl get ns`). Vide si injoignable."""
+    out = _kubectl("get", "namespaces", "-o", "name")
+    if out is None or out.returncode != 0:
+        return []
+    # format `namespace/<nom>` → <nom>
+    return [ln.split("/", 1)[-1] for ln in out.stdout.split() if ln]
+
+
+def _discover_crd_groups() -> list[str]:
+    """Noms complets des CRD installées (`kubectl get crd`) — le PIVOT (ADR 0074 §1).
+
+    `discover.detect_platforms` les mappe par suffixe de groupe (`*.cilium.io` …)."""
+    out = _kubectl("get", "crd", "-o", "name")
+    if out is None or out.returncode != 0:
+        return []
+    return [ln.split("/", 1)[-1] for ln in out.stdout.split() if ln]
+
+
+def _discover_sc_provisioners() -> list[str]:
+    """Provisioners des StorageClass (`kubectl get sc`) → backend (ADR 0074 §1)."""
+    out = _kubectl("get", "storageclass", "-o", "jsonpath={.items[*].provisioner}")
+    if out is None or out.returncode != 0:
+        return []
+    return out.stdout.split()
+
+
+def _discover_gateways_present() -> bool:
+    """`True` si au moins un `Gateway` (gateway.networking.k8s.io) est posé (ADR 0074 §1)."""
+    out = _kubectl("get", "gateways.gateway.networking.k8s.io", "-A", "-o", "name")
+    return out is not None and out.returncode == 0 and bool(out.stdout.strip())
+
+
 def _confirm_destroy(vms: list[str], *, assume_yes: bool) -> bool:
     """Confirme la DESTRUCTION des VMs `vms`. --yes saute ; hors TTY sans --yes : refus.
 
@@ -947,6 +1019,91 @@ def cmd_scale(args: argparse.Namespace) -> int:
     if not args.apply:
         print("→ PLAN (rien appliqué) — `cluster scale --apply` pour exécuter.")
     return rc
+
+
+def _discover_health() -> list:
+    """Bilan de santé du cluster, sondé puis classé par `discover.classify_health` (pur).
+
+    Réduit le réel à des compteurs (nœuds Ready/total, PVC Pending/total) que la
+    fonction pure transforme en verdicts. Read-only (ADR 0074 §3)."""
+    ready = _ready_nodes()
+    nodes_all = _kubectl("get", "nodes", "--no-headers")
+    total = len(nodes_all.stdout.splitlines()) if (nodes_all and nodes_all.returncode == 0) else 0
+    # PVC : compte Bound vs autres (Pending) sur tous les namespaces.
+    pvc = _kubectl("get", "pvc", "-A", "--no-headers")
+    pvc_total = pvc_pending = 0
+    if pvc is not None and pvc.returncode == 0:
+        for ln in pvc.stdout.splitlines():
+            cols = ln.split()
+            # format -A : NAMESPACE NAME STATUS … → STATUS en colonne 2
+            if len(cols) >= 3:
+                pvc_total += 1
+                if cols[2] != "Bound":
+                    pvc_pending += 1
+    return _discover.classify_health(
+        nodes_ready=len(ready),
+        nodes_total=total,
+        pvc_pending=pvc_pending,
+        pvc_total=pvc_total,
+    )
+
+
+def cmd_discover(args: argparse.Namespace) -> int:
+    """`discover` : reconstruit un `topology.yaml` depuis un cluster réel (ADR 0074).
+
+    INVERSE de `artifact generate`. Façade FINE (ADR 0074 §6) : sonde le réel via
+    kubectl (rôles, namespaces, CRDs, StorageClass, Gateway) puis assemble par la
+    logique PURE (`discover.assemble`). Émet (1) le YAML reconstruit (stdout ou `-o`),
+    (2) l'INCONNU (jamais ignoré — ADR 0052/0074 §2), (3) un bilan de SANTÉ (§3).
+    Read-only. Code 0 si le cluster est joignable ; 2 (usage) sinon."""
+    if not _ready_nodes():
+        raise _UsageError(
+            "banc injoignable (aucun nœud Ready) — exporter KUBECONFIG ou `cluster env`, "
+            "ou monter le cluster (`cluster up`)"
+        )
+    result = _discover.assemble(
+        nodes=_discover_node_roles(),
+        namespaces=_discover_namespaces(),
+        crd_groups=_discover_crd_groups(),
+        storageclass_provisioners=_discover_sc_provisioners(),
+        gateways_present=_discover_gateways_present(),
+        health=_discover_health(),
+        topology_name=args.name,
+    )
+
+    # 1. le topology.yaml reconstruit (valide — passe stack validate, ADR 0074 §5)
+    header = (
+        "# topology.yaml reconstruit par `cluster discover` (ADR 0074) — valeurs\n"
+        "# génériques (ADR 0023). Vérifier avant usage : `cluster stack validate`.\n"
+    )
+    body = yaml.safe_dump(result.topology, sort_keys=False, allow_unicode=True)
+    rendered = header + body
+
+    if args.output:
+        # 2+3. inconnu & santé en COMMENTAIRE dans le fichier (tracé, jamais perdu).
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(rendered)
+            if result.unknown:
+                f.write("\n# ── INCONNU (hors catalogue — à expliquer/adopter, ADR 0074 §2) :\n")
+                for u in result.unknown:
+                    ns = f" (ns {u.namespace})" if u.namespace else ""
+                    f.write(f"#   {u.kind}: {u.name}{ns}\n")
+        print(f"topology.yaml reconstruit → {args.output}")
+    else:
+        print(rendered, end="")
+
+    # bilan de santé + inconnu sur stderr (informatif, n'altère pas le YAML sur stdout)
+    if result.unknown:
+        print("\nInconnu (hors catalogue — signalé, ADR 0074 §2) :", file=sys.stderr)
+        for u in result.unknown:
+            ns = f" (ns {u.namespace})" if u.namespace else ""
+            print(f"  • {u.kind}: {u.name}{ns}", file=sys.stderr)
+    if result.health:
+        print("\nBilan de santé :", file=sys.stderr)
+        for h in result.health:
+            mark = {"sain": "✓", "dégradé": "✗", "absent": "○"}.get(h.verdict, "?")
+            print(f"  {mark} {h.dimension} : {h.verdict} ({h.detail})", file=sys.stderr)
+    return 0
 
 
 def cmd_preview(args: argparse.Namespace) -> int:
@@ -1540,6 +1697,7 @@ _DISPATCH = {
     "env": cmd_env,  # imprime `export KUBECONFIG=<banc>` à eval dans le shell
     "access": cmd_access,  # accès dev (URLs + secrets) — délègue à access.sh (ADR 0048)
     "scale": cmd_scale,  # ajuste les replicas au nb de nœuds Ready (ADR 0072, runtime)
+    "discover": cmd_discover,  # reconstruit un topology.yaml depuis le réel (ADR 0074, inverse de generate)  # noqa: E501
     "up": cmd_up,  # calque `pulumi up` : monte TOUTE la séquence (délègue à run-phases.sh)
     "next": cmd_next,  # applique la PROCHAINE couche (1er drift, granularité fine)
     "destroy": cmd_destroy,  # calque `pulumi destroy`
@@ -1747,6 +1905,19 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_scale.add_argument(
         "--apply", action="store_true", help="applique le scaling (sinon : affiche le PLAN seul)"
+    )
+
+    p_discover = sub.add_parser(
+        "discover",
+        help="reconstruire un topology.yaml depuis un cluster réel (l'inverse de construire)",
+    )
+    p_discover.add_argument(
+        "-o", "--output", default=None, help="écrire le topology.yaml ici (défaut : afficher)"
+    )
+    p_discover.add_argument(
+        "--name",
+        default="discovered",
+        help="nom de la topologie reconstruite (défaut : discovered)",
     )
 
     p_destroy = sub.add_parser(

@@ -93,4 +93,4 @@ Format léger inspiré de Michael Nygard :
 | 0071 | [Exposition `hostport` (80/443 sur l'hôte) via Cilium eBPF](0071-exposition-hostport-cilium.md)                                      | Proposed           |
 | 0072 | [`cluster scale` : ajuster les replicas au nombre de nœuds](0072-cluster-scale-replicas-noeuds.md)                                   | Proposed           |
 | 0073 | [Hubble UI : activer l'observabilité réseau (opt-in)](0073-hubble-ui-observabilite-reseau.md)                                        | Proposed           |
-| 0074 | [`cluster discover` : reconstruire un `topology.yaml` depuis un cluster réel](0074-cluster-discover-reconstruire-topologie.md)       | Proposed           |
+| 0074 | [`cluster discover` : reconstruire un `topology.yaml` depuis un cluster réel](0074-cluster-discover-reconstruire-topologie.md)       | Accepted           |
