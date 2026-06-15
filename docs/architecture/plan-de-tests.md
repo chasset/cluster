@@ -6,11 +6,11 @@ Trois niveaux complémentaires, du plus rapide/isolé au plus complet/réel
 [ADR 0034](../decisions/0034-validation-e2e-from-scratch.md) pour la doctrine «
 la preuve est un run e2e from-scratch »).
 
-| Niveau          | Question posée                                               | Où c'est codé                                                         | Exécution                | Cluster requis |
-| --------------- | ------------------------------------------------------------ | --------------------------------------------------------------------- | ------------------------ | -------------- |
-| **Unitaire**    | « cette fonction de décision classe-t-elle correctement ? »  | [`test/unit/*.bats`](../../test/unit/)                                | `pnpm test:shell` (bats) | non            |
-| **Intégration** | « la couche monte-t-elle et passe-t-elle son gate ? »        | gates dans [`test/lima/run-phases.sh`](../../test/lima/run-phases.sh) | `run-phases.sh <phase>`  | oui (banc)     |
-| **Scénario**    | « le cluster résiste-t-il / se comporte-t-il comme prévu ? » | [`test/scenarios/NN-*.sh`](../../test/scenarios/)                     | `run-all.sh`             | oui (banc)     |
+| Niveau          | Question posée                                               | Où c'est codé                                                           | Exécution                | Cluster requis |
+| --------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------- | ------------------------ | -------------- |
+| **Unitaire**    | « cette fonction de décision classe-t-elle correctement ? »  | [`bench/unit/*.bats`](../../bench/unit/)                                | `pnpm test:shell` (bats) | non            |
+| **Intégration** | « la couche monte-t-elle et passe-t-elle son gate ? »        | gates dans [`bench/lima/run-phases.sh`](../../bench/lima/run-phases.sh) | `run-phases.sh <phase>`  | oui (banc)     |
+| **Scénario**    | « le cluster résiste-t-il / se comporte-t-il comme prévu ? » | [`bench/scenarios/NN-*.sh`](../../bench/scenarios/)                     | `run-all.sh`             | oui (banc)     |
 
 > **Pourquoi trois niveaux ?** L'unitaire verrouille la **logique** (rapide,
 > sans cluster) ; l'intégration prouve qu'une **couche monte** (gate) ; le
@@ -25,12 +25,12 @@ parsing), testable **sans cluster**
 ([ADR 0017](../decisions/0017-langage-des-scripts.md)). shellcheck valide la
 syntaxe ; bats valide le **comportement**.
 
-| Fichier                                                      | Couvre                                                       | `@test` |
-| ------------------------------------------------------------ | ------------------------------------------------------------ | ------- |
-| [`state-classify.bats`](../../test/unit/state-classify.bats) | classification d'état de `state.sh` (couche bootstrap/hôte)  | 18      |
-| [`dataops-assert.bats`](../../test/unit/dataops-assert.bats) | run Dagster + ingest Marquez (couche dataops)                | 16      |
-| [`metrology.bats`](../../test/unit/metrology.bats)           | métrologie/historique du banc (harnais)                      | 24      |
-| [`gitops-assert.bats`](../../test/unit/gitops-assert.bats)   | statut Argo CD + déclenchement webhook (couche gitops, #231) | 9       |
+| Fichier                                                       | Couvre                                                       | `@test` |
+| ------------------------------------------------------------- | ------------------------------------------------------------ | ------- |
+| [`state-classify.bats`](../../bench/unit/state-classify.bats) | classification d'état de `state.sh` (couche bootstrap/hôte)  | 18      |
+| [`dataops-assert.bats`](../../bench/unit/dataops-assert.bats) | run Dagster + ingest Marquez (couche dataops)                | 16      |
+| [`metrology.bats`](../../bench/unit/metrology.bats)           | métrologie/historique du banc (harnais)                      | 24      |
+| [`gitops-assert.bats`](../../bench/unit/gitops-assert.bats)   | statut Argo CD + déclenchement webhook (couche gitops, #231) | 9       |
 
 ### Densification visée (couches sans assertion pure)
 
@@ -50,7 +50,7 @@ pure extraite ni bats. À densifier (logique testable hors cluster) :
 
 ## Niveau 2 — Tests d'intégration (gates de phase)
 
-Chaque phase du harnais [`run-phases.sh`](../../test/lima/run-phases.sh) se
+Chaque phase du harnais [`run-phases.sh`](../../bench/lima/run-phases.sh) se
 termine par un **gate** bloquant (exit ≠ 0 sinon) sur le cluster réel. Le détail
 gate/assertion par couche, et leur regroupement en **chemins d'installation**
 (`socle` / `atlas` / `storage-real` / `cluster-dataops`), est décidé par
@@ -70,12 +70,12 @@ gate/assertion par couche, et leur regroupement en **chemins d'installation**
 
 ## Niveau 3 — Scénarios (comportement)
 
-26 scénarios numérotés ([`test/scenarios/`](../../test/scenarios/), runner
+26 scénarios numérotés ([`bench/scenarios/`](../../bench/scenarios/), runner
 `run-all.sh`), couvrant résilience, sécurité active, chaos et observabilité. La
 **matrice détaillée** (ce que teste chacun + couverture) vit dans
-[`test/scenarios/README.md`](../../test/scenarios/README.md). Chaque famille est
-**scellée par un chemin d'installation** (ADR 0045 §4/§6) — le chemin qui monte
-le banc requis et que le garde-fou de fraîcheur surveille à sa cadence
+[`bench/scenarios/README.md`](../../bench/scenarios/README.md). Chaque famille
+est **scellée par un chemin d'installation** (ADR 0045 §4/§6) — le chemin qui
+monte le banc requis et que le garde-fou de fraîcheur surveille à sa cadence
 ([ADR 0025](../decisions/0025-securite-active-chaos-attaques-controlees.md),
 [ADR 0042](../decisions/0042-fraicheur-preuves-banc.md)) :
 
@@ -111,9 +111,9 @@ phase `dataops` a posé l'infra (orchestrateurs vides). Étapes (chacune un gate
    (réutilise la logique de `dataops-assert.bats`).
 
 Le contenu poussé (workflow jouet d'exemple générique) vit dans
-[`test/lima/atlas-workflow-sample/`](../../test/lima/atlas-workflow-sample/) ;
+[`bench/lima/atlas-workflow-sample/`](../../bench/lima/atlas-workflow-sample/) ;
 l'init du dépôt Gitea est faite par la phase `gitops-seed`
-([`test/lima/gitea-init.sh`](../../test/lima/gitea-init.sh)). Implémentation :
+([`bench/lima/gitea-init.sh`](../../bench/lima/gitea-init.sh)). Implémentation :
 [issue #231](https://github.com/univ-lehavre/cluster/issues/231).
 
 ## Couverture par profil de banc — ce que le banc `atlas` ne peut pas jouer
@@ -140,12 +140,12 @@ monte le banc requis**, à la cadence du garde-fou de fraîcheur (#244).
 
 ```bash
 # Banc complet (Ceph + durcissement) → débloque les scénarios 01–22 :
-WITH_CEPH=1 WITH_HARDENING=1 NO_CACHE=1 test/lima/run-phases.sh storage-real
+WITH_CEPH=1 WITH_HARDENING=1 NO_CACHE=1 bench/lima/run-phases.sh storage-real
 ```
 
 ## Voir aussi
 
 - [Chemins d'installation (ADR 0045)](../decisions/0045-chemins-installation-banc-couches.md)
   — quelle couche, quel ordre, quels gates par chemin.
-- [Matrice des scénarios](../../test/scenarios/README.md) — détail des 26 (+1).
+- [Matrice des scénarios](../../bench/scenarios/README.md) — détail des 26 (+1).
 - [Leçons des Runs](lecons-des-runs.md) — synthèse des drifts par campagne.

@@ -3,7 +3,7 @@ name: Bench freshness
 # Garde-fou de fraîcheur des preuves de banc (ADR 0042 amendé / ADR 0045 §6). Le
 # banc Lima NE PEUT PAS tourner en CI (nested virt, arm64, ~30 min) : ce workflow
 # n'EXÉCUTE pas l'e2e — il OBSERVE la date du dernier run de CHAQUE chemin nommé
-# (test/lima/runs-history.yaml, champ `target`) et ALERTE quand l'un dépasse SA
+# (bench/lima/runs-history.yaml, champ `target`) et ALERTE quand l'un dépasse SA
 # cadence (atlas 7 j, storage-real 30 j ; cluster-dataops 90 j en warn-only). Un
 # run atlas frais ne masque donc plus un storage-real périmé (#244). NON BLOQUANT
 # : cron seulement, jamais sur `push`/`pull_request`.
@@ -40,7 +40,7 @@ jobs:
         # piloter l'ouverture d'issue, puis l'étape finale matérialise l'échec.
         run: |
           set +e
-          out=$(bash test/lima/check-freshness.sh 2>&1); rc=$?
+          out=$(bash bench/lima/check-freshness.sh 2>&1); rc=$?
           echo "$out"
           {
             echo "rc=$rc"
@@ -69,7 +69,7 @@ jobs:
           TITLE="⏰ Preuve de banc périmée — relancer le(s) chemin(s) concerné(s)"
           NOTE="— Détecté par bench-freshness.yml (ADR 0042 / ADR 0045 §6). Le détail"
           NOTE="${NOTE} ci-dessus nomme le(s) chemin(s) périmé(s) ; relancer ce(s) chemin(s)"
-          NOTE="${NOTE} (test/lima/run-phases.sh <chemin>) et committer le run. Refermer ensuite."
+          NOTE="${NOTE} (bench/lima/run-phases.sh <chemin>) et committer le run. Refermer ensuite."
           BODY=$(printf '%s\n\n%s' "$SUMMARY" "$NOTE")
           # Filet de sécurité : crée le label s'il manque (idempotent), sinon le
           # premier run sur un dépôt neuf échouerait au --label.

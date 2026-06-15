@@ -8,7 +8,7 @@
 # doc comme emplacement attendu. `exclude` est une regex sur l'URI résolue
 # (lychee transforme les liens relatifs en file:///… → exclude_path ne matche
 # pas, contrairement à exclude).
-exclude = ["test/multi-node/inventory\\.yaml"]
+exclude = ["bench/multi-node/inventory\\.yaml"]
 
 # Ne pas vérifier les fragments/ancres (#section) : trop de faux positifs sur
 # les titres accentués/emoji ; markdownlint couvre déjà la structure.

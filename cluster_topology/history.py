@@ -1,6 +1,6 @@
 """Lecture de l'historique des runs + verdicts de fraîcheur (P4, ADR 0056 §8.10-12).
 
-`test/lima/runs-history.yaml` est la **preuve datée** versionnée du banc (ADR
+`bench/lima/runs-history.yaml` est la **preuve datée** versionnée du banc (ADR
 0034/0042) : une entrée appendée par run `all` complété (champ `date`, `profil`,
 `topologie`, `commit`, durées de phases, métriques échantillonnées). Ce module la
 **LIT** (read-only) et en dérive, sans la réécrire :
@@ -10,13 +10,13 @@
   lu s'il est présent — rétrocompat avec les entrées antérieures qui n'en ont
   pas) ;
 - un **verdict de fraîcheur** (exig. 10 : « ce chemin n'a pas de run frais »),
-  calculé À L'IDENTIQUE de `test/lima/metrology.sh` (seuils ADR 0045 §6 :
+  calculé À L'IDENTIQUE de `bench/lima/metrology.sh` (seuils ADR 0045 §6 :
   atlas=7 j, storage-real=30 j, cluster-dataops=90 j, défaut 7 j ; surcharge
   `SEUIL_<CHEMIN>` ; le suffixe `+hardening` se replie sur le chemin de base).
 
 Honnêteté des Runs (ADR 0023/0052) : un run `fail` n'est PAS un trou — l'historique
 machine ne porte que les succès (un run complet en émet une entrée), les échecs
-sont consignés en prose dans `test/lima/RESULTS.md`. Ce module ne FABRIQUE ni ne
+sont consignés en prose dans `bench/lima/RESULTS.md`. Ce module ne FABRIQUE ni ne
 RÉÉCRIT aucun run ; l'append reste l'apanage de `metro_record_run` (bash, en fin
 de run from-scratch). Aucune métrique n'est produite ici (P6) — seules celles déjà
 consignées sont relues.

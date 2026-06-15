@@ -37,7 +37,7 @@ Concrètement :
    correctif. La synthèse transverse vit dans
    [`docs/architecture/lecons-des-runs.md`](../architecture/lecons-des-runs.md).
 4. **Le run produit une preuve archivée** : log brut **générisé** sous
-   `test/<banc>/runs/` + **métriques** (matériel hôte + temps par phase, émises
+   `bench/<banc>/runs/` + **métriques** (matériel hôte + temps par phase, émises
    par `run-phases.sh`). Un « ~15 min » sans matériel ni log n'est pas une
    preuve.
 5. **Le lint reste obligatoire** — il est le filet bon marché qui attrape tôt le

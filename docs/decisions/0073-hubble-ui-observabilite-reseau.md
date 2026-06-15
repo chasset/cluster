@@ -33,7 +33,7 @@ Deux choses ont changé depuis 0019 (2026-06-02) :
    perd de sa force : la protection existe.
 2. **Un portail développeur consomme ces UI**
    ([ADR 0048](0048-acces-local-developpeur.md)) :
-   [`test/lima/access.sh`](../../test/lima/access.sh) dérive du **contrat**
+   [`bench/lima/access.sh`](../../bench/lima/access.sh) dérive du **contrat**
    ([`contract/endpoints.example.yaml`](../../contract/endpoints.example.yaml))
    les UI à exposer (champ `ui_hostname`, regroupées par `layer`). Hubble UI
    trouve naturellement sa place dans le `layer: monitoring`, aux côtés de
@@ -150,7 +150,7 @@ bloc « UI de la plateforme » L125+) une entrée `hubble-ui` modelée sur
 `auth: none` (réseau privé, ADR 0003), `ui_hostname: hubble.cluster.lan`,
 `source: platform/cilium-expo/hubble-ui-gateway.yaml`. `access.sh` la prendra en
 charge **automatiquement** (il itère sur les `ui_hostname` dont le Service
-existe, [access.sh L99-109/137-143](../../test/lima/access.sh)) : si hubble-ui
+existe, [access.sh L99-109/137-143](../../bench/lima/access.sh)) : si hubble-ui
 n'est pas déployé, le Service est absent → l'UI est simplement ignorée
 (`warn … Gateway non posé`), aucune régression.
 

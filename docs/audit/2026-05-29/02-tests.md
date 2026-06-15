@@ -35,8 +35,8 @@ unitaire Ansible (`molecule`).
 
 ### Majeur (→ vérifié majeur) — La restauration etcd n'a jamais été testée
 
-- **Fichier** : `bootstrap/RUNBOOK.md:557-587`, `test/RESULTS.md:40`,
-  `test/scenarios/04-control-plane-loss.sh`
+- **Fichier** : `bootstrap/RUNBOOK.md:557-587`, `bench/RESULTS.md:40`,
+  `bench/scenarios/04-control-plane-loss.sh`
 - **Constat** : le RUNBOOK recommande de tester la restauration sur le banc,
   mais le scénario 04 fait `vagrant halt`/`up` (etcd revient intact tout seul)
   et se contente d'un `ls` des backups — il n'exécute **jamais**
@@ -50,7 +50,7 @@ unitaire Ansible (`molecule`).
 
 ### Majeur (→ vérifié majeur) — Scénario 05 (replication-bump) faux-positive
 
-- **Fichier** : `test/scenarios/05-replication-bump.sh:49-66`
+- **Fichier** : `bench/scenarios/05-replication-bump.sh:49-66`
 - **Constat** : la boucle d'attente de `HEALTH_OK` n'a pas de branche d'échec ;
   à expiration en `HEALTH_WARN`, le script enchaîne le REVERT et sort 0. Un bump
   bloqué est indistinguable d'un bump convergé — alors que le docstring exige la
@@ -60,7 +60,7 @@ unitaire Ansible (`molecule`).
 
 ### Majeur (→ vérifié majeur) — Scénario 04 (control-plane-loss) sort toujours 0
 
-- **Fichier** : `test/scenarios/04-control-plane-loss.sh:48-63`
+- **Fichier** : `bench/scenarios/04-control-plane-loss.sh:48-63`
 - **Constat** : la boucle d'attente du retour de l'API n'a aucune branche
   d'échec ; si l'API ne revient jamais, le script termine quand même sur « ✓
   Scénario terminé ». La vérification du snapshot etcd est un simple `ls` sans
@@ -70,7 +70,7 @@ unitaire Ansible (`molecule`).
 
 ### Mineur — Les 8 scénarios n'ont jamais tourné de bout en bout
 
-- **Fichier** : `test/RESULTS.md:312-315`, `test/scenarios/README.md:141-147`
+- **Fichier** : `bench/RESULTS.md:312-315`, `bench/scenarios/README.md:141-147`
 - **Constat** : « écrits, shellcheck vert, prêts à dérouler » mais gated par le
   drift #9 (Driver CSI non instancié → PVC Pending). Code de test non validé.
   _Gravité ramenée de majeur à mineur : limitation explicitement assumée et
@@ -89,7 +89,7 @@ unitaire Ansible (`molecule`).
 
 ### Mineur — Scénario 03 ne teste pas la continuité des I/O annoncée
 
-- **Fichier** : `test/scenarios/03-worker-loss.sh`
+- **Fichier** : `bench/scenarios/03-worker-loss.sh`
 - **Constat** : l'en-tête promet de vérifier le passage `HEALTH_WARN` et la
   continuité des I/O (`min_size=2`), mais le script ne lance aucune écriture/
   lecture pendant le halt — seul le retour `HEALTH_OK` est asserté. _Ramené à
@@ -99,7 +99,7 @@ unitaire Ansible (`molecule`).
 
 ### Mineur — `platform/` et `apps/` non couverts par aucun test
 
-- **Fichier** : `test/multi-node/run-phases.sh:254`
+- **Fichier** : `bench/multi-node/run-phases.sh:254`
 - **Constat** : registry, dashboard et RStudio sont déployés sans qu'aucun
   scénario ne vérifie leur fonctionnement (push/pull, accès, démarrage). _Ramené
   à mineur : le banc s'arrête avant de les déployer, et les comportements visés
@@ -115,8 +115,8 @@ unitaire Ansible (`molecule`).
 
 ### Mineur/Suggestion — Vagrantfile et `RESULTS.md` : commentaires obsolètes
 
-- **Fichier** : `test/multi-node/Vagrantfile:11-17,111-119`,
-  `test/RESULTS.md:9-13`
+- **Fichier** : `bench/multi-node/Vagrantfile:11-17,111-119`,
+  `bench/RESULTS.md:9-13`
 - **Constat** : en-têtes décrivant encore `10.0.0.x` / `/dev/sd*` contredits par
   le code (`192.168.67.x`, VirtIO `vd*`) ; un TODO résolu peut induire un
   opérateur à surcharger `CEPH_MIN_HDD=0` à tort.
@@ -128,6 +128,6 @@ unitaire Ansible (`molecule`).
   promis ne sont jamais calculés) → c'est un outil de diagnostic, pas un test.
   La suite n'a pas de récapitulatif PASS/FAIL ni d'isolation d'état entre
   scénarios destructifs.
-- **Recommandation** : implémenter les seuils ou ranger le 08 dans `test/tools/`
-  ; ajouter un `run-all.sh` produisant un tableau récapitulatif et vérifiant le
-  retour à `HEALTH_OK` entre scénarios destructifs.
+- **Recommandation** : implémenter les seuils ou ranger le 08 dans
+  `bench/tools/` ; ajouter un `run-all.sh` produisant un tableau récapitulatif
+  et vérifiant le retour à `HEALTH_OK` entre scénarios destructifs.

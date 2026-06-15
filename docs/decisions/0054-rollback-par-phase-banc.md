@@ -4,7 +4,7 @@
 
 Le banc se monte **phase par phase** par un chemin nommé codé
 ([ADR 0045](0045-chemins-installation-banc-couches.md)) :
-`test/lima/run-phases.sh ceph|sc|datalake|monitoring|dataops|gitops…`. Mais il
+`bench/lima/run-phases.sh ceph|sc|datalake|monitoring|dataops|gitops…`. Mais il
 n'existe **aucun moyen symétrique de DÉFAIRE une seule phase**. Pour re-tester
 une phase proprement (itération de développement/validation), on n'a que deux
 leviers, tous deux **globaux** :
@@ -43,10 +43,10 @@ total, réservé au banc jetable.** Cinq règles.
 
 ### 1. Symétrie d'invocation
 
-`test/lima/run-phases.sh rollback <phase>` défait ce que `run-phases.sh <phase>`
-a monté. La phase est nommée à l'identique (`ceph`, `sc`, `datalake`,
-`metrics-server`, `monitoring`, `dataops`, `gitops`, `gitops-seed`…). Couverture
-: **toutes les phases plateforme**.
+`bench/lima/run-phases.sh rollback <phase>` défait ce que
+`run-phases.sh <phase>` a monté. La phase est nommée à l'identique (`ceph`,
+`sc`, `datalake`, `metrics-server`, `monitoring`, `dataops`, `gitops`,
+`gitops-seed`…). Couverture : **toutes les phases plateforme**.
 
 ### 2. Stratégie d'effacement — gros grain
 

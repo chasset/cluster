@@ -69,7 +69,7 @@ casse le lint.
 l'implémentation)_.
 
 **Runs de preuve** : à consigner dans
-[`test/lima/RESULTS.md`](../../test/lima/RESULTS.md) ; un run `fail` est
+[`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md) ; un run `fail` est
 consigné au même titre qu'un succès
 ([ADR 0056](../decisions/0056-modele-declaratif-topologies.md) §8,
 [ADR 0052](../decisions/0052-reproductibilite-des-resultats.md)).

@@ -109,14 +109,14 @@ Skip si ns absent ; `mark ok/fail` sur deploy `marquez` (API) et `marquez-web`.
 
 ### G. Harnais E2E (clôt #148)
 
-- `test/lima/run-phases.sh` : phase `dataops-chain` (déploie monitoring → CNPG →
-  Dagster → Marquez avec gates `retry`, déploie un émetteur jetable
+- `bench/lima/run-phases.sh` : phase `dataops-chain` (déploie monitoring → CNPG
+  → Dagster → Marquez avec gates `retry`, déploie un émetteur jetable
   Dagster+sensor OpenLineage, lance un run réel, vérifie l'ingestion côté
   Marquez, teardown, récap + bloc RESULTS.md).
-- `test/scenarios/23-marquez-openlineage.sh` (calque du 22 : skip neutre,
+- `bench/scenarios/23-marquez-openlineage.sh` (calque du 22 : skip neutre,
   `STRICT_OL`).
-- Tests unitaires : `test/lima/dataops-assert.sh` (classificateurs purs) +
-  `test/unit/dataops-assert.bats`.
+- Tests unitaires : `bench/lima/dataops-assert.sh` (classificateurs purs) +
+  `bench/unit/dataops-assert.bats`.
 - `docs/architecture/chaine-dataops.md` : doc transverse (accès + actions
   vérifiables par brique).
 
@@ -124,9 +124,9 @@ Skip si ns absent ; `mark ok/fail` sur deploy `marquez` (API) et `marquez-web`.
 
 Banc Lima :
 `up → bootstrap → storage-simple → platform-prereqs → dataops-chain`, puis
-`test/scenarios/run-all.sh ONLY='23'`. Critère « done » (#148) : API/web Ready,
+`bench/scenarios/run-all.sh ONLY='23'`. Critère « done » (#148) : API/web Ready,
 migration Flyway OK, **lineage d'un run Dagster réel visible dans Marquez**, run
-consigné dans `test/lima/RESULTS.md`. CI : `pnpm lint` (inclut bats) +
+consigné dans `bench/lima/RESULTS.md`. CI : `pnpm lint` (inclut bats) +
 `pnpm docs:build` + markdownlint + trivy + `scripts/audit-image-digests.sh`.
 
 ## Hors scope (suites)
@@ -153,4 +153,5 @@ consigné dans `test/lima/RESULTS.md`. CI : `pnpm lint` (inclut bats) +
 sont livrés et mergés ; les détails par palier vivent dans le corps du plan.
 
 **Issues rattachées** (toutes fermées) : #130, #148, #161, #164. **Runs de
-preuve** : consignés dans [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md).
+preuve** : consignés dans
+[`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md).

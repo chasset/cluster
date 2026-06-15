@@ -4,7 +4,7 @@
 
 Le dépôt est un **catalogue de topologies**
 ([ADR 0023](0023-plateforme-exemple-generique.md)). Le spike
-[`test/spikes/clustermesh-latency/`](../../test/spikes/clustermesh-latency/)
+[`bench/spikes/clustermesh-latency/`](../../bench/spikes/clustermesh-latency/)
 explore une topologie **multi-site** : plusieurs clusters Kubernetes autonomes
 (un par site) fédérés par **Cilium Cluster Mesh**, sous latence inter-site
 simulée (`tc netem`). Migré de kind vers de vraies VMs Lima (#128), il exécute

@@ -32,7 +32,7 @@ ce cluster. Deux questions restaient implicites :
 Fait cadrant : le banc Lima de `cluster` monte déjà la **seule topologie locale,
 `multi-node-3`** (1 control-plane + 2 workers, quorum mon Ceph + réplication ×3,
 [ADR 0040](0040-terrains-x-topologies.md)), via
-[`test/lima/run-phases.sh`](../../test/lima/run-phases.sh) — phases
+[`bench/lima/run-phases.sh`](../../bench/lima/run-phases.sh) — phases
 idempotentes, gates, paramétré par inventaire/`group_vars` **non versionnés**
 surchargeant des `.example`. Le banc est prouvable **from-scratch**
 ([ADR 0034](0034-validation-e2e-from-scratch.md)). `atlas` n'a donc **pas à
@@ -48,7 +48,7 @@ GitOps (`sourceRepos`) devient une valeur surchargeable, défaut générique.**
    release `cluster` (tag, matrice de versions
    [ADR 0006](0006-matrice-de-versions-et-politique-de-bump.md)) expose le
    **harnais de banc complet** : `bootstrap/` (playbooks Ansible), `platform/`
-   (manifestes figés), `test/lima/` (montage `multi-node-3`) et
+   (manifestes figés), `bench/lima/` (montage `multi-node-3`) et
    [`contract/`](../../contract/) (interface). `atlas` **pinne une version** du
    socle et monte son banc avec ses propres `group_vars`/inventaire (non
    versionnés, patron `.example`). Ni sous-module, ni copie : une dépendance
@@ -76,8 +76,8 @@ GitOps (`sourceRepos`) devient une valeur surchargeable, défaut générique.**
    **Initialisation post-bootstrap** : Gitea est posé par le socle (Ansible,
    infra — il fait partie de ce qui doit converger _avant_ qu'Argo CD
    réconcilie). Une fois le bootstrap terminé, une **phase d'initialisation du
-   dépôt** (idempotente, dans le harnais `test/lima/`) crée l'organisation et le
-   dépôt dans Gitea, puis **seed/push** le contenu `atlas` (manifestes
+   dépôt** (idempotente, dans le harnais `bench/lima/`) crée l'organisation et
+   le dépôt dans Gitea, puis **seed/push** le contenu `atlas` (manifestes
    `Application`, code-locations) — c'est ce que l'`AppProject` réconciliera
    ensuite. Ordre :
    `bootstrap (infra + Gitea) → init dépôt Gitea (seed atlas) → Argo CD sync`.
@@ -101,7 +101,7 @@ GitOps (`sourceRepos`) devient une valeur surchargeable, défaut générique.**
    `webhook` du Service `argocd-server` existe déjà dans le bundle épinglé.
 
 5. **`multi-node-3`, stockage `local-path`.** Le banc `atlas` réutilise le
-   harnais existant (`test/lima/run-phases.sh`) tel quel — mêmes phases, mêmes
+   harnais existant (`bench/lima/run-phases.sh`) tel quel — mêmes phases, mêmes
    gates, même topologie ([ADR 0040](0040-terrains-x-topologies.md)) — en
    **profil `local-path`** (phase `storage-simple`, défaut du harnais ; **pas**
    `WITH_CEPH=1`). Justifié : `atlas` itère sur l'**applicatif/métier**, pas sur
@@ -124,7 +124,7 @@ GitOps (`sourceRepos`) devient une valeur surchargeable, défaut générique.**
    (`ServiceMonitor`, TLS), il ne les « lance » pas.
 
 7. **Test d'intégration end-to-end (gate de preuve).** La chaîne décidée ici est
-   validée par une **phase d'intégration** du harnais `test/lima/`, qui prouve
+   validée par une **phase d'intégration** du harnais `bench/lima/`, qui prouve
    le flux **complet** dans l'ordre — chaque étape est un **gate** (exit ≠ 0 si
    le critère n'est pas atteint), idempotent et rejouable comme les phases
    existantes ([ADR 0034](0034-validation-e2e-from-scratch.md)) :
@@ -138,7 +138,7 @@ GitOps (`sourceRepos`) devient une valeur surchargeable, défaut générique.**
    4. **DataOps tourne** : la code-location déployée exécute un run Dagster qui
       **réussit** et **émet du lineage** ingéré par Marquez — gate : réutilise
       la logique d'assertion existante
-      ([`dataops-assert.sh`](../../test/lima/dataops-assert.sh) :
+      ([`dataops-assert.sh`](../../bench/lima/dataops-assert.sh) :
       `classify_dagster_run`, `classify_marquez_ingest`).
 
    La logique de décision est **isolée et testée** (prédicats purs, couverts
@@ -165,7 +165,7 @@ Accepted (2026-06-09).
   versionnée, la valeur réelle (`atlas.git`) vit en config locale. Lève
   l'ambiguïté de l'`AppProject` sans graver une spécificité de déploiement.
 - **Prix à payer** : `cluster` doit **garantir** que le harnais de banc
-  (`bootstrap/` + `platform/` + `test/lima/`) reste consommable par un tiers —
+  (`bootstrap/` + `platform/` + `bench/lima/`) reste consommable par un tiers —
   c'est-à-dire que **toute** spécificité de déploiement passe bien par les
   `.example` surchargeables, jamais par un défaut versionné. Cette discipline,
   déjà imposée par ADR 0023, devient un **contrat envers `atlas`**.
@@ -198,7 +198,7 @@ Accepted (2026-06-09).
 - **À faire (suite)** : (a) rendre `sourceRepos` surchargeable dans
   [`appproject-atlas.yaml`](../../platform/argocd/appproject-atlas.yaml), défaut
   générique intra-banc ; (b) outiller **Gitea (infra) + la phase d'init du
-  dépôt** (seed atlas) dans le harnais `test/lima/` ; (c) **enregistrer le
+  dépôt** (seed atlas) dans le harnais `bench/lima/` ; (c) **enregistrer le
   webhook Gitea → Argo CD + poser le secret partagé** (`webhook.gitea.secret`) à
   l'init ; (d) documenter le flux « déployer depuis atlas » + l'observabilité
   (`ServiceMonitor` Prometheus, collecte Loki, annotation cert-manager) dans le

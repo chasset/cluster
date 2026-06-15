@@ -1,6 +1,6 @@
 # code: language=ansible
 # Rôle platform-metrics-server (ADR 0033/0049/0016) — Metrics API (kubectl top).
-# Porte la phase shell `phase_metrics_server` (test/lima/run-phases.sh) en rôle
+# Porte la phase shell `phase_metrics_server` (bench/lima/run-phases.sh) en rôle
 # Ansible : manifeste officiel figé (platform/metrics-server/metrics-server.yaml,
 # épinglé par digest ADR 0006) appliqué via kubernetes.core.k8s, puis gate sur
 # l'APIService agrégée v1beta1.metrics.k8s.io (ce qui rend `kubectl top` opérant,

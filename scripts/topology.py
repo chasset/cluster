@@ -124,12 +124,12 @@ _CATALOG_DIR = os.path.join(_ROOT, "topologies")
 _DEFAULT_TOPOLOGY = os.path.join(_ROOT, "topology.yaml")
 _EXAMPLE_TOPOLOGY = os.path.join(_CATALOG_DIR, "socle.example.yaml")
 _PROD_INVENTORY = os.path.join(_ROOT, "bootstrap", "hosts.example.yaml")
-_RUNS_HISTORY = os.path.join(_ROOT, "test", "lima", "runs-history.yaml")
+_RUNS_HISTORY = os.path.join(_ROOT, "bench", "lima", "runs-history.yaml")
 # Kubeconfig du banc Lima, écrit par run-phases.sh (KUBECONFIG_LOCAL = WORKDIR/kubeconfig).
 # `preview` lit l'état RÉEL du cluster via kubectl ; sans KUBECONFIG exporté, il retombe
 # ICI (sinon il interroge ~/.kube/config — pas le banc — et voit 0 nœud Ready alors que
 # le socle est monté : faux « à installer », scorie de fidélité du RÉEL).
-_BENCH_KUBECONFIG = os.path.join(_ROOT, "test", "lima", ".work", "kubeconfig")
+_BENCH_KUBECONFIG = os.path.join(_ROOT, "bench", "lima", ".work", "kubeconfig")
 # Borne l'attente du scan réel (preview/up) sur limactl/kubectl : un cluster injoignable ou
 # un démon Lima bloqué ne doit JAMAIS figer le refresh (leçon du timeout ha._vm_exec).
 _REFRESH_TIMEOUT_S = 8
@@ -586,7 +586,7 @@ def cmd_destroy(args: argparse.Namespace) -> int:
 
     # Délégation à run-phases.sh down <vm…> (bash garde limactl, ADR 0049).
     rc = subprocess.run(  # noqa: S603 — chemin codé, noms de VM contrôlés (topo validée)
-        ["bash", os.path.join(_ROOT, "test", "lima", "run-phases.sh"), "down", *targets],
+        ["bash", os.path.join(_ROOT, "bench", "lima", "run-phases.sh"), "down", *targets],
         check=False,
     ).returncode
     if rc != 0:
@@ -842,7 +842,7 @@ def cmd_access(args: argparse.Namespace) -> int:
 
     Façade fine (ADR 0049/0017) : l'orchestration (Gateways, forwards SSH, /etc/hosts
     `*.cluster.lan`, secrets/tokens LUS du cluster, `.env` atlas) vit dans
-    `test/lima/access.sh` (ADR 0048), du bash irréductible (limactl/ssh). On délègue
+    `bench/lima/access.sh` (ADR 0048), du bash irréductible (limactl/ssh). On délègue
     via l'arm `run-phases.sh access`, en passant les options telles quelles
     (`--stop` / `--print-hosts` / `--no-hosts`). Code 0/1 = celui de access.sh ; 2 si
     le banc n'a pas de kubeconfig (socle non monté)."""
@@ -861,7 +861,7 @@ def cmd_access(args: argparse.Namespace) -> int:
         )
         if on
     ]
-    runphases = os.path.join(_ROOT, "test", "lima", "run-phases.sh")
+    runphases = os.path.join(_ROOT, "bench", "lima", "run-phases.sh")
     return subprocess.run(  # noqa: S603 — chemin codé, flags d'un set fixe
         ["bash", runphases, "access", *flags],
         check=False,
@@ -1160,7 +1160,7 @@ def cmd_up(args: argparse.Namespace) -> int:
     # qui ne matchait jamais la stack → PLAN « à installer » alors que la stack est montée.
     # Preset nommé (run-phases.sh <chemin>) OU arm générique `layers <seq>` (palier
     # non-préfixe) : dans les deux cas bash exécute, Python a décidé l'ordre.
-    runphases = os.path.join(_ROOT, "test", "lima", "run-phases.sh")
+    runphases = os.path.join(_ROOT, "bench", "lima", "run-phases.sh")
     if layers_seq is not None:
         argv = ["bash", runphases, "layers", ",".join(layers_seq)]
         libelle = f"layers [{', '.join(topo.declared_layers)}]"
@@ -1302,7 +1302,7 @@ def cmd_ha_3cp(args: argparse.Namespace) -> int:
         """Rappel d'un sous-commande de run-phases.sh (bash garde VM/CNI/inventaire,
         ADR 0049). Renvoie le code de sortie."""
         return subprocess.run(  # noqa: S603 — chemin codé, arguments contrôlés
-            ["bash", os.path.join(_ROOT, "test", "lima", "run-phases.sh"), *cmd],
+            ["bash", os.path.join(_ROOT, "bench", "lima", "run-phases.sh"), *cmd],
             check=False,
         ).returncode
 
@@ -1398,7 +1398,7 @@ def cmd_bootstrap_seq(args: argparse.Namespace) -> int:
         return subprocess.run(  # noqa: S603 — chemin codé, arguments contrôlés
             [
                 "bash",
-                os.path.join(_ROOT, "test", "lima", "run-phases.sh"),
+                os.path.join(_ROOT, "bench", "lima", "run-phases.sh"),
                 "ha-cni",
                 args.l2_iface,
                 lb_prefix,
@@ -1702,7 +1702,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--all", action="store_true", help="tous les chemins nommés (pas que la stack)"
     )
     p_runs.add_argument(
-        "--history", default=None, help="chemin du runs-history.yaml (défaut : test/lima/)"
+        "--history", default=None, help="chemin du runs-history.yaml (défaut : bench/lima/)"
     )
 
     p_prev = sub.add_parser(
@@ -1714,7 +1714,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--target", default=None, help="chemin nommé visé (défaut : déduit de la stack active)"
     )
     p_prev.add_argument(
-        "--history", default=None, help="chemin du runs-history.yaml (défaut : test/lima/)"
+        "--history", default=None, help="chemin du runs-history.yaml (défaut : bench/lima/)"
     )
 
     p_env = sub.add_parser(
@@ -1774,7 +1774,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--target", default=None, help="chemin nommé visé (défaut : déduit du profil+backend)"
     )
     p_next.add_argument(
-        "--history", default=None, help="chemin du runs-history.yaml (défaut : test/lima/)"
+        "--history", default=None, help="chemin du runs-history.yaml (défaut : bench/lima/)"
     )
 
     p_met = artifact_sub.add_parser(
@@ -1787,7 +1787,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_met.add_argument("--all", action="store_true", help="tous les runs (pas que la stack active)")
     p_met.add_argument(
-        "--history", default=None, help="chemin du runs-history.yaml (défaut : test/lima/)"
+        "--history", default=None, help="chemin du runs-history.yaml (défaut : bench/lima/)"
     )
 
     # ── Groupe `test` (noun-verb) : épreuves jouables + réversibilité ─────────────

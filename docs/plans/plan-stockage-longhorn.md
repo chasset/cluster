@@ -32,7 +32,7 @@ troisième, sans inventer de mécanique nouvelle :
   (`longhorn`), défauts génériques
   ([ADR 0023](../decisions/0023-plateforme-exemple-generique.md)).
 - **Profil de déploiement** : une variable `WITH_LONGHORN` (ou un profil nommé
-  `longhorn`) dans `test/lima/run-phases.sh`, symétrique de `WITH_CEPH`, qui
+  `longhorn`) dans `bench/lima/run-phases.sh`, symétrique de `WITH_CEPH`, qui
   bascule la StorageClass par défaut et dimensionne la VM (réplication ×2/×3
   exige ≥ 2-3 nœuds — la topologie de référence `multi-node-3` convient).
 - **Stockage composé** : si le profil Longhorn a besoin d'objet S3 (Loki,
@@ -42,9 +42,9 @@ troisième, sans inventer de mécanique nouvelle :
 
 ```bash
 # Symétrie visée avec les profils existants :
-test/lima/run-phases.sh storage-simple          # local-path
-WITH_CEPH=1     test/lima/run-phases.sh ceph     # Rook-Ceph
-WITH_LONGHORN=1 test/lima/run-phases.sh longhorn # Longhorn (cible de ce plan)
+bench/lima/run-phases.sh storage-simple          # local-path
+WITH_CEPH=1     bench/lima/run-phases.sh ceph     # Rook-Ceph
+WITH_LONGHORN=1 bench/lima/run-phases.sh longhorn # Longhorn (cible de ce plan)
 ```
 
 ## Périmètre — ce que Longhorn fait / ne fait pas (ADR 0064)
@@ -74,7 +74,7 @@ WITH_LONGHORN=1 test/lima/run-phases.sh longhorn # Longhorn (cible de ce plan)
    applique le manifeste, attend `Ready`, pose la SC par défaut (exactement
    une), défauts génériques ADR 0023. + playbook `bootstrap/longhorn.yaml`.
 3. **Profil banc** — `WITH_LONGHORN` / phase `longhorn` dans
-   `test/lima/run-phases.sh` (symétrique `WITH_CEPH`), dimensionnement VM,
+   `bench/lima/run-phases.sh` (symétrique `WITH_CEPH`), dimensionnement VM,
    bascule SC par défaut. Fonctions pures testables **bats** si logique non
    triviale ([ADR 0017](../decisions/0017-langage-des-scripts.md)).
 4. **Rollback** — `rollback longhorn` dans le dispatch existant
@@ -83,7 +83,7 @@ WITH_LONGHORN=1 test/lima/run-phases.sh longhorn # Longhorn (cible de ce plan)
    (`/var/lib/longhorn`). À garder en phase avec ce que le rôle crée.
 5. **Preuve de banc** (ADR 0034/0052) — run e2e : monte `longhorn` → PVC
    répliqué → **tue un nœud, vérifie la survie I/O** → remonte. Consigner un
-   cycle dans `test/lima/RESULTS.md`. **Sans ce run, le profil reste déclaré
+   cycle dans `bench/lima/RESULTS.md`. **Sans ce run, le profil reste déclaré
    mais non prouvé.**
 6. **Doc** — câbler le profil dans la doc : `docs/composants.md` (pile briques),
    `docs/architecture/decisions-stockage.md` (bilan 3 options — déjà rédigé),

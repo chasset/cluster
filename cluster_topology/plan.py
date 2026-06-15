@@ -8,7 +8,7 @@ l'affaire de la couche d'exécution `runner.py` (ADR 0063 G5), appelée par la
 façade `next` sur décision humaine explicite (`--apply`).
 
 L'ordre des phases est une **transcription fidèle** des arms de
-`test/lima/run-phases.sh` (chemins nommés `socle`/`atlas`/`storage-real`/
+`bench/lima/run-phases.sh` (chemins nommés `socle`/`atlas`/`storage-real`/
 `cluster-dataops`/`atlas-ceph`) — il ne le réinvente pas (ADR 0063 G3 / ADR 0045).
 La fraîcheur réutilise `history.verdict_for_run` ; le faisceau `-e` réutilise
 `profile.derive_run_params` (zéro logique dupliquée).

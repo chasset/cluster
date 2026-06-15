@@ -65,7 +65,7 @@ Accepted (2026-06-01).
   ADR 0006 avant. Le playbook `assert` la présence d'une version cible mais ne
   vérifie pas la compat croisée (responsabilité de l'opérateur).
 - **Validation banc obligatoire** : un upgrade raté en prod est coûteux →
-  rejouer sur `test/multi-node/` d'abord.
+  rejouer sur `bench/multi-node/` d'abord.
 
 ## À revoir
 

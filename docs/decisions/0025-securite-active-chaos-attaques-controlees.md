@@ -3,11 +3,11 @@
 ## Contexte
 
 Le dépôt valide sa sécurité par **15 scénarios**
-([`test/scenarios/`](../../test/scenarios/)) qui exercent la **défense passive**
-: PSA **rejette** un pod dangereux (10), NetworkPolicy **coupe** l'egress (11),
-`securityContext` contraint le runtime (12), WireGuard **chiffre** le trafic
-pod-to-pod (14), etcd **chiffre** les Secrets at-rest (15). Tous posent une
-contrainte et vérifient qu'elle **est en place**.
+([`bench/scenarios/`](../../bench/scenarios/)) qui exercent la **défense
+passive** : PSA **rejette** un pod dangereux (10), NetworkPolicy **coupe**
+l'egress (11), `securityContext` contraint le runtime (12), WireGuard
+**chiffre** le trafic pod-to-pod (14), etcd **chiffre** les Secrets at-rest
+(15). Tous posent une contrainte et vérifient qu'elle **est en place**.
 
 Une reconnaissance de la posture sécurité a établi deux manques structurels :
 
@@ -99,7 +99,7 @@ que **strictement encadrée** :
 1. **Banc isolé jetable UNIQUEMENT.** Les scénarios 16-22 ne tournent **JAMAIS**
    contre une topologie réelle, une production, ni un nœud qui n'est pas un banc
    de test reconstructible. Cibles autorisées : banc Lima/kubeadm
-   (`test/spikes/banc-lima-kubeadm/`), banc Vagrant `192.168.67.0/24`, ou tout
+   (`bench/spikes/banc-lima-kubeadm/`), banc Vagrant `192.168.67.0/24`, ou tout
    cluster **explicitement marqué jetable**.
 2. **Jamais de cible tierce.** Le brute-force SSH ne vise que les nœuds du banc
    ; aucun scan, aucune attaque, aucune exfiltration vers une adresse ou un hôte

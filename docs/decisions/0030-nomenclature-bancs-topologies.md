@@ -6,7 +6,7 @@ Le dépôt est un catalogue de topologies
 ([ADR 0023](0023-plateforme-exemple-generique.md)) et porte désormais plusieurs
 bancs de test locaux — Vagrant mono-VM, Vagrant multi-VM, banc Lima, spike
 Cilium Cluster Mesh — **sans nomenclature**. On les désigne par leur **chemin**
-(`test/multi-node/`, `test/lima/`), ce qui mélange deux choses distinctes : la
+(`bench/multi-node/`, `bench/lima/`), ce qui mélange deux choses distinctes : la
 **topologie** validée (forme du cluster) et l'**outil** qui la monte (Vagrant,
 Lima). Un même chemin sous-entend un outil ; or une topologie peut tourner sur
 plusieurs outils (le multi-node-3 existe en Vagrant **et** en Lima). Sans noms
@@ -34,12 +34,12 @@ control planes quand c'est discriminant.
 Règles :
 
 - **Le nom décrit la topologie, jamais l'outil.** `multi-node-3` tourne
-  aujourd'hui sur Vagrant (`test/multi-node/`) **et** sur Lima (`test/lima/`) :
-  même nom, deux lignes dans la table (colonne « Outil » différente).
-- **Source de vérité de la table** : [`test/README.md`](../../test/README.md),
+  aujourd'hui sur Vagrant (`bench/multi-node/`) **et** sur Lima (`bench/lima/`)
+  : même nom, deux lignes dans la table (colonne « Outil » différente).
+- **Source de vérité de la table** : [`bench/README.md`](../../bench/README.md),
   enrichi d'une colonne « Nom technique ». La matrice du catalogue et les
   RESULTS.md référencent ces noms.
-- **Pas de renommage de dossiers dans ce chantier.** Les chemins `test/*/`
+- **Pas de renommage de dossiers dans ce chantier.** Les chemins `bench/*/`
   restent inchangés (renommer est invasif — chemins dans scripts, CI, docs — et
   fera l'objet d'une décision séparée si besoin). Le nom technique est une
   **étiquette logique**, pas le dossier.
@@ -56,8 +56,8 @@ Accepted.
   matrice (#171) et les RESULTS.md gagnent une clé de jointure ; l'écart entre
   topologies `cible` et `buildé` devient lisible.
 - **Prix à payer** : une indirection nom ↔ dossier tant que les dossiers ne sont
-  pas renommés (`multi-node-3` vit sous `test/multi-node/` ou `test/lima/`). La
-  colonne « Dossier » de la table lève l'ambiguïté.
+  pas renommés (`multi-node-3` vit sous `bench/multi-node/` ou `bench/lima/`).
+  La colonne « Dossier » de la table lève l'ambiguïté.
 - **Évolution** : ajouter une topologie = une ligne dans la table + (si buildée)
   un run consigné. `ha-3cp` et `multisite` sont nommés d'avance pour que les
   issues de cadrage (catalogue, terrain cloud) s'y réfèrent dès maintenant.

@@ -9,12 +9,12 @@ câblée.
 Ce document est la **carte d'accès** unifiée ; le détail de déploiement de
 chaque brique vit dans son `README` (lié dans le tableau). La validation
 assemblée est portée par le harnais
-[`dataops-chain`](../../test/lima/run-phases.sh) (#148).
+[`dataops-chain`](../../bench/lima/run-phases.sh) (#148).
 
 > **Valeurs génériques (ADR 0023).** Les URLs `https://<svc>.cluster.lan` sont
 > des **placeholders** : sur une topologie réelle, l'administrateur réseau
 > substitue le hostname. Les commandes console supposent un `kubectl` pointant
-> le cluster (sur le banc Lima : `KUBECONFIG=test/lima/.work/kubeconfig`).
+> le cluster (sur le banc Lima : `KUBECONFIG=bench/lima/.work/kubeconfig`).
 
 ## Flux d'ensemble
 
@@ -67,9 +67,9 @@ dans son UI. L'observabilité (Prometheus/Loki/Mailpit) est transverse.
 Le maillon qui prouve que tout est câblé est **Dagster → Marquez** : un run réel
 émet du lineage que Marquez ingère.
 
-- **Automatisé** : `test/lima/run-phases.sh dataops-chain` déploie la chaîne,
+- **Automatisé** : `bench/lima/run-phases.sh dataops-chain` déploie la chaîne,
   lance un run émetteur réel et vérifie l'ingestion ; puis
-  `test/scenarios/run-all.sh ONLY='23'` re-vérifie l'assertion isolément.
+  `bench/scenarios/run-all.sh ONLY='23'` re-vérifie l'assertion isolément.
 - **À la main, dans le navigateur** :
   1. ouvrir l'UI Dagster (`dagster.cluster.lan`), lancer un run d'un asset ;
   2. ouvrir l'UI Marquez (`marquez.cluster.lan`), namespace `dagster` → le
@@ -78,7 +78,7 @@ Le maillon qui prouve que tout est câblé est **Dagster → Marquez** : un run 
   3. en console :
      `kubectl -n postgres exec -it pg-1 -- psql -d marquez -c '\dt'` montre les
      tables Flyway peuplées.
-- **État de validation** : [résultats du banc Lima](../../test/lima/RESULTS.md)
+- **État de validation** : [résultats du banc Lima](../../bench/lima/RESULTS.md)
   (section « Chaîne DataOps assemblée »).
 
 ## Voir aussi

@@ -4,7 +4,7 @@
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Date**     | 2026-06-13                                                                                                                                             |
 | **Type**     | cartographie en éventail (lecteurs + synthèse adversariale)                                                                                            |
-| **Fonde**    | [ADR 0066](../../decisions/0066-rollback-atomique-graphe-composants.md) Lot 0 — graphe atomique encodé dans `test/lima/rollback-lib.sh`                |
+| **Fonde**    | [ADR 0066](../../decisions/0066-rollback-atomique-graphe-composants.md) Lot 0 — graphe atomique encodé dans `bench/lima/rollback-lib.sh`               |
 | **Éventail** | 5 agents (lecture des rôles Ansible / manifestes / `run-phases.sh`, recoupement croisé)                                                                |
 | **Verdict**  | 23 composants atomiques + 30+ arêtes confirmés contre le code ; ordre de montage reproduit l'ordre codé `atlas-ceph` ; 8 pièges structurels identifiés |
 
@@ -74,12 +74,12 @@ graphe), désormais satisfaite.
 
 ## Ce qui en est sorti
 
-Le graphe a été encodé dans `test/lima/rollback-lib.sh` **à côté** des fonctions
-par phase (rien retiré — Lot 0), prouvé par **48 invariants bats** sans banc
-(trivialité + unicité du possesseur, acyclicité, déterminisme, ownership des
-OBC, reproduction de l'ordre codé, garde-fou anti-GC des CRD partagées). La
-bascule du rollback réel (Lot 3) et du montage (Lot 4) suivra, **prouvée par
-run** de banc
+Le graphe a été encodé dans `bench/lima/rollback-lib.sh` **à côté** des
+fonctions par phase (rien retiré — Lot 0), prouvé par **48 invariants bats**
+sans banc (trivialité + unicité du possesseur, acyclicité, déterminisme,
+ownership des OBC, reproduction de l'ordre codé, garde-fou anti-GC des CRD
+partagées). La bascule du rollback réel (Lot 3) et du montage (Lot 4) suivra,
+**prouvée par run** de banc
 ([ADR 0034](../../decisions/0034-validation-e2e-from-scratch.md)/[0052](../../decisions/0052-reproductibilite-des-resultats.md)).
 
 > Première entrée de la 4ᵉ trace empirique

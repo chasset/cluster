@@ -4,14 +4,14 @@
 #
 # Lib PARTAGÉE consommée par deux frontaux :
 #   - bootstrap/state.sh           (prod  : collecte SSH + kubectl, puis classe)
-#   - test/lima/run-phases.sh      (banc  : collecte kubectl --kubeconfig, puis classe)
+#   - bench/lima/run-phases.sh      (banc  : collecte kubectl --kubeconfig, puis classe)
 #
 # Comme bootstrap/lib/state-classify.sh, ces fonctions ne font NI SSH, NI
 # kubectl : elles prennent en entrée des valeurs DÉJÀ collectées par le frontal
 # (compteurs, chaînes, champs jsonpath) et renvoient un verdict `STATUS|message`
 # sur stdout, où STATUS ∈ {ok, fail, skip}. Le frontal collecte (réseau), la
 # fonction classe (décision testable). But : rendre la logique de verdict de
-# l'audit cluster testable SANS cluster (bats — test/unit/health-classify.bats).
+# l'audit cluster testable SANS cluster (bats — bench/unit/health-classify.bats).
 #
 # Convention de sortie : une ligne "STATUS|message". L'appelant découpe sur le
 # premier '|' (cf. mark_classified dans state.sh). Aucune fonction n'écrit

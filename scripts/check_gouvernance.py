@@ -201,7 +201,7 @@ class Repo:
         return sorted(d for d in os.listdir(base) if re.match(r"^\d{4}-\d{2}-\d{2}$", d))
 
     def scenarios(self) -> list[str]:
-        return _git_files(os.path.join("test", "scenarios", "[0-9]*.sh"), self.root)
+        return _git_files(os.path.join("bench", "scenarios", "[0-9]*.sh"), self.root)
 
 
 # ── Règles (orchestrent les fonctions pures sur le dépôt) ───────────────────

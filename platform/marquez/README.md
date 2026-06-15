@@ -66,10 +66,10 @@ docker buildx build --platform linux/arm64 \
 
 > **Banc Lima.** Les pré-requis transverses (CRDs Gateway API, containerd vers
 > le registry HTTP `registry:80`) sont posés par
-> `test/lima/run-phases.sh platform-prereqs`. La validation e2e assemblée
+> `bench/lima/run-phases.sh platform-prereqs`. La validation e2e assemblée
 > (chaîne `monitoring → CNPG → Dagster → Marquez` + lineage réel) est portée par
-> `test/lima/run-phases.sh dataops-chain` — cf.
-> [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md) (#148).
+> `bench/lima/run-phases.sh dataops-chain` — cf.
+> [`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md) (#148).
 
 ## Déploiement — ordre
 

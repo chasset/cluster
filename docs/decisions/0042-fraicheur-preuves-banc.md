@@ -4,7 +4,7 @@
 
 [ADR 0034](0034-validation-e2e-from-scratch.md) pose que la **preuve** de
 validation est un run e2e from-scratch consigné (log archivé sous
-`test/lima/runs/`, synthèse dans `test/lima/RESULTS.md`), jamais le passage au
+`bench/lima/runs/`, synthèse dans `bench/lima/RESULTS.md`), jamais le passage au
 vert du lint. Mais rien ne **garantit que ces preuves restent fraîches** : le
 code évolue (PR après PR) tandis que le dernier run consigné peut dater de
 plusieurs jours/semaines. La doc finit par affirmer « validé » sur la foi d'un
@@ -19,9 +19,9 @@ consignées** (par un humain, en local) et **alerter** quand elles vieillissent.
 
 Deux familles de preuves à surveiller :
 
-- **e2e from-scratch** (`test/lima/run-phases.sh`) — monte tout depuis zéro ;
+- **e2e from-scratch** (`bench/lima/run-phases.sh`) — monte tout depuis zéro ;
   consigné dans `runs/<date>-*.log` + `RESULTS.md`.
-- **scénarios** (`test/scenarios/NN-*.sh`) — épreuves sur banc monté ; leur
+- **scénarios** (`bench/scenarios/NN-*.sh`) — épreuves sur banc monté ; leur
   statut d'exécution vit dans la matrice (§ « scénarios exécutés »).
 
 ## Décision
@@ -51,7 +51,7 @@ dernier run consigné dépasse un seuil — sans bloquer les PR.**
 3. **Source de fraîcheur = un champ daté machine-lisible**, pas le mtime Git (le
    checkout CI ne préserve pas les dates de fichiers). Le run consigne sa date
    dans un artefact versionné dédié — l'**historique des runs**
-   (`test/lima/runs-history.yaml`, cf. backlog métriques) ou, à défaut, la date
+   (`bench/lima/runs-history.yaml`, cf. backlog métriques) ou, à défaut, la date
    en tête du dernier `runs/<date>-*.log`. Le garde-fou lit ce champ.
 4. **Couplage avec la consignation.** La fraîcheur n'a de sens que si chaque run
    s'enregistre. `run-phases.sh` doit **append** une entrée datée (id, tuple,

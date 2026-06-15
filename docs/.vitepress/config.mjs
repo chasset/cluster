@@ -28,7 +28,7 @@ export default defineConfig({
     /\/Dockerfile$/,
     // Dossiers de code liés depuis la doc (VitePress les résout en /index) :
     /\/(roles|lib|templates|files|examples)\//,
-    /\/test\/unit\//,
+    /\/bench\/unit\//,
   ],
 
   srcExclude: [
@@ -40,7 +40,7 @@ export default defineConfig({
     'docs/.vitepress/**',
   ],
 
-  // Map every README.md to its directory's index.md so URLs like /test/,
+  // Map every README.md to its directory's index.md so URLs like /bench/,
   // /bootstrap/, /storage/ceph/ resolve cleanly.
   rewrites: (id) => {
     if (id === 'README.md') return 'index.md'
@@ -59,7 +59,7 @@ export default defineConfig({
       { text: 'Glossaire', link: '/docs/glossaire' },
       { text: 'Décisions (ADR)', link: '/docs/decisions/' },
       { text: 'Audit', link: '/docs/audit/' },
-      { text: 'Banc de test', link: '/test/' },
+      { text: 'Banc de test', link: '/bench/' },
     ],
     sidebar: [
       {
@@ -129,11 +129,11 @@ export default defineConfig({
       {
         text: 'Banc de test (Lima)',
         items: [
-          { text: "Vue d'ensemble", link: '/test/' },
-          { text: 'Banc Lima (multi-nœuds)', link: '/test/lima/' },
-          { text: 'Journal des runs Lima (courant)', link: '/test/lima/RESULTS' },
-          { text: 'Historique Vagrant (déprécié)', link: '/test/RESULTS' },
-          { text: 'Scénarios reproductibles', link: '/test/scenarios/' },
+          { text: "Vue d'ensemble", link: '/bench/' },
+          { text: 'Banc Lima (multi-nœuds)', link: '/bench/lima/' },
+          { text: 'Journal des runs Lima (courant)', link: '/bench/lima/RESULTS' },
+          { text: 'Historique Vagrant (déprécié)', link: '/bench/RESULTS' },
+          { text: 'Scénarios reproductibles', link: '/bench/scenarios/' },
         ],
       },
       {

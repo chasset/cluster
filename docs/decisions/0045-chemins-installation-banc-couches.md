@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Le harnais de banc [`test/lima/run-phases.sh`](../../test/lima/run-phases.sh)
+Le harnais de banc [`bench/lima/run-phases.sh`](../../bench/lima/run-phases.sh)
 expose une douzaine de phases (`up`, `bootstrap`, `storage-simple`, `ceph`,
 `sc`, `datalake`, `dataops`, `gitops`, `monitoring`…) et un agrégat `all`. Au
 fil des ajouts (DataOps #173, métrologie #219, socle GitOps #230), `all` a pris
@@ -87,7 +87,7 @@ n'est un fourre-tout :
   StorageClass Ceph (`rook-ceph-block-replicated`) de
   [`storage/ceph/wordpress/`](../../storage/ceph/wordpress/) est **Bound** et le
   Pod **Ready** ; (2) **smoke-test S3 sur le RGW** — PUT/GET/DELETE réel via
-  [`scénario 06`](../../test/scenarios/06-object-store-smoke.sh)
+  [`scénario 06`](../../bench/scenarios/06-object-store-smoke.sh)
   ([`smoke-test.sh`](../../storage/ceph/storageClass/datalake/smoke-test.sh)).
   **Ni `monitoring` ni `dataops`** dans ce chemin : il prouve le **stockage**
   (bloc + objet), pas la chaîne applicative. C'est aussi le banc Ceph monté qui
@@ -150,10 +150,10 @@ le [plan de tests](../architecture/plan-de-tests.md) (couverture par couche +
 lacunes à combler) :
 
 - **Unitaire** — assertion pure (logique de décision isolée, hors cluster,
-  `test/unit/*.bats`, ADR 0017).
+  `bench/unit/*.bats`, ADR 0017).
 - **Intégration** — **gate de phase** (`run-phases.sh`) : vérification bloquante
   en fin de phase (exit ≠ 0 sinon), sur cluster réel.
-- **Scénario** — comportement de bout en bout (`test/scenarios/NN-*.sh`) :
+- **Scénario** — comportement de bout en bout (`bench/scenarios/NN-*.sh`) :
   résilience, sécurité, observabilité, **et la chaîne GitOps→DataOps** (sc. 27).
 
 Synthèse par couche (le détail des 3 niveaux est dans le plan de tests) :
@@ -275,10 +275,10 @@ second axe combinable avec tout chemin, indépendant du stockage.
   distinction `socle` (rapide) vs `atlas` (complet), pour ne pas alourdir le
   smoke.
 - **Implémentation (#237)** : cibles nommées dans
-  [`test/lima/run-phases.sh`](../../test/lima/run-phases.sh) — `socle`, `atlas`
-  (`monitoring` avant `gitops`+`dataops`), `storage-real`, `cluster-dataops` ;
-  `all` retiré. Reste à consigner un run from-scratch de chaque chemin (ADR
-  0034/0042).
+  [`bench/lima/run-phases.sh`](../../bench/lima/run-phases.sh) — `socle`,
+  `atlas` (`monitoring` avant `gitops`+`dataops`), `storage-real`,
+  `cluster-dataops` ; `all` retiré. Reste à consigner un run from-scratch de
+  chaque chemin (ADR 0034/0042).
 - **Politique de couverture explicite (§6)** : on sait désormais quels chemins
   doivent rester prouvés (`atlas` 7 j, `storage-real` 30 j, `cluster-dataops` 90
   j) et quels scénarios chacun scelle — la dérive « un chemin frais en masque un

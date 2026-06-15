@@ -2,7 +2,7 @@
 #
 # Un « drift » = un écart révélé par un run e2e que le lint ne voyait pas. Ce
 # fichier est LE catalogue indexé ; les pages de synthèse (lecons-des-runs.md) et
-# les journaux de campagne (test/lima/RESULTS.md) y RÉFÈRENT par id, sans
+# les journaux de campagne (bench/lima/RESULTS.md) y RÉFÈRENT par id, sans
 # dupliquer le détail. Le drift est la 3e trace EMPIRIQUE de la cartographie
 # documentaire, à côté des passages d'audit et de RESULTS.md (ADR 0058 §6).
 #
@@ -22,11 +22,11 @@
 #               statut = corrige/caduc (clos par construction).
 #
 # Couverture : L1–L56. Les pages de synthèse (lecons-des-runs.md) et les journaux
-# de campagne (test/RESULTS.md banc Vagrant déprécié, test/lima/RESULTS.md banc
+# de campagne (bench/RESULTS.md banc Vagrant déprécié, bench/lima/RESULTS.md banc
 # courant) RÉFÈRENT à ce registre par id. Le préfixe L = banc Lima (source
 # canonique des fiches L1–L40) ; le banc Vagrant numérotait ses propres écarts
 # (0a–0e, #3–#26), repris ici par leur Lnn quand il existe — sinon laissés dans
-# test/RESULTS.md (artefacts du banc abandonné, ADR 0038).
+# bench/RESULTS.md (artefacts du banc abandonné, ADR 0038).
 
 drifts:
   # ── Bootstrap K8s sur Lima (#127 / #144) — L1–L11 ────────────────────────
@@ -628,7 +628,7 @@ drifts:
       bootstrap/ansible.cfg. La config du dépôt n'était donc jamais chargée par le
       banc (roles_path marchait par chance).
     correctif: >-
-      Exporter `ANSIBLE_CONFIG="${REPO}/bootstrap/ansible.cfg"` dans test/lima/lib.sh
+      Exporter `ANSIBLE_CONFIG="${REPO}/bootstrap/ansible.cfg"` dans bench/lima/lib.sh
       (couvre toutes les invocations du banc). Validé : warnings disparus, run vert
       sous inject_facts_as_vars=False.
     statut: corrige
@@ -699,12 +699,12 @@ drifts:
     campagne: "chemins d'installation + scénarios atlas (#237)"
     portee: harnais
     symptome: >-
-      `KUBECONFIG=test/lima/.work/kubeconfig ONLY=… test/scenarios/run-all.sh`
+      `KUBECONFIG=bench/lima/.work/kubeconfig ONLY=… bench/scenarios/run-all.sh`
       (chemin RELATIF) : tous les scénarios échouent ou skippent à tort
       (`connection to localhost:8080 refused`), alors qu'un `kubectl` direct avec
       le même kubeconfig joint bien le cluster.
     cause: >-
-      `run-all.sh` fait `cd "$(dirname …)"` (dans test/scenarios/) au démarrage.
+      `run-all.sh` fait `cd "$(dirname …)"` (dans bench/scenarios/) au démarrage.
       Un KUBECONFIG en chemin relatif au CWD d'appel devient invalide après ce
       `cd` → kubectl retombe sur le contexte par défaut (localhost:8080).
     correctif: >-

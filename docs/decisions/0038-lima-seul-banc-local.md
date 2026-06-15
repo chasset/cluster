@@ -39,10 +39,10 @@ d'être un axe du catalogue : il devient un _attribut dérivé du terrain_.**
    × briques. Le provisioner est une **colonne d'information**, déterminée par
    le terrain.
 3. **Vagrant / VirtualBox : _deprecated_.** Conservés en l'état pour
-   l'**historique des Runs** (`test/RESULTS.md`, banc Vagrant 28→31/05 — on ne
+   l'**historique des Runs** (`bench/RESULTS.md`, banc Vagrant 28→31/05 — on ne
    réécrit pas le passé, [ADR 0023](0023-plateforme-exemple-generique.md)), mais
    **plus maintenus ni retestés**, et retirés des valeurs **actives** du
-   catalogue. Le code (`test/multi-node/`, `test/single-node/` Vagrant) n'est
+   catalogue. Le code (`bench/multi-node/`, `bench/single-node/` Vagrant) n'est
    pas supprimé maintenant — il porte la trace d'un build réel — mais n'évolue
    plus.
 4. **kind / k3d : écartés** (rappel) — voies de provisioning conteneur non

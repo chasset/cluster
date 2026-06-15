@@ -64,9 +64,9 @@ git ; son interface est elle-même exposée par cette chaîne (Gateway + cert).
 
 ## Ce qui a été validé sur le banc
 
-Banc `test/multi-node` (3 VM Debian arm64, K8s 1.34.8, Cilium 1.19.4). Détail
+Banc `bench/multi-node` (3 VM Debian arm64, K8s 1.34.8, Cilium 1.19.4). Détail
 chronologique et findings : [validation-banc.md](validation-banc.md) et le
-journal brut [`test/RESULTS.md`](../../test/RESULTS.md).
+journal brut [`bench/RESULTS.md`](../../bench/RESULTS.md).
 
 | Couche                                         | Validé banc  | Preuve observée                                                                                                                            |
 | ---------------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |

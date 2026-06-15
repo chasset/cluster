@@ -23,19 +23,19 @@ profil léger `local-path` (pas de [Ceph](composants.md#rook-ceph) — ADR
 
 ```bash
 # socle léger → monitoring → gitops (Gitea + Argo CD) → dataops → gitops-seed
-test/lima/run-phases.sh atlas
-# (variante stockage réel : test/lima/run-phases.sh atlas-ceph)
+bench/lima/run-phases.sh atlas
+# (variante stockage réel : bench/lima/run-phases.sh atlas-ceph)
 ```
 
 La dernière phase, **`gitops-seed`**
-([`test/lima/gitea-init.sh`](../test/lima/gitea-init.sh)), initialise le dépôt
+([`bench/lima/gitea-init.sh`](../bench/lima/gitea-init.sh)), initialise le dépôt
 Gitea du banc : elle crée l'organisation `atlas` + le dépôt `workflows`, y
 pousse un **workflow jouet**, pose le **webhook** Gitea → Argo CD et
 l'`Application` `atlas-workflows`. À partir de là, tout `push` sur ce dépôt
 déclenche une réconciliation. État du banc et UIs disponibles :
 
 ```bash
-test/lima/run-phases.sh status   # VMs, nœuds, phases franchies, UIs, dernier run
+bench/lima/run-phases.sh status   # VMs, nœuds, phases franchies, UIs, dernier run
 ```
 
 > **`kubectl top` (usage CPU/mémoire).** Le chemin `atlas` pose
@@ -55,7 +55,7 @@ une commande rend tout consommable depuis votre poste
 ([ADR 0048](decisions/0048-acces-local-developpeur.md)) :
 
 ```bash
-test/lima/access.sh
+bench/lima/access.sh
 ```
 
 Elle fait, en une fois :
@@ -73,8 +73,8 @@ Elle fait, en une fois :
   Gitea). Patron versionné :
   [`contract/atlas.env.cluster.example`](../contract/atlas.env.cluster.example).
 
-Pour tout arrêter (tunnels + bloc `/etc/hosts`) : `test/lima/access.sh --stop`.
-Pour ne pas toucher `/etc/hosts` : `test/lima/access.sh --no-hosts` (les URLs
+Pour tout arrêter (tunnels + bloc `/etc/hosts`) : `bench/lima/access.sh --stop`.
+Pour ne pas toucher `/etc/hosts` : `bench/lima/access.sh --no-hosts` (les URLs
 s'ouvrent via `curl --resolve <host>:<port>:127.0.0.1`).
 
 > **Pourquoi des tunnels ?** Le réseau de la VM n'est pas routable depuis l'hôte
@@ -121,7 +121,7 @@ Si vous préférez un accès manuel sans `access.sh` (ou pour diagnostiquer), un
 `kubectl port-forward` par service reste possible :
 
 ```bash
-export KUBECONFIG=test/lima/.work/kubeconfig
+export KUBECONFIG=bench/lima/.work/kubeconfig
 # Argo CD sert en HTTP clair (server.insecure) : http, pas https.
 kubectl -n argocd      port-forward svc/argocd-server 8080:80
 kubectl -n gitea       port-forward svc/gitea-http 3000:80

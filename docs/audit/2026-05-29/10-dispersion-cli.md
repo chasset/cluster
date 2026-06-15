@@ -63,7 +63,7 @@ sans résoudre le cœur (l'ordre d'exécution vit dans Ansible + la doc).
   l'ordre des étapes. La séquence réelle n'est documentée que dans le RUNBOOK,
   page non référencée depuis l'accueil.
 - **Recommandation** : section « Par où commencer / parcours d'installation »
-  avec l'ordre canonique et des liens explicites vers les RUNBOOK et `test/`.
+  avec l'ordre canonique et des liens explicites vers les RUNBOOK et `bench/`.
 
 ### Majeur — Absence d'orchestrateur global nommant les points d'entrée
 
@@ -96,7 +96,7 @@ sans résoudre le cœur (l'ordre d'exécution vit dans Ansible + la doc).
 
 ### Suggestions
 
-- `log()`/`die()` → mini `test/scenarios/lib.sh` sourcé par les 8 scénarios.
+- `log()`/`die()` → mini `bench/scenarios/lib.sh` sourcé par les 8 scénarios.
 - `--help` : généraliser le pattern de `prune.sh` via la lib commune, ou laisser
   tel quel (docblocks déjà soignés ; la priorité est la découvrabilité globale).
 

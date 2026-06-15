@@ -6,7 +6,7 @@ une décision structurante : cartographie en éventail (N lecteurs + synthèse) 
 merge. C'est la **4ᵉ trace empirique** du dépôt
 ([ADR 0067](../../decisions/0067-workflows-consignes-4e-trace-empirique.md)), à
 côté des [passages d'audit](../), de
-[`RESULTS.md`](../../../test/lima/RESULTS.md) et du
+[`RESULTS.md`](../../../bench/lima/RESULTS.md) et du
 [registre des drifts](../../architecture/registre-drifts.yaml) (ADR 0058 §6).
 
 ## Ce qu'on consigne

@@ -18,7 +18,7 @@ patterns récurrents et les invariants qu'ils imposent.
 > un aveu de faiblesse — c'est la **preuve que le processus est sérieux** : on
 > ne déclare « validé » qu'après un run from-scratch réel, et chaque piège
 > traversé est verrouillé pour de bon. Le détail daté vit dans les
-> [`RESULTS.md`](../../test/lima/RESULTS.md) ; ici, la vue d'ensemble.
+> [`RESULTS.md`](../../bench/lima/RESULTS.md) ; ici, la vue d'ensemble.
 
 ## Tableau de bord — runs e2e consignés
 

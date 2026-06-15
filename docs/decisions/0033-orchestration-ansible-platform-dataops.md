@@ -4,11 +4,11 @@
 
 Le bootstrap Kubernetes est en **Ansible** (`bootstrap/roles/`) ; la couche
 **plateforme DataOps** (registry, CloudNativePG, Dagster, Marquez) était, elle,
-montée en **shell impératif** (`test/lima/run-phases.sh` + `kubectl apply` +
+montée en **shell impératif** (`bench/lima/run-phases.sh` + `kubectl apply` +
 `sed`/`awk` de surcharge banc). Le run e2e validé (#167/#148) a révélé un écart
 net : le bootstrap nu n'a produit **qu'un drift cosmétique**, la couche
 plateforme en a cascadé **neuf** (L12–L20,
-[`test/lima/RESULTS.md`](../../test/lima/RESULTS.md)) — config containerd,
+[`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md)) — config containerd,
 secrets de rôles, attentes Ready, surcharges par topologie, build d'images.
 Chacun est précisément ce qu'Ansible gère nativement (`kubernetes.core`,
 `lineinfile` + handler, `k8s_info` + `until`, templating Jinja). La couture

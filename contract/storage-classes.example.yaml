@@ -5,7 +5,7 @@
 #
 # Décision : docs/decisions/0043-contrat-interface-cluster-atlas.md.
 # Règle : UNE SEULE SC `default` est active à la fois (posée par le banc via
-# test/lima/run-phases.sh::set_default_sc — local-path en mode rapide,
+# bench/lima/run-phases.sh::set_default_sc — local-path en mode rapide,
 # rook-ceph-block-replicated en mode Ceph).
 
 contract_version: '1.0'

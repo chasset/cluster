@@ -25,15 +25,15 @@ Posés par [Lefthook](https://lefthook.dev/) au premier `pnpm install` (config :
 
 ### `pre-push` — vérifie tout le dépôt avant d'envoyer
 
-| Hook                     | Sur quoi                                                         |
-| ------------------------ | ---------------------------------------------------------------- |
-| `no-direct-push-to-main` | refuse `git push` direct sur `main` — passage par PR obligatoire |
-| `prettier --check`       | tous les `*.{yaml,yml,md,json}`                                  |
-| `yamllint .`             | tout le dépôt                                                    |
-| `shellcheck`             | tous les `*.sh`                                                  |
-| `bats`                   | tests unitaires des fonctions pures de `state.sh` (`test/unit/`) |
-| `kubeconform`            | tous les manifestes K8s (hors CRDs Rook + values.yaml Helm)      |
-| `ansible-lint`           | tous les rôles et playbooks (`production` profile)               |
+| Hook                     | Sur quoi                                                          |
+| ------------------------ | ----------------------------------------------------------------- |
+| `no-direct-push-to-main` | refuse `git push` direct sur `main` — passage par PR obligatoire  |
+| `prettier --check`       | tous les `*.{yaml,yml,md,json}`                                   |
+| `yamllint .`             | tout le dépôt                                                     |
+| `shellcheck`             | tous les `*.sh`                                                   |
+| `bats`                   | tests unitaires des fonctions pures de `state.sh` (`bench/unit/`) |
+| `kubeconform`            | tous les manifestes K8s (hors CRDs Rook + values.yaml Helm)       |
+| `ansible-lint`           | tous les rôles et playbooks (`production` profile)                |
 
 > Aucun hook ne peut être contourné par `--no-verify` en pratique : la CI
 > rejouera la même chose sur GitHub.
@@ -132,15 +132,16 @@ Configurée côté GitHub (non versionnable, documentée ici pour mémoire) :
 
 ## Banc d'essai Lima
 
-[`test/`](test/) — valider sur **vrai Debian 13** avant de toucher les serveurs.
+[`bench/`](bench/) — valider sur **vrai Debian 13** avant de toucher les
+serveurs.
 
-### [`test/lima/`](test/lima/) — banc multi-nœuds (ADR 0038, seul banc local)
+### [`bench/lima/`](bench/lima/) — banc multi-nœuds (ADR 0038, seul banc local)
 
 3 VMs Lima Debian 13 arm64 (réseau user-v2 `192.168.104.0/24`) + disques bruts
-pour Ceph. Orchestré par [`test/lima/run-phases.sh`](test/lima/run-phases.sh) à
-**gates** : `up → bootstrap → ceph → sc → datalake → dataops → monitoring`. Deux
-profils — léger (local-path/SeaweedFS, ~11 min) et Ceph (RGW, ~30 min). Couvre
-la chaîne complète Phase 1-5 + DataOps.
+pour Ceph. Orchestré par [`bench/lima/run-phases.sh`](bench/lima/run-phases.sh)
+à **gates** : `up → bootstrap → ceph → sc → datalake → dataops → monitoring`.
+Deux profils — léger (local-path/SeaweedFS, ~11 min) et Ceph (RGW, ~30 min).
+Couvre la chaîne complète Phase 1-5 + DataOps.
 
 **Toujours valider sur le banc avant la prod** — c'est le seul endroit où le
 multi-VM et les disques Ceph sont exercés (validation = run e2e from-scratch,
@@ -221,7 +222,7 @@ auth, dashboard cluster-admin, RStudio sans login). Voir
 L'ordre de déploiement (canari `cp1` → workers → stockage cluster-wide) et les
 gates par étape sont décrits dans
 [`bootstrap/RUNBOOK.md` § Ordre de déploiement](bootstrap/RUNBOOK.md) ; **tout
-changement de cette nature doit passer par le banc ([`test/`](test/)) avant la
+changement de cette nature doit passer par le banc ([`bench/`](bench/)) avant la
 prod**. Le _pourquoi_ de chaque choix structurant est tracé dans les
 [ADR](docs/decisions/). Le reste-à-faire priorisé vit dans
 [`docs/audit/2026-05-29/12-plan-action.md`](docs/audit/2026-05-29/12-plan-action.md).

@@ -30,7 +30,7 @@ cert-manager, registry, Rook, Argo CD, opérateurs + CRDs) = Ansible ;
 [`bootstrap/gitops.yaml`](../../bootstrap/gitops.yaml)) pose Argo CD + les
 NetworkPolicies + l'`AppProject` + (optionnel) le Gateway, en `--server-side`.
 Sur le banc Lima, c'est la phase `gitops`
-([`test/lima/run-phases.sh`](../../test/lima/run-phases.sh)). La séquence
+([`bench/lima/run-phases.sh`](../../bench/lima/run-phases.sh)). La séquence
 `kubectl` ci-dessous reste la **référence manuelle** (et ce que le rôle traduit)
 :
 

@@ -27,7 +27,7 @@ L'[ADR 0058](0058-doctrine-audit-grille-passages.md) a déjà institué **trois
 traces empiriques** (datées, mesurées, non réécrites) :
 
 1. les **passages d'audit** datés (`docs/audit/AAAA-MM-JJ/`) ;
-2. **`test/lima/RESULTS.md`** (déroulé réel des runs de banc) ;
+2. **`bench/lima/RESULTS.md`** (déroulé réel des runs de banc) ;
 3. le **registre des drifts** (`registre-drifts.yaml`, §6) — un écart révélé par
    un run que le lint ne voyait pas.
 

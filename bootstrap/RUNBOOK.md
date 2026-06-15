@@ -568,7 +568,7 @@ joué :
 
 ```bash
 # Sur le banc (exige confirmation explicite)
-ansible-playbook -i ../test/multi-node/inventory.yaml rollback.yaml \
+ansible-playbook -i ../bench/multi-node/inventory.yaml rollback.yaml \
   -e confirm=yes --limit cp1
 ```
 
@@ -713,7 +713,7 @@ kubectl get nodes      # attendre que les nœuds redeviennent Ready
 ```
 
 > Tester cette procédure **sur le banc multi-nœuds** avant d'en avoir besoin en
-> prod (cf. `test/multi-node/`).
+> prod (cf. `bench/multi-node/`).
 
 ### Rotation de la clé de chiffrement etcd (ADR 0014)
 
@@ -755,6 +755,6 @@ sudo touch /etc/kubernetes/manifests/kube-apiserver.yaml
 
 Vérifier qu'un Secret est bien chiffré après chaque étape (`k8s:enc:secretbox:`)
 via `etcdctl` — c'est ce que fait le scénario
-[`test/scenarios/15-etcd-encryption-audit.sh`](../test/scenarios/15-etcd-encryption-audit.sh)
+[`bench/scenarios/15-etcd-encryption-audit.sh`](../bench/scenarios/15-etcd-encryption-audit.sh)
 (`ROTATE=1` déroule et vérifie toute la rotation, témoin inclus). **Tester sur
 le banc avant la prod.**

@@ -11,7 +11,7 @@
 # conteneur (comme le fait le snapshot). Sans ce paquet, il faudrait
 # l'installer en pleine urgence de restauration — risque évité ici (même
 # esprit que cri-tools/crictl posé par le rôle k8s-install). Validé par le
-# scénario test/scenarios/09-etcd-restore.sh.
+# scénario bench/scenarios/09-etcd-restore.sh.
 - name: Installer etcd-client (etcdctl pour la restauration hors conteneur)
   ansible.builtin.apt:
     name: etcd-client

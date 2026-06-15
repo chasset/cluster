@@ -14,8 +14,8 @@ visent la cible **ambiante** du shell plutôt qu'une cible **nommée**.
 
 L'isolation **par fichier** est acquise, mais c'est tout ce qu'il y a :
 
-- **Banc** = kubeconfig `test/lima/.work/kubeconfig` + inventaire
-  `test/lima/.work/inventory.yaml` (générés, gitignorés) ; SSH user `lima` via
+- **Banc** = kubeconfig `bench/lima/.work/kubeconfig` + inventaire
+  `bench/lima/.work/inventory.yaml` (générés, gitignorés) ; SSH user `lima` via
   `-F ~/.lima/<vm>/ssh.config`.
 - **Prod** = `~/.kube/config` (ou fichier opérateur) + `bootstrap/hosts.yaml`
   (gitignoré, copié de `hosts.example.yaml`) ; SSH user `debian`.
@@ -24,8 +24,8 @@ Quatre fragilités transforment cette isolation par fichier en **faux sentiment
 de sûreté** dès que les deux cibles coexistent :
 
 1. **kubectl nu = cible ambiante implicite.** Le banc est sûr —
-   `test/lima/run-phases.sh` force **toujours** `KUBECONFIG=.work/kubeconfig` et
-   `kubectl --kubeconfig …`, il ne déborde jamais. Mais `bootstrap/state.sh`
+   `bench/lima/run-phases.sh` force **toujours** `KUBECONFIG=.work/kubeconfig`
+   et `kubectl --kubeconfig …`, il ne déborde jamais. Mais `bootstrap/state.sh`
    (`kubectl_q`/`kubectl_ready`, couches Cilium/Ceph/StorageClass) et
    `bootstrap/cni.sh` appellent **kubectl nu**, sans `--kubeconfig` : ils lisent
    le `KUBECONFIG` **ambiant** du shell. En prod, c'est l'intention. Mais si le
@@ -47,7 +47,7 @@ de sûreté** dès que les deux cibles coexistent :
    il tourne : la séparation tient à la **discipline d'invocation** (`-i …`),
    sans garde-fou. Un mauvais `-i` rejoue un hardening prod sur les VMs jetables
    (faux drift résiduel) ou, pire, mute les serveurs réels.
-4. **Le helper `env.sh` devine la cible.** `test/lima/env.sh` auto-détecte
+4. **Le helper `env.sh` devine la cible.** `bench/lima/env.sh` auto-détecte
    `lima` dès qu'une VM Lima existe — un fait **orthogonal à l'intention**. Un
    opérateur qui prépare une commande prod se voit proposer le banc ; son
    `eval "$(env.sh export)"` pose `KUBECONFIG=.work/kubeconfig` dans le shell —

@@ -8,8 +8,8 @@ combinaisons ont réellement été montées sur banc).
 
 > Les **décisions** détaillées vivent dans les [ADR](../decisions/) ; les
 > **historiques de Runs** dans
-> [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md) et
-> [`test/RESULTS.md`](../../test/RESULTS.md) (honnêteté des Runs, ADR 0023).
+> [`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md) et
+> [`bench/RESULTS.md`](../../bench/RESULTS.md) (honnêteté des Runs, ADR 0023).
 > Cette page est une **carte de lecture**, pas une source de vérité : en cas
 > d'écart, les RESULTS.md font foi.
 
@@ -186,13 +186,13 @@ banc déjà monté. La table ci-dessous dit ce qu'un scénario **requiert** (sa
 catégorie, la topologie et les briques nécessaires, le terrain particulier
 exigé) — **pas** s'il a tourné. Le statut d'exécution réel (quoi a été passé,
 sur quelle combinaison, quand) est dans le **bloc « Scénarios exécutés »** juste
-après la table. Source : [`test/scenarios/`](../../test/scenarios/).
+après la table. Source : [`bench/scenarios/`](../../bench/scenarios/).
 
 > **Miroir machine (ADR 0056 P4).** Cette table a un pendant exécutable :
 > `cluster_topology/epreuves.py` (constante `EPREUVES`) la reprend champ par
 > champ pour **filtrer** les épreuves jouables selon une `topology.yaml`
 > (`topology.py epreuves`). Un test de parité (`tests/test_epreuves.py`) casse
-> si le code et le glob `test/scenarios/NN-*.sh` divergent — la table reste la
+> si le code et le glob `bench/scenarios/NN-*.sh` divergent — la table reste la
 > source humaine, le code son miroir testé.
 
 La colonne **Type** distingue la **nature** de l'épreuve :
@@ -248,10 +248,11 @@ La colonne **Type** distingue la **nature** de l'épreuve :
 >
 > **Scénarios 24–26 (observabilité) : écrits et éprouvés (2026-06-08).** La
 > stack monitoring/Loki (#158/#186) est désormais **sollicitée par des
-> épreuves** réelles, scriptées dans [`test/scenarios/`](../../test/scenarios/)
-> : Prometheus scrape ses targets (22 UP), l'alerte témoin `Watchdog` est bien
-> _firing_, et un log poussé est relu en LogQL (round-trip via le backing S3).
-> Passés au vert sur le banc Ceph (profil RGW) — _monté **et** éprouvé_.
+> épreuves** réelles, scriptées dans
+> [`bench/scenarios/`](../../bench/scenarios/) : Prometheus scrape ses targets
+> (22 UP), l'alerte témoin `Watchdog` est bien _firing_, et un log poussé est
+> relu en LogQL (round-trip via le backing S3). Passés au vert sur le banc Ceph
+> (profil RGW) — _monté **et** éprouvé_.
 
 ### Synthèse — unitaire vs intégration, par chaîne fonctionnelle
 
@@ -297,7 +298,7 @@ run non tracé — honnêteté des Runs).
 
 > **À retenir** : seuls **23–26** ont un statut d'exécution **tracé à une
 > combinaison**. Les scénarios 01–22 existent et ont tourné par le passé (cf.
-> [`RESULTS.md`](../../test/lima/RESULTS.md)), mais leur dernier passage n'est
+> [`RESULTS.md`](../../bench/lima/RESULTS.md)), mais leur dernier passage n'est
 > pas consigné par tuple — les y rattacher est un chantier de traçabilité à
 > part. Ne pas lire l'absence de tuple comme « échoué » : c'est « non tracé ici
 > ».
@@ -306,8 +307,8 @@ run non tracé — honnêteté des Runs).
 
 Quelles combinaisons d'axes ont effectivement tourné. Topologies nommées selon
 l'[ADR 0030](../decisions/0030-nomenclature-bancs-topologies.md). Source de
-vérité : [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md) et
-[`test/RESULTS.md`](../../test/RESULTS.md).
+vérité : [`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md) et
+[`bench/RESULTS.md`](../../bench/RESULTS.md).
 
 Toutes les lignes : topologie `multi-node-3` (1 CP + 2 workers), arch `arm64`,
 terrain `local`, provisioner **Lima** (seul banc local,
@@ -326,7 +327,7 @@ terrain `local`, provisioner **Lima** (seul banc local,
 
 > Toutes les lignes sont sur **Lima** (le banc Vagrant historique 28→31/05 n'est
 > plus listé — déprécié, ADR 0038 ; sa trace reste dans
-> [`test/RESULTS.md`](../../test/RESULTS.md)). Les dimensions fines
+> [`bench/RESULTS.md`](../../bench/RESULTS.md)). Les dimensions fines
 > **storageClass** et **backing S3** sont validées sur **leurs deux valeurs**
 > (léger local-path/SeaweedFS **et** Ceph rook-ceph/RGW) — c'est l'apport de
 > #158/#186.

@@ -154,4 +154,4 @@ sont livrés et mergés ; les détails par palier vivent dans le corps du plan.
 - **Issues rattachées** (toutes fermées/mergées) : #129, #130, #137, #140, #141,
   #144.
 - **Runs de preuve** : consignés dans
-  [`test/lima/RESULTS.md`](../../test/lima/RESULTS.md).
+  [`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md).

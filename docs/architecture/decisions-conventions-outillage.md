@@ -75,7 +75,7 @@ La **politique de bump** se résume en cinq règles :
 3. **Pinner partout** : tags d'image avec version explicite, jamais `:latest` ni
    `:N` flottant — idéalement avec **digest** pour les composants critiques
    (c'est le cas de cert-manager et d'Argo CD dans la matrice).
-4. **Valider sur le banc multi-nœuds** (`test/multi-node/`) avant la prod :
+4. **Valider sur le banc multi-nœuds** (`bench/multi-node/`) avant la prod :
    déployer, vérifier que `state.sh` est vert sur toutes les couches, et jouer
    un cycle bootstrap → rollback → re-bootstrap.
 5. **Mettre à jour l'ADR** (nouvelle matrice et date).
@@ -106,8 +106,8 @@ La décision pose **bash comme langage d'orchestration**, avec des règles clair
   `jq` est une dépendance assumée.
 - **Fonctions pures → bats-core.** La logique isolable (classification,
   comptage, parsing) est extraite dans des libs sourçables (`bootstrap/lib/`) et
-  testée par bats (`test/unit/`) : shellcheck valide la **syntaxe**, bats valide
-  le **comportement**.
+  testée par bats (`bench/unit/`) : shellcheck valide la **syntaxe**, bats
+  valide le **comportement**.
 - **python3 toléré, pas imposé.** Pour une tâche où bash deviendrait illisible
   (données complexes, calculs), python3 (présent partout) est acceptable, mais
   reste l'exception.

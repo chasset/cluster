@@ -108,7 +108,7 @@ d'audit, avec une convention explicite :
 - **Source de vérité unique et citable** : le registre YAML est LE catalogue ;
   les pages de synthèse
   ([`lecons-des-runs.md`](../architecture/lecons-des-runs.md)) et les journaux
-  ([`RESULTS.md`](../../test/lima/RESULTS.md)) y **renvoient par id**, sans
+  ([`RESULTS.md`](../../bench/lima/RESULTS.md)) y **renvoient par id**, sans
   dupliquer le détail. Un drift est cité **partout par son `Lnn`** (commentaires
   de code, RUNBOOK, rôles) — l'id est stable.
 - **Champs normés par entrée** : `id` (`Lnn`, stable), `campagne` (le

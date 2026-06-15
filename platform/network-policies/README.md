@@ -73,7 +73,8 @@ kubectl apply -f platform/network-policies/registry/
 
 ## Validation (banc multi-nœuds)
 
-À exécuter sur le banc Lima [`test/lima/`](../../test/lima/) **avant la prod** :
+À exécuter sur le banc Lima [`bench/lima/`](../../bench/lima/) **avant la prod**
+:
 
 - `kubectl get netpol -A` → les policies présentes par namespace.
 - WordPress répond toujours (ingress :80) et lit/écrit MySQL (DNS +

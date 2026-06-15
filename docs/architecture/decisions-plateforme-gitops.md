@@ -139,7 +139,7 @@ bordure est traité dans la vue
 ## Validation sur banc
 
 La mise en service d'Argo CD est conditionnée à une **validation banc**
-(`test/multi-node`) : une `Application` de test doit passer
+(`bench/multi-node`) : une `Application` de test doit passer
 **`Synced/Healthy`**, l'UI répondre en HTTPS via le Gateway (cert CA interne,
 root importé), et le CLI `--grpc-web` fonctionner à travers la `HTTPRoute`. Le
 default-deny Cilium est préservé via `platform/network-policies/argocd/`. Le
@@ -151,6 +151,6 @@ protocole de banc est détaillé dans la vue
 - [Exposition réseau](../architecture/exposition-reseau.md) — Gateway Cilium,
   HTTPRoute, TLS de bordure pour l'UI Argo CD.
 - [Validation banc](../architecture/validation-banc.md) — protocole de tests sur
-  `test/multi-node`.
+  `bench/multi-node`.
 - ADR de cette vue : [ADR 0016](../decisions/0016-observabilite.md),
   [ADR 0022](../decisions/0022-argocd-gitops-applicatif.md).

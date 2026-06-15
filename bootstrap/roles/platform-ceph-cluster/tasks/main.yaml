@@ -1,6 +1,6 @@
 # code: language=ansible
 # Rôle platform-ceph-cluster (ADR 0033/0049/0008/0009) — porte phase_ceph
-# (test/lima/run-phases.sh) : operator Rook → CephCluster + toolbox, gate sur la
+# (bench/lima/run-phases.sh) : operator Rook → CephCluster + toolbox, gate sur la
 # santé RÉELLE (HEALTH_OK ET le bon nombre d'OSD up, pas « vert à 0 OSD »).
 #
 # Manifestes VENDORED figés appliqués via kubernetes.core.k8s ; les surcharges

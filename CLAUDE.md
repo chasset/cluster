@@ -36,7 +36,7 @@ Précisions :
   `.example`, convention `.env` / `.env.example`. Ne **jamais** laisser une
   valeur de prod comme défaut versionné.
 - **Exceptions** : le banc Vagrant `192.168.67.0/24` reste tel quel (exemple
-  fonctionnel public) ; `test/RESULTS.md` (historique de validation banc) n'est
+  fonctionnel public) ; `bench/RESULTS.md` (historique de validation banc) n'est
   **pas** réécrit — honnêteté des Runs.
 
 Détail et justification :
@@ -67,7 +67,7 @@ Détail et justification :
   `kubectl patch`/`apply` manuel = **diagnostic uniquement** ; tout correctif
   repart dans le code versionné (manifeste/rôle/harnais) puis est **re-prouvé
   par un run**. Le banc se monte par un **chemin nommé codé**
-  (`test/lima/run-phases.sh <chemin>`, ADR 0045), **jamais** en enchaînant des
+  (`bench/lima/run-phases.sh <chemin>`, ADR 0045), **jamais** en enchaînant des
   phases à la main — si un enchaînement manque, **coder le chemin**. Une valeur
   de profil (storageClass…) se **dérive** de `WITH_CEPH`/`WITH_HARDENING`,
   jamais codée en dur.
