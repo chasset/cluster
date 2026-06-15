@@ -24,14 +24,18 @@ VALID_TARGET_KINDS = {"prod", "lima"}
 # bare-metal/local (pod statique, annonce ARP) ; kube-vip-lb = via LB-IPAM ;
 # external = LB fourni par le terrain (cloud, ADR 0040).
 VALID_LB_MODES = {"kube-vip-arp", "kube-vip-lb", "external"}
-# Modes d'exposition applicative (ADR 0020/0071). `gateway` = bordure L7 Cilium
-# (LB-IPAM + Gateway API) ; `hostport` = 80/443 sur l'IP de l'hôte (eBPF, VM publique) ;
-# `none` = ClusterIP seuls. `lb-ipam` est un ALIAS déprécié-doux de `gateway` (ADR 0071 §3).
-VALID_EXPOSITION_MODES = {"gateway", "hostport", "none"}
-_EXPOSITION_ALIASES = {"lb-ipam": "gateway"}
-# Défaut d'exposition par terrain (ADR 0071 §6) : le banc Lima en `hostport` (le plus
-# reproductible, sans plage IP/L2) ; ailleurs `gateway` (bordure L7 de référence).
-_EXPOSITION_DEFAULT = {"lima": "hostport"}
+# Modes d'exposition applicative — UN SEUL câblé (ADR 0020/0071 réécrit). `gateway` =
+# bordure L7 Cilium exposée en hostNetwork (l'Envoy du Gateway bind 80/443 sur l'IP du
+# nœud, SANS LB-IPAM) ; `none` = ClusterIP seuls (accès par port-forward). `lb-ipam` ET
+# `hostport` sont des ALIAS déprécié-doux de `gateway` : `hostport` (« 80/443 sur l'IP de
+# l'hôte ») est désormais ABSORBÉ par gateway-hostNetwork, qui fait la même chose en
+# gagnant le routage L7/SNI + le TLS de bordure (ADR 0071).
+VALID_EXPOSITION_MODES = {"gateway", "none"}
+_EXPOSITION_ALIASES = {"lb-ipam": "gateway", "hostport": "gateway"}
+# Défaut d'exposition GLOBAL (ADR 0071) : `gateway` partout. Le hostNetwork ne réclame ni
+# plage IP ni interface L2 annonçable → aussi reproductible sur le banc Lima que sur une
+# VM publique mono-NIC (plus de défaut par terrain).
+_EXPOSITION_DEFAULT = "gateway"
 
 
 @dataclass
@@ -97,14 +101,15 @@ class Topology:
 
     @property
     def exposition_mode(self) -> str:
-        """Mode d'exposition CANONIQUE (ADR 0020/0071) : gateway | hostport | none.
+        """Mode d'exposition CANONIQUE (ADR 0020/0071) : `gateway` | `none`.
 
-        `exposition.mode` déclaré (alias `lb-ipam` → `gateway` résolu) prime ; sinon
-        défaut PAR TERRAIN (banc Lima → `hostport`, ailleurs → `gateway`, ADR 0071 §6)."""
+        `exposition.mode` déclaré (alias `lb-ipam`/`hostport` → `gateway` résolus) prime ;
+        sinon défaut GLOBAL `gateway` (gateway-hostNetwork, reproductible partout — ADR
+        0071 ; plus de défaut par terrain)."""
         declared = self.exposition.get("mode") if isinstance(self.exposition, dict) else None
         if declared:
             return _EXPOSITION_ALIASES.get(declared, declared)
-        return _EXPOSITION_DEFAULT.get(self.target_kind, "gateway")
+        return _EXPOSITION_DEFAULT
 
     @property
     def declared_layers(self) -> list[str]:
@@ -176,15 +181,17 @@ def topology_from_dict(data: dict[str, Any]) -> Topology:
                 f"`network.control_plane_lb.mode` = {mode!r} inconnu "
                 f"(valides : {sorted(VALID_LB_MODES)} — ADR 0047/0055)"
             )
-    # exposition.mode : enum validé si déclaré (ADR 0020/0071). `lb-ipam` est résolu en
-    # `gateway` (alias) AVANT validation ; un mode inconnu lève (sinon étiquette morte).
+    # exposition.mode : enum validé si déclaré (ADR 0020/0071). Les alias `lb-ipam` et
+    # `hostport` sont résolus en `gateway` AVANT validation ; un mode inconnu lève (sinon
+    # étiquette morte).
     expo = topo.exposition.get("mode") if isinstance(topo.exposition, dict) else None
     if expo is not None:
         canonical = _EXPOSITION_ALIASES.get(expo, expo)
         if canonical not in VALID_EXPOSITION_MODES:
             raise TopologyError(
                 f"`exposition.mode` = {expo!r} inconnu "
-                f"(valides : {sorted(VALID_EXPOSITION_MODES)} | alias lb-ipam — ADR 0071)"
+                f"(valides : {sorted(VALID_EXPOSITION_MODES)} ; "
+                f"alias lb-ipam/hostport → gateway — ADR 0071)"
             )
     return topo
 

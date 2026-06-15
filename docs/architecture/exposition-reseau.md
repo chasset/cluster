@@ -6,9 +6,10 @@ le banc**. Elle relie quatre décisions :
 [ADR 0019](../decisions/0019-durcissement-reseau-cilium.md) (durcissement
 Cilium), [ADR 0020](../decisions/0020-exposition-reseau-tout-cilium.md)
 (exposition tout-Cilium),
-[ADR 0021](../decisions/0021-cert-manager-ca-interne.md) (TLS de bordure) et
-[ADR 0022](../decisions/0022-argocd-gitops-applicatif.md) (GitOps / Argo CD).
-Les termes en gras sont définis dans le
+[ADR 0021](../decisions/0021-cert-manager-ca-interne.md) (TLS de bordure),
+[ADR 0022](../decisions/0022-argocd-gitops-applicatif.md) (GitOps / Argo CD) et
+[ADR 0071](../decisions/0071-exposition-gateway-hostnetwork.md) (Gateway en
+hostNetwork). Les termes en gras sont définis dans le
 [glossaire](../glossaire.md#exposition-réseau-comment-on-atteint-un-service-depuis-lextérieur-du-cluster).
 
 > **Périmètre.** Le cluster de production **n'est pas exposé à Internet**
@@ -23,16 +24,35 @@ présent comme CNI : moins de composants à exploiter, un seul plan de données
 eBPF. C'est une déviation assumée, tracée en
 [ADR 0020](../decisions/0020-exposition-reseau-tout-cilium.md).
 
-## La chaîne, couche par couche
+## Le chemin par défaut : Gateway en hostNetwork (ADR 0071)
+
+Depuis l'[ADR 0071](../decisions/0071-exposition-gateway-hostnetwork.md), le
+chemin **par défaut** expose le Gateway en **hostNetwork** : l'Envoy bind 80/443
+**directement sur l'IP du nœud** (`gatewayAPI.hostNetwork.enabled=true`), sans
+IP virtuelle. On supprime alors les couches 1 et 2 ci-dessous (ARP/L2 + LB-IPAM)
+— le client joint `https://<host>` qui résout vers l'**IP du nœud**, et la
+chaîne démarre directement à la couche 3 (Gateway/Envoy). C'est le mode
+`gateway` (unique), valable banc Lima comme VM publique mono-NIC.
+
+> **Piège #42786** : en hostNetwork (Cilium 1.19.x) le `Gateway` reste
+> `Programmed: False` alors que le trafic passe. On **gate la readiness sur la
+> joignabilité L7 réelle** (`curl --resolve <host>:443:<node_ip>`), jamais sur
+> `.status.Programmed` (ADR 0071 §6).
+
+Le chemin LB-IPAM + L2 décrit ci-dessous (IP virtuelle annoncée sur le LAN)
+reste une **option de prod** (`CILIUM_LB_IPAM_ENABLED=1`) quand l'admin réseau
+fournit une plage dédiée.
+
+## La chaîne, couche par couche (chemin LB-IPAM optionnel)
 
 ```text
   Client du LAN
       │  https://argocd.cluster.lan
       ▼
  ┌─────────────────────────────────────────────────────────────┐
- │ 1. ARP / annonce L2  → "l'IP 192.168.67.240, c'est ce nœud"  │  Cilium L2
+ │ 1. ARP / annonce L2  → "l'IP 192.168.67.240, c'est ce nœud"  │  Cilium L2     (option prod)
  ├─────────────────────────────────────────────────────────────┤
- │ 2. IP LoadBalancer   → pool LB-IPAM (192.168.67.240-250)     │  Cilium LB-IPAM
+ │ 2. IP LoadBalancer   → pool LB-IPAM (192.168.67.240-250)     │  Cilium LB-IPAM (option prod)
  ├─────────────────────────────────────────────────────────────┤
  │ 3. Gateway (Envoy)   → termine le TLS (HTTPS)                │  Cilium Gateway API
  │      └─ certificat fourni par cert-manager (CA interne)      │  cert-manager
@@ -44,6 +64,10 @@ eBPF. C'est une déviation assumée, tracée en
       ▼
    Le pod applicatif (ex. argocd-server)
 ```
+
+> En mode par défaut (hostNetwork), les couches 1-2 disparaissent : l'Envoy du
+> Gateway (couche 3) bind 80/443 sur l'IP du nœud, le client l'atteint
+> directement.
 
 1. **Datapath eBPF (`kubeProxyReplacement`).** Cilium remplace kube-proxy : tout
    le routage de Service passe par eBPF dans le noyau. Prérequis de tout le

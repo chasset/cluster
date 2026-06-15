@@ -41,13 +41,15 @@ sein du datapath eBPF déjà déployé ?
 
 ## Décision
 
-> **Amendé par [ADR 0071](0071-exposition-hostport-cilium.md)** : un mode
-> `hostport` (80/443 servis sur l'IP de l'hôte par Cilium eBPF) rejoint le
-> Gateway — `exposition.mode: gateway | hostport | none`. Le Gateway tout-Cilium
-> ci-dessous reste un mode de plein droit, mais **le banc Lima passe en
-> `hostport` par défaut** (la validation Gateway se fait via une topologie
-> `gateway.example.yaml` dédiée). NodePort reste écarté (plage 30000-32767
-> inadaptée à 80/443) — `hostport` le remplace.
+> **Amendé par [ADR 0071](0071-exposition-gateway-hostnetwork.md)** : le Gateway
+> est exposé en **hostNetwork** (`gatewayAPI.hostNetwork.enabled=true`) —
+> l'Envoy bind 80/443 **sur l'IP du nœud, sans LB-IPAM ni L2**. C'est le mode
+> d'exposition **unique** (`exposition.mode: gateway | none` ; `lb-ipam` et
+> `hostport` sont des alias historiques de `gateway`), **défaut partout** (banc
+> Lima comme VM publique). Le chemin **LB-IPAM + L2** décrit ci-dessous (IP
+> virtuelle annoncée sur le LAN) est rétrogradé en **option de prod**
+> (`CILIUM_LB_IPAM_ENABLED=1`, plage négociée avec l'admin réseau), il n'est
+> plus armé par défaut. NodePort reste écarté.
 
 Adopter une exposition réseau **tout-Cilium**, en remplacement de MetalLB (étape
 1.1) **et** d'ingress-nginx (étape 1.2). Quatre fonctions Cilium sont activées,

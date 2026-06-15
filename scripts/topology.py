@@ -1332,8 +1332,10 @@ def cmd_up(args: argparse.Namespace) -> int:
             **os.environ,
             "NODES_OVERRIDE": nodes_override,
             "STACK_NAME": stack_name,
-            # exposition.mode CONSÉQUENT (ADR 0071) : le banc pose les CRs Gateway
-            # seulement en mode `gateway` ; `hostport`/`none` les omettent.
+            # exposition.mode CONSÉQUENT (ADR 0020/0071 réécrit) : le banc expose le
+            # Gateway en hostNetwork (80/443 sur l'IP du nœud) en mode `gateway` (le
+            # défaut) ; `none` n'arme aucune bordure. `exposition_mode` a déjà résolu
+            # les alias historiques lb-ipam/hostport → gateway.
             "EXPOSITION_MODE": topo.exposition_mode,
         },
     ).returncode
