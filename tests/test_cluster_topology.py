@@ -153,6 +153,34 @@ class Validation(unittest.TestCase):
             self.assertEqual(t.network["control_plane_lb"]["mode"], mode)
 
 
+class Exposition(unittest.TestCase):
+    """exposition.mode (ADR 0020/0071) : enum validé, alias lb-ipam→gateway, défaut terrain."""
+
+    def test_default_lima_is_hostport(self):
+        t = topology_from_dict(_base(target_kind="lima"))
+        self.assertEqual(t.exposition_mode, "hostport")
+
+    def test_default_prod_is_gateway(self):
+        t = topology_from_dict(_base(target_kind="prod"))
+        self.assertEqual(t.exposition_mode, "gateway")
+
+    def test_lb_ipam_alias_resolves_to_gateway(self):
+        t = topology_from_dict(_base(exposition={"mode": "lb-ipam"}))
+        self.assertEqual(t.exposition_mode, "gateway")
+
+    def test_hostport_and_none_accepted(self):
+        self.assertEqual(
+            topology_from_dict(_base(exposition={"mode": "hostport"})).exposition_mode, "hostport"
+        )
+        self.assertEqual(
+            topology_from_dict(_base(exposition={"mode": "none"})).exposition_mode, "none"
+        )
+
+    def test_unknown_mode_rejected(self):
+        with self.assertRaises(TopologyError):
+            topology_from_dict(_base(exposition={"mode": "bogus"}))
+
+
 class HaThreeCpExample(unittest.TestCase):
     """La topologie ha-3cp déclarée (hyperconvergé, local-path) est valide et
     expose la mécanique HA attendue (#250, ADR 0055/0056)."""

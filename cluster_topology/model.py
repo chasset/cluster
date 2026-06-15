@@ -24,6 +24,14 @@ VALID_TARGET_KINDS = {"prod", "lima"}
 # bare-metal/local (pod statique, annonce ARP) ; kube-vip-lb = via LB-IPAM ;
 # external = LB fourni par le terrain (cloud, ADR 0040).
 VALID_LB_MODES = {"kube-vip-arp", "kube-vip-lb", "external"}
+# Modes d'exposition applicative (ADR 0020/0071). `gateway` = bordure L7 Cilium
+# (LB-IPAM + Gateway API) ; `hostport` = 80/443 sur l'IP de l'hôte (eBPF, VM publique) ;
+# `none` = ClusterIP seuls. `lb-ipam` est un ALIAS déprécié-doux de `gateway` (ADR 0071 §3).
+VALID_EXPOSITION_MODES = {"gateway", "hostport", "none"}
+_EXPOSITION_ALIASES = {"lb-ipam": "gateway"}
+# Défaut d'exposition par terrain (ADR 0071 §6) : le banc Lima en `hostport` (le plus
+# reproductible, sans plage IP/L2) ; ailleurs `gateway` (bordure L7 de référence).
+_EXPOSITION_DEFAULT = {"lima": "hostport"}
 
 
 @dataclass
@@ -86,6 +94,17 @@ class Topology:
     def is_ha_control_plane(self) -> bool:
         """> 1 control-plane → exige un control_plane_lb (VIP), ADR 0047/0055."""
         return len(self.control_nodes) > 1
+
+    @property
+    def exposition_mode(self) -> str:
+        """Mode d'exposition CANONIQUE (ADR 0020/0071) : gateway | hostport | none.
+
+        `exposition.mode` déclaré (alias `lb-ipam` → `gateway` résolu) prime ; sinon
+        défaut PAR TERRAIN (banc Lima → `hostport`, ailleurs → `gateway`, ADR 0071 §6)."""
+        declared = self.exposition.get("mode") if isinstance(self.exposition, dict) else None
+        if declared:
+            return _EXPOSITION_ALIASES.get(declared, declared)
+        return _EXPOSITION_DEFAULT.get(self.target_kind, "gateway")
 
     @property
     def declared_layers(self) -> list[str]:
@@ -156,6 +175,16 @@ def topology_from_dict(data: dict[str, Any]) -> Topology:
             raise TopologyError(
                 f"`network.control_plane_lb.mode` = {mode!r} inconnu "
                 f"(valides : {sorted(VALID_LB_MODES)} — ADR 0047/0055)"
+            )
+    # exposition.mode : enum validé si déclaré (ADR 0020/0071). `lb-ipam` est résolu en
+    # `gateway` (alias) AVANT validation ; un mode inconnu lève (sinon étiquette morte).
+    expo = topo.exposition.get("mode") if isinstance(topo.exposition, dict) else None
+    if expo is not None:
+        canonical = _EXPOSITION_ALIASES.get(expo, expo)
+        if canonical not in VALID_EXPOSITION_MODES:
+            raise TopologyError(
+                f"`exposition.mode` = {expo!r} inconnu "
+                f"(valides : {sorted(VALID_EXPOSITION_MODES)} | alias lb-ipam — ADR 0071)"
             )
     return topo
 
