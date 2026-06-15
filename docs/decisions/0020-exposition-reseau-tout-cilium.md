@@ -41,6 +41,13 @@ sein du datapath eBPF déjà déployé ?
 
 ## Décision
 
+> **Amendé par [ADR 0071](0071-nodeport-exposition-officielle.md)** : NodePort
+> n'est plus écarté — il devient un mécanisme d'exposition **officiel** déclaré
+> par `exposition.mode: gateway | nodeport | none`. Le Gateway tout-Cilium
+> ci-dessous reste un mode de plein droit, mais **le banc Lima passe en
+> `nodeport` par défaut** (la validation Gateway se fait via une topologie
+> `gateway.example.yaml` dédiée, plus par le défaut du banc).
+
 Adopter une exposition réseau **tout-Cilium**, en remplacement de MetalLB (étape
 1.1) **et** d'ingress-nginx (étape 1.2). Quatre fonctions Cilium sont activées,
 appliquées par [`bootstrap/cni.sh`](../../bootstrap/cni.sh) (idempotent à
