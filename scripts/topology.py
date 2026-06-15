@@ -100,6 +100,7 @@ from cluster_topology import (  # noqa: E402
     plan_init,
     render_lima_inventory,
     render_prod_inventory,
+    resolve_layers,
     suggest_next,
     verdict_for_run,
 )
@@ -929,6 +930,27 @@ def cmd_up(args: argparse.Namespace) -> int:
         raise _UsageError(str(exc)) from exc
     stack_name = topo.catalog.get("topology", "—")
 
+    # ADR 0069 : si les `layers` déclarés veulent des couches que le PRESET dérivé ne
+    # monte pas (palier non-préfixe, ex. [gitops, metrics] → preset socle), on bascule
+    # sur l'arm GÉNÉRIQUE `layers <seq>` — Python fournit l'ordre (resolve_layers, tri
+    # du graphe atomique), bash exécute. Sans --target explicite seulement (un --target
+    # force le preset). Le socle (up/bootstrap) préfixe la séquence passée à l'arm.
+    # On ne résout les couches (qui interroge le graphe) QUE si `layers` est
+    # EXPLICITEMENT déclaré ET qu'aucun --target n'est forcé : un profil scalaire
+    # (rétrocompat) passe par son preset sans ce détour.
+    layers_seq: list[str] | None = None
+    if not args.target and topo.layers:
+        backend = topo.storage.get("backend", "local-path")
+        try:
+            resolved = resolve_layers(topo.declared_layers, backend)
+        except TopologyError as exc:
+            raise _UsageError(str(exc)) from exc
+        # Couches voulues NON couvertes par la séquence du preset → arm `layers`.
+        if resolved and not set(resolved).issubset(set(seq)):
+            socle = ["up", "bootstrap", "ceph", "sc"] if backend == "ceph" else ["up", "bootstrap"]
+            layers_seq = socle + resolved
+            seq = layers_seq  # le PLAN affiché reflète la vraie séquence montée
+
     # Affiche le PLAN (les couches à monter) avant de confirmer — comme `preview`.
     print(f"stack : {stack_name}  →  chemin : {target}")
     print("Couches à monter (séquence complète) :")
@@ -954,16 +976,25 @@ def cmd_up(args: argparse.Namespace) -> int:
     # matche pour le verdict de fraîcheur PAR STACK (deux stacks dérivant le même chemin
     # ne partagent pas leur verdict). Sans lui, le bash écrivait un littéral générique
     # qui ne matchait jamais la stack → PLAN « à installer » alors que la stack est montée.
-    print(f"→ montage du chemin `{target}` ({len(topo.nodes)} nœud(s)) via run-phases.sh…")
-    rc = subprocess.run(  # noqa: S603 — chemin codé, target dérivé d'une topo validée
-        ["bash", os.path.join(_ROOT, "test", "lima", "run-phases.sh"), target],
+    # Preset nommé (run-phases.sh <chemin>) OU arm générique `layers <seq>` (palier
+    # non-préfixe) : dans les deux cas bash exécute, Python a décidé l'ordre.
+    runphases = os.path.join(_ROOT, "test", "lima", "run-phases.sh")
+    if layers_seq is not None:
+        argv = ["bash", runphases, "layers", ",".join(layers_seq)]
+        libelle = f"layers [{', '.join(topo.declared_layers)}]"
+    else:
+        argv = ["bash", runphases, target]
+        libelle = f"chemin `{target}`"
+    print(f"→ montage {libelle} ({len(topo.nodes)} nœud(s)) via run-phases.sh…")
+    rc = subprocess.run(  # noqa: S603 — chemin codé, séquence dérivée d'une topo validée
+        argv,
         check=False,
         env={**os.environ, "NODES_OVERRIDE": nodes_override, "STACK_NAME": stack_name},
     ).returncode
     if rc != 0:
-        print(f"échec du montage (run-phases.sh {target} rc={rc}).", file=sys.stderr)
+        print(f"échec du montage ({libelle} rc={rc}).", file=sys.stderr)
         return 1
-    print(f"✓ stack `{stack_name}` montée (chemin {target}).")
+    print(f"✓ stack `{stack_name}` montée ({libelle}).")
     return 0
 
 

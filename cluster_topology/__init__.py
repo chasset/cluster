@@ -27,6 +27,7 @@ from cluster_topology.gates import (
 )
 from cluster_topology.generator import render_lima_inventory, render_prod_inventory
 from cluster_topology.history import Run, load_runs, verdict_for_run
+from cluster_topology.layers import layers_from_profile, resolve_layers
 from cluster_topology.metrics import RunMetrics, format_metrics, metrics_of
 from cluster_topology.model import Topology, TopologyError, load_topology
 from cluster_topology.plan import (
@@ -81,8 +82,10 @@ __all__ = [
     "default_target",
     "diff_phases",
     "expected_phase_sequence",
+    "layers_from_profile",
     "observed_done_phases",
     "phase_label",
+    "resolve_layers",
     "suggest_next",
     "RunMetrics",
     "metrics_of",

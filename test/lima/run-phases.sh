@@ -1706,6 +1706,33 @@ case "${1:-}" in
         log "🎉 Chemin 'metrics' : socle → metrics-server (kubectl top opérant)."
         record_if_fresh "${run_start}"
         ;;
+    # ── layers : séquence ARBITRAIRE de phases, ORDONNÉE par topology.py (ADR 0069). ─
+    # L'arm générique des paliers SANS preset dédié (ex. [gitops, metrics]). Python
+    # fournit l'ordre (resolve_layers, tri topo du graphe atomique) ; bash EXÉCUTE,
+    # ne re-trie PAS (ADR 0063 : bash exécute, Python décide). Le préfixe socle
+    # (up,bootstrap[,ceph,sc]) est délégué à run_socle pour préserver le cache #219 +
+    # le verdict SOCLE_BUILT/record_if_fresh ; le reste boucle sur les phases unitaires.
+    layers)
+        [ -n "${2:-}" ] || die "usage : layers <phase1,phase2,…> (séquence ordonnée par topology.py)"
+        TARGET=layers
+        chemin_prelude
+        run_start=$(date +%s)
+        IFS=',' read -r -a _seq <<< "$2"
+        # Backend dérivé du préfixe : `ceph` dans la séquence ⇒ socle Ceph.
+        case ",$2," in *",ceph,"*) WITH_CEPH=1 ;; esac
+        run_socle
+        run_hardening_if_requested
+        # Sauter le préfixe socle déjà monté par run_socle (up/bootstrap[,ceph,sc]) ;
+        # boucler sur la queue applicative restante (chaque phase = un arm unitaire).
+        for _p in "${_seq[@]}"; do
+            case "${_p}" in
+                up | bootstrap | ceph | sc) continue ;; # posés par run_socle
+                *) time_phase "${_p}" "phase_${_p//-/_}" ;;
+            esac
+        done
+        log "🎉 Chemin 'layers' : socle → ${2//,/ → }."
+        record_if_fresh "${run_start}"
+        ;;
     # ── atlas : socle léger → monitoring → gitops → dataops (ADR 0044/0045). ──
     # Observabilité d'abord (capte la suite + pose SeaweedFS) ; puis socle GitOps
     # (Gitea + Argo CD) ; puis l'INFRA DataOps (CNPG/Dagster/Marquez vides — les

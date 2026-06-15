@@ -105,6 +105,23 @@ class ParityArms(unittest.TestCase):
                 )
 
 
+class ParityLayersArm(unittest.TestCase):
+    """L'arm GÉNÉRIQUE `layers <seq>` (ADR 0069) monte la MÊME chose que l'arm nommé
+    correspondant : socle + resolve_layers == expected_phase_sequence(preset). Garde-fou
+    que le chemin layers ne diverge pas des presets prouvés (gitops-seed mis à part —
+    posé par l'arm atlas en queue, hors clôture du graphe)."""
+
+    def test_layers_atlas_equiv_local_path(self):
+        from cluster_topology.layers import resolve_layers
+
+        # layers = le profil dataops complet (atlas) en local-path.
+        resolved = resolve_layers(["metrics", "store", "obs", "gitops", "dataops"], "local-path")
+        layers_seq = ["up", "bootstrap", *resolved]
+        atlas = expected_phase_sequence(_topo("dataops", "local-path"), "atlas")
+        # atlas porte gitops-seed en plus (posé en queue par l'arm, hors graphe).
+        self.assertEqual(layers_seq, [p for p in atlas if p != "gitops-seed"])
+
+
 class ParityHardening(unittest.TestCase):
     """Le durcissement s'insère APRÈS le socle, AVANT la queue (run_hardening_if_requested
     est appelé juste après run_socle dans chaque arm — atlas : avant storage-simple)."""
