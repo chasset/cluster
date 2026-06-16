@@ -1632,6 +1632,115 @@ class Discover(unittest.TestCase):
         self.assertIn("squat-ns", content)
 
 
+class Refresh(unittest.TestCase):
+    """`refresh` : réaligne la topo active sur le réel voulu (ADR 0076). Pas de cluster.
+
+    On stub le réel via `_real_layers_backend` (la sonde discover agrégée) ; la logique
+    pure (diff/fusion) est testée à part (test_refresh_plan/test_refresh_fuse). Ici :
+    dispatch, diff affiché, --dry-run, confirmation, fusion en place, fail-closed."""
+
+    _TOPO = """\
+# en-tête à préserver (ADR 0023)
+catalog:
+  topology: banc
+  profile: dataops
+  status: cible
+nodes:
+  - name: node1
+    roles:
+      - control
+      - worker
+  - name: node2
+    roles:
+      - worker
+storage:
+  backend: local-path
+target_kind: lima
+"""
+
+    # Couches du profil dataops résolues en phases (== ce que resolve_layers rend).
+    _DATAOPS = ["storage-simple", "metrics-server", "monitoring", "dataops"]
+
+    def setUp(self):
+        # `resolve_layers` shellerait le graphe (bloqué par le blindage) → on le stube
+        # sur la résolution connue du profil dataops, pour comparer au MÊME grain.
+        orig = cli.resolve_layers
+        cli.resolve_layers = lambda _declared, _backend: list(self._DATAOPS)
+        self.addCleanup(setattr, cli, "resolve_layers", orig)
+
+    def _stub_real(self, *, layers, backend):
+        orig = cli._real_layers_backend
+        cli._real_layers_backend = lambda: (list(layers), backend)
+        self.addCleanup(setattr, cli, "_real_layers_backend", orig)
+
+    def _topo_file(self):
+        path = _tmp(self._TOPO)
+        self.addCleanup(os.unlink, path)
+        return path
+
+    def _read(self, path):
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+
+    def test_refuses_unreachable_cluster(self):
+        # Aucun réel lu → usage (refresh n'a rien à rapatrier ≠ « rien à faire »).
+        self._stub_real(layers=[], backend=None)
+        code, _, err = _capture(["refresh", "-f", self._topo_file(), "--yes"])
+        self.assertEqual(code, 2)
+        self.assertIn("injoignable", err)
+
+    def test_dry_run_shows_diff_writes_nothing(self):
+        # Réel = dataops + gitops monté en plus ; --dry-run montre +gitops sans écrire.
+        self._stub_real(layers=[*self._DATAOPS, "gitops"], backend="local-path")
+        path = self._topo_file()
+        before = self._read(path)
+        code, out, _ = _capture(["refresh", "-f", path, "--dry-run"])
+        self.assertEqual(code, 0)
+        self.assertIn("+ couche `gitops`", out)
+        self.assertIn("dry-run", out)
+        self.assertEqual(self._read(path), before)  # RIEN écrit
+
+    def test_backend_change_materialized_with_yes(self):
+        # Réel passé en ceph (évolution voulue) → fusion écrit backend: ceph, reste intact.
+        self._stub_real(layers=self._DATAOPS, backend="ceph")
+        path = self._topo_file()
+        code, out, _ = _capture(["refresh", "-f", path, "--yes"])
+        self.assertEqual(code, 0)
+        self.assertIn("mis à jour", out)
+        d = yaml.safe_load(self._read(path))
+        self.assertEqual(d["storage"]["backend"], "ceph")
+        self.assertEqual(d["catalog"]["status"], "cible")  # préservé
+        self.assertIn("# en-tête à préserver", self._read(path))
+
+    def test_new_layer_materialized(self):
+        # Réel ajoute `gitops` (couche en plus, voulue) → +gitops matérialisé.
+        self._stub_real(layers=[*self._DATAOPS, "gitops"], backend="local-path")
+        path = self._topo_file()
+        code, _, _ = _capture(["refresh", "-f", path, "--yes"])
+        self.assertEqual(code, 0)
+        self.assertIn("gitops", yaml.safe_load(self._read(path))["layers"])
+
+    def test_aligned_reports_nothing(self):
+        # Réel == déclaré (profil dataops résolu) → rien à rapatrier, rien écrit.
+        self._stub_real(layers=self._DATAOPS, backend="local-path")
+        path = self._topo_file()
+        before = self._read(path)
+        code, out, _ = _capture(["refresh", "-f", path, "--yes"])
+        self.assertEqual(code, 0)
+        self.assertIn("déjà aligné", out)
+        self.assertEqual(self._read(path), before)
+
+    def test_refused_confirmation_writes_nothing(self):
+        # Hors TTY sans --yes : _confirm renvoie défaut (False) → rien écrit, code 0.
+        self._stub_real(layers=self._DATAOPS, backend="ceph")
+        path = self._topo_file()
+        before = self._read(path)
+        code, _, err = _capture(["refresh", "-f", path])  # pas de --yes, _capture hors TTY
+        self.assertEqual(code, 0)
+        self.assertIn("annulé", err)
+        self.assertEqual(self._read(path), before)
+
+
 class Dispatch(unittest.TestCase):
     def test_unknown_command_is_usage(self):
         with self.assertRaises(SystemExit) as ctx:

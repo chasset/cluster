@@ -112,6 +112,8 @@ from cluster_topology import (  # noqa: E402
 from cluster_topology import bootstrap as _bootstrap  # noqa: E402
 from cluster_topology import discover as _discover  # noqa: E402
 from cluster_topology import ha as _ha  # noqa: E402
+from cluster_topology import refresh_fuse as _refresh_fuse  # noqa: E402
+from cluster_topology import refresh_plan as _refresh_plan  # noqa: E402
 from cluster_topology import roundtrip as _roundtrip  # noqa: E402
 from cluster_topology import runner as _runner  # noqa: E402
 from cluster_topology import scale as _scale  # noqa: E402
@@ -1331,6 +1333,125 @@ def cmd_discover(args: argparse.Namespace) -> int:
     return 0
 
 
+def _real_layers_backend() -> tuple[list[str], str | None]:
+    """Couches saines + backend RÉELS du cluster, dérivés des sondes de `discover`.
+
+    Réutilise `_discover.assemble` (façade fine, ADR 0074/0076 §6) : on ne réimplémente
+    aucune détection. Renvoie (layers triées, backend) ; backend None si le cluster est
+    injoignable / aucune StorageClass reconnue (→ `refresh` ne PROPOSE rien dessus)."""
+    if not _ready_nodes():  # cluster injoignable → rien de fiable à rapatrier
+        return [], None
+    result = _discover.assemble(
+        nodes=_discover_node_roles(),
+        namespaces=_discover_namespaces(),
+        crd_groups=_discover_crd_groups(),
+        storageclass_provisioners=_discover_sc_provisioners(),
+        gateways_present=_discover_gateways_present(),
+    )
+    topo = result.topology
+    return list(topo.get("layers", [])), topo.get("storage", {}).get("backend")
+
+
+def cmd_refresh(args: argparse.Namespace) -> int:
+    """`refresh` : matérialise une évolution VOULUE du réel dans `topology.yaml` (ADR 0076).
+
+    3ᵉ geste réel↔déclaration (après `preview`=constater, `discover`=adopter de zéro) :
+    RÉALIGNE la topo active sur le réel (couche montée, backend changé délibérément).
+    Borné par l'ADR 0046 — JAMAIS d'écriture silencieuse : diff AFFICHÉ + confirmation,
+    puis FUSION en place (préserve commentaires/`status`, édition texte chirurgicale §4).
+    `--dry-run` : diff seul, rien écrit. `--yes` : confirme (CI/hors-TTY).
+
+    Périmètre v1 (ADR 0076 §2) : `layers` (couches saines) + `storage.backend`. Les
+    différences de NŒUDS sont SIGNALÉES (pas fusionnées : le nom k8s `lima-node1` ≠ le
+    nom déclaré `node1` exige une normalisation — différée, issue #357). Le SCALE
+    (runtime, ADR 0072) n'est jamais rapatrié. Suppression (déclaré absent) signalée,
+    jamais appliquée sans `--prune` (§3, v2).
+
+    Code 0 (à jour, ou fusion appliquée) ; 2 (usage : cluster injoignable, fichier non
+    éditable sûrement) ; le refus de confirmation n'est pas une erreur (0, rien fait)."""
+    path = _resolve(args.file)
+    topo = load_topology(path)
+    # Le RÉEL : couches saines + backend (sondes discover). Cluster injoignable → on
+    # refuse net (refresh n'a aucun réel à rapatrier — ce n'est pas « rien à faire »).
+    real_layers, real_backend = _real_layers_backend()
+    if real_backend is None and not real_layers:
+        raise _UsageError(
+            "cluster injoignable (aucun nœud Ready / aucune couche lue) — exporter "
+            "KUBECONFIG ou `cluster env`, ou monter le cluster (`cluster up`)"
+        )
+    # Le DÉCLARÉ, AU MÊME GRAIN que le réel : `discover` émet des PHASES (storage-simple,
+    # monitoring, gitops, dataops…), tandis que `declared_layers` peut être des ALIAS de
+    # profil (base/metrics/store/obs). On RÉSOUT le déclaré en phases (resolve_layers, le
+    # même graphe qu'`up`) — sinon tout matche faux (aliases ≠ phases). Backend du
+    # déclaré pour résoudre la variante stockage (storage-simple vs ceph/sc).
+    declared_backend = topo.storage.get("backend", "local-path")
+    try:
+        declared_phase_layers = resolve_layers(topo.declared_layers, declared_backend)
+    except TopologyError as exc:
+        raise _UsageError(str(exc)) from exc
+    # Les nœuds ne sont PAS fusionnés en v1 : on passe le MÊME jeu en déclaré et réel
+    # pour neutraliser leur diff (nom k8s lima-node1 ≠ déclaré node1, #357).
+    declared_nodes = [{"name": n.name, "roles": n.roles} for n in topo.nodes]
+    plan = _refresh_plan.plan_refresh(
+        declared_nodes=declared_nodes,
+        declared_layers=declared_phase_layers,
+        declared_backend=declared_backend,
+        real_nodes=declared_nodes,  # v1 : pas de diff de nœuds (cf. docstring / #357)
+        real_layers=real_layers,
+        real_backend=real_backend,
+    )
+
+    if not plan.has_signals:
+        print(f"`{os.path.basename(path)}` : déjà aligné sur le réel — rien à rapatrier.")
+        return 0
+
+    # Diff AFFICHÉ (ADR 0046 : on regarde avant d'écrire). Les absences sont dans le plan
+    # (signalées) mais NON appliquées (pas de --prune en v1).
+    print("Écart réel ↔ déclaration (refresh) :")
+    for line in _refresh_plan.format_plan(plan):
+        print(line)
+
+    if not plan.has_additions:
+        # Que des absences (rien à matérialiser) : on a SIGNALÉ, on n'écrit pas.
+        print("→ rien à matérialiser (seules des absences, signalées ci-dessus).")
+        return 0
+
+    if args.dry_run:
+        print("→ --dry-run : aucune écriture (diff seul).")
+        return 0
+
+    # --yes confirme (CI) ; hors TTY sans --yes, _confirm renvoie le défaut (False) →
+    # refus plutôt qu'écrire à l'aveugle (ADR 0046 : jamais de matérialisation silencieuse).
+    no_input = args.yes or not sys.stdin.isatty()
+    question = "Matérialiser ces ajouts dans la déclaration ?"
+    if not _confirm(question, default=args.yes, no_input=no_input):
+        print("refresh annulé (rien écrit).", file=sys.stderr)
+        return 0
+
+    # FUSION en place (édition texte, préserve le reste — ADR 0076 §4). Fail-closed :
+    # un fichier de forme inattendue lève FuseError → usage, JAMAIS de corruption.
+    with open(path, encoding="utf-8") as f:
+        source = f.read()
+    try:
+        fused = _refresh_fuse.fuse_topology(source, plan)
+    except _refresh_fuse.FuseError as exc:
+        raise _UsageError(f"fusion impossible ({exc}) — éditer `{path}` à la main") from exc
+    # On REVALIDE le résultat avant d'écrire (le fichier fusionné doit rester une topo
+    # valide — sinon on n'écrit pas et on signale). Import local : topology_from_dict
+    # n'est pas dans l'API du paquet, on le prend du modèle.
+    from cluster_topology.model import topology_from_dict
+
+    try:
+        topology_from_dict(yaml.safe_load(fused))
+    except (TopologyError, yaml.YAMLError) as exc:
+        raise _UsageError(f"fusion produirait une topo invalide ({exc}) — annulé") from exc
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(fused)
+    n_lignes = len(_refresh_plan.format_plan(plan))
+    print(f"✓ `{os.path.basename(path)}` mis à jour ({n_lignes} ligne(s)).")
+    return 0
+
+
 def cmd_preview(args: argparse.Namespace) -> int:
     """`preview` : LA vue complète d'une stack — VOULU + RÉEL + PLAN (calque `pulumi preview`).
 
@@ -2074,6 +2195,7 @@ _DISPATCH = {
     "access": cmd_access,  # accès dev (URLs + secrets) — délègue à access.sh (ADR 0048)
     "scale": cmd_scale,  # ajuste les replicas au nb de nœuds Ready (ADR 0072, runtime)
     "discover": cmd_discover,  # reconstruit un topology.yaml depuis le réel (ADR 0074, inverse de generate)  # noqa: E501
+    "refresh": cmd_refresh,  # réaligne la topo active sur le réel voulu (ADR 0076, fusion + confirmation)  # noqa: E501
     "up": cmd_up,  # calque `pulumi up` : monte TOUTE la séquence (délègue à run-phases.sh)
     "next": cmd_next,  # applique la PROCHAINE couche (1er drift, granularité fine)
     "destroy": cmd_destroy,  # calque `pulumi destroy`
@@ -2138,6 +2260,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "  access      ouvrir l'accès dev (URLs des services + identifiants)\n"
             "  scale       ajuster les replicas au nombre de nœuds\n"
             "  discover    reconstruire un topology.yaml depuis un cluster réel\n"
+            "  refresh     réaligner la déclaration sur le réel voulu (couche·backend)\n"
             "  artifact    fichiers générés + historique (generate·diff·runs·metrics)\n"
             "  test        vérifier le cluster (scenarios·smoke·roundtrip)\n"
             "\n"
@@ -2328,6 +2451,18 @@ def _build_parser() -> argparse.ArgumentParser:
         "--name",
         default="discovered",
         help="nom de la topologie reconstruite (défaut : discovered)",
+    )
+
+    p_refresh = sub.add_parser(
+        "refresh",
+        help="réaligner la déclaration sur une évolution voulue du réel (couche/backend)",
+    )
+    _add_file(p_refresh)
+    p_refresh.add_argument(
+        "--dry-run", action="store_true", help="afficher le diff seulement (n'écrit rien)"
+    )
+    p_refresh.add_argument(
+        "--yes", action="store_true", help="confirmer la fusion (requis hors TTY)"
     )
 
     p_destroy = sub.add_parser(
