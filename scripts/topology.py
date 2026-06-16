@@ -2227,11 +2227,17 @@ def cmd_remove(args: argparse.Namespace) -> int:
 
     Mêmes gardes d'isolation que `next` (ADR 0053) : le rollback vise le banc (kubeconfig
     + node-side ceph) → `_assert_bench_target` ; `BANC_JETABLE=1` est imposé par
-    run-phases.sh (jamais la prod). Code 0 si supprimé, 1 si une étape échoue /
-    confirmation refusée, 2 si usage."""
+    run-phases.sh (jamais la prod). Le backend de la stack est THREADÉ à rollback-lib
+    (STORAGE_BACKEND) pour cibler les bonnes ressources : sans lui, le rollback
+    retomberait sur `ceph` et tenterait de supprimer une OBC absente en local-path.
+    Code 0 si supprimé, 1 si une étape échoue / confirmation refusée, 2 si usage."""
     _assert_bench_target(f"cluster remove ({args.phase})")
+    topo = load_topology(_resolve(args.file))
+    backend = topo.storage.get("backend", "local-path")
     try:
-        result = _roundtrip.run_remove(args.phase, allow_full=args.full, assume_yes=args.yes)
+        result = _roundtrip.run_remove(
+            args.phase, backend=backend, allow_full=args.full, assume_yes=args.yes
+        )
     except _roundtrip.RoundtripError as exc:
         raise _UsageError(str(exc)) from exc
     print(f"Remove — couche `{result.phase}` → clôture {result.layers} :")
@@ -2597,6 +2603,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "remove",
         help="supprimer UNE couche et ses dépendantes (inverse de next, DESTRUCTIF banc)",
     )
+    _add_file(p_remove)
     p_remove.add_argument(
         "--phase",
         required=True,

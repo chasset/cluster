@@ -1876,8 +1876,10 @@ class Remove(unittest.TestCase):
 
         captured = {}
 
-        def fake(phase, *, allow_full, assume_yes):
-            captured.update(phase=phase, allow_full=allow_full, assume_yes=assume_yes)
+        def fake(phase, *, backend, allow_full, assume_yes):
+            captured.update(
+                phase=phase, backend=backend, allow_full=allow_full, assume_yes=assume_yes
+            )
             return RemoveResult(
                 phase=phase,
                 layers=[phase],
@@ -1887,15 +1889,19 @@ class Remove(unittest.TestCase):
         orig = cli._roundtrip.run_remove
         cli._roundtrip.run_remove = fake
         self.addCleanup(setattr, cli._roundtrip, "run_remove", orig)
-        code, out, _ = _capture(["remove", "--phase", "monitoring", "--yes"])
+        code, out, _ = _capture(["remove", "-f", _EXAMPLE, "--phase", "monitoring", "--yes"])
         self.assertEqual(code, 0)
-        self.assertEqual(captured, {"phase": "monitoring", "allow_full": False, "assume_yes": True})
+        # le backend de la stack est threadé (socle.example = ceph) ; flags relayés.
+        self.assertEqual(captured["phase"], "monitoring")
+        self.assertEqual(captured["allow_full"], False)
+        self.assertEqual(captured["assume_yes"], True)
+        self.assertIn(captured["backend"], ("ceph", "local-path"))  # threadé depuis la topo
         self.assertIn("couche supprimée", out)
 
     def test_incomplete_removal_is_rc1(self):
         from cluster_topology.roundtrip import RemoveResult, RoundtripStep
 
-        def fake(phase, *, allow_full, assume_yes):
+        def fake(phase, *, backend, allow_full, assume_yes):
             return RemoveResult(
                 phase=phase, layers=[phase], steps=[RoundtripStep("supprimer", False)]
             )
@@ -1903,19 +1909,19 @@ class Remove(unittest.TestCase):
         orig = cli._roundtrip.run_remove
         cli._roundtrip.run_remove = fake
         self.addCleanup(setattr, cli._roundtrip, "run_remove", orig)
-        code, out, _ = _capture(["remove", "--phase", "monitoring", "--yes"])
+        code, out, _ = _capture(["remove", "-f", _EXAMPLE, "--phase", "monitoring", "--yes"])
         self.assertEqual(code, 1)
         self.assertIn("INCOMPLÈTE", out)
 
     def test_storage_opt_in_error_is_usage(self):
         # run_remove lève RoundtripError (clôture stockage sans --full) → usage (2).
-        def boom(phase, *, allow_full, assume_yes):
+        def boom(phase, *, backend, allow_full, assume_yes):
             raise cli._roundtrip.RoundtripError("clôture de stockage — exiger --full")
 
         orig = cli._roundtrip.run_remove
         cli._roundtrip.run_remove = boom
         self.addCleanup(setattr, cli._roundtrip, "run_remove", orig)
-        code, _, err = _capture(["remove", "--phase", "ceph", "--yes"])
+        code, _, err = _capture(["remove", "-f", _EXAMPLE, "--phase", "ceph", "--yes"])
         self.assertEqual(code, 2)
         self.assertIn("--full", err)
 

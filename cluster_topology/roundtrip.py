@@ -315,6 +315,7 @@ class RemoveResult:
 def run_remove(
     phase: str,
     *,
+    backend: str | None = None,
     allow_full: bool = False,
     assume_yes: bool = False,
     run_phase=_run_phase,
@@ -328,6 +329,12 @@ def run_remove(
     confirmation, `run-phases.sh rollback`, vérification du signal) — pas de logique de
     destruction dupliquée. Détruire une couche entraîne celle de ses dépendantes
     (clôture descendante, ADR 0066) : on les retire en ordre AVAL→AMONT.
+
+    `backend` : le backend de stockage de la stack (local-path|ceph). DOIT être posé
+    (`STORAGE_BACKEND`) pour que rollback-lib cible les BONNES ressources : l'OBC Ceph
+    `cnpg-backups`/`loki-buckets` n'existe QU'en ceph — sans le backend, _rb_backend
+    retombe sur `ceph` par défaut et tente de supprimer une CRD `objectbucketclaim`
+    ABSENTE en local-path (rollback rc≠0). `None` → on laisse le défaut de rollback-lib.
 
     `allow_full` : autorise une clôture qui touche le stockage (≈ démontage du socle).
     `assume_yes` : saute la confirmation (CI). I/O injectables (tests sans banc)."""
@@ -344,10 +351,16 @@ def run_remove(
         result.steps.append(RoundtripStep("confirmation", False, "suppression non confirmée"))
         return result
 
+    # Env du rollback : BANC_JETABLE (destructif assumé) + STORAGE_BACKEND (cible les
+    # bonnes ressources par backend — l'OBC Ceph n'existe pas en local-path).
+    rollback_env = {"BANC_JETABLE": "1"}
+    if backend:
+        rollback_env["STORAGE_BACKEND"] = backend
+
     # 1. Détruire chaque couche de la clôture (ordre inverse : aval→amont).
     destroy_order = list(reversed(layers))
     for p in destroy_order:
-        rc = run_phase(["rollback", p], env_extra={"BANC_JETABLE": "1"})
+        rc = run_phase(["rollback", p], env_extra=rollback_env)
         if rc != 0:
             result.steps.append(RoundtripStep(f"supprimer {p}", False, f"rollback rc={rc}"))
             return result
