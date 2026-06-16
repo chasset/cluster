@@ -368,9 +368,7 @@ def run_remove(
         if rc != 0:
             echecs.append(f"{p} (rc={rc})")
     if echecs:
-        result.steps.append(
-            RoundtripStep("supprimer", False, f"échec(s) : {', '.join(echecs)}")
-        )
+        result.steps.append(RoundtripStep("supprimer", False, f"échec(s) : {', '.join(echecs)}"))
     else:
         result.steps.append(RoundtripStep("supprimer", True, f"clôture défaite : {destroy_order}"))
 
