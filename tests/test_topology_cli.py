@@ -2490,6 +2490,56 @@ class FetchKubeconfig(unittest.TestCase):
             )
 
 
+class DiscoverNodeside(unittest.TestCase):
+    """ADR 0081 étape 3 : _discover_nodeside sonde le node-side via node_exec (sans nœud)."""
+
+    _INV = "cloud:\n  vars:\n    target_kind: lima\ncontrol:\n  hosts:\n    node1: {}\n"
+
+    def _stub_probes(self, table):
+        # table: argv-clé (1er mot après 'sh -c' ou la commande) → stdout. None = injoignable.
+        class _CP:
+            def __init__(self, out):
+                self.returncode = 0
+                self.stdout = out
+                self.stderr = ""
+
+        def fake(node, argv, **kw):
+            key = argv[-1] if argv[0] == "sh" else argv[0]
+            if key not in table:
+                return _CP("")  # true / sondes non stubées → ok vide
+            val = table[key]
+            return None if val is None else _CP(val)
+
+        orig = cli._node_exec
+        cli._node_exec = fake
+        self.addCleanup(setattr, cli, "_node_exec", orig)
+
+    def test_assembles_nodeside_facts(self):
+        inv = _tmp(self._INV)
+        self.addCleanup(os.unlink, inv)
+        self._stub_probes(
+            {
+                "containerd": "containerd github.com/... v1.7.27 x",
+                "ls /etc/cni/net.d/ 2>/dev/null": "05-cilium.conflist",
+                "lsblk -dno NAME,SIZE 2>/dev/null": "vda 40G\nvdb 10G\n",
+                "systemctl": "active",  # auditd ET fail2ban → active
+            }
+        )
+        ns = cli._discover_nodeside("node1", inventory_path=inv)
+        self.assertEqual(ns.cri, "containerd 1.7.27")
+        self.assertEqual(ns.cni, "cilium")
+        self.assertEqual([d.name for d in ns.disks], ["vda", "vdb"])
+        self.assertEqual(ns.hardening, "hardened")
+
+    def test_unreachable_node_returns_none(self):
+        inv = _tmp(self._INV)
+        self.addCleanup(os.unlink, inv)
+        orig = cli._node_exec
+        cli._node_exec = lambda node, argv, **kw: None  # injoignable dès `true`
+        self.addCleanup(setattr, cli, "_node_exec", orig)
+        self.assertIsNone(cli._discover_nodeside("node1", inventory_path=inv))
+
+
 class Dispatch(unittest.TestCase):
     def test_unknown_command_is_usage(self):
         with self.assertRaises(SystemExit) as ctx:

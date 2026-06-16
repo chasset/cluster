@@ -1403,6 +1403,32 @@ def _fetch_kubeconfig(
     print(f"✓ kubeconfig rapatrié de `{node}` → {out_path} (endpoint {server})")
 
 
+def _discover_nodeside(node: str, *, inventory_path: str):
+    """Sonde l'état NODE-SIDE de `node` via node_exec (ADR 0081 étape 3) → `NodeSide`.
+
+    Lance les commandes node-side (containerd/CNI/lsblk/systemctl) sur le nœud ; le PARSING
+    est PUR (`nodeside.assemble_nodeside`). Chaque sonde est best-effort : une commande qui
+    échoue donne une chaîne vide → champ None/[] (un nœud peut ne pas répondre à tout sans
+    invalider le reste). Renvoie None si le nœud est totalement injoignable (1re sonde None)."""
+    from nestor import nodeside
+
+    def probe(argv: list[str]) -> str:
+        out = _node_exec(node, argv, inventory_path=inventory_path)
+        return (out.stdout or "") if out is not None and out.returncode == 0 else ""
+
+    # joignabilité : une 1re sonde None (pas rc≠0) = nœud injoignable → on n'invente rien.
+    first = _node_exec(node, ["true"], inventory_path=inventory_path)
+    if first is None:
+        return None
+    return nodeside.assemble_nodeside(
+        cri_version=probe(["containerd", "--version"]),
+        cni_listing=probe(["sh", "-c", "ls /etc/cni/net.d/ 2>/dev/null"]),
+        lsblk=probe(["sh", "-c", "lsblk -dno NAME,SIZE 2>/dev/null"]),
+        auditd=probe(["systemctl", "is-active", "auditd"]),
+        fail2ban=probe(["systemctl", "is-active", "fail2ban"]),
+    )
+
+
 def cmd_scale(args: argparse.Namespace) -> int:
     """`scale` : ajuste les replicas des workloads stateless au nombre de nœuds (ADR 0072).
 
@@ -1552,6 +1578,28 @@ def cmd_discover(args: argparse.Namespace) -> int:
         for h in result.health:
             mark = {"sain": "✓", "dégradé": "✗", "absent": "○"}.get(h.verdict, "?")
             print(f"  {mark} {h.dimension} : {h.verdict} ({h.detail})", file=sys.stderr)
+
+    # NODE-SIDE (ADR 0081 étape 3) : ce que l'API k8s NE PORTE PAS — CRI/CNI/disques/
+    # durcissement, lu par node_exec sur chaque nœud découvert. Sur stderr (informatif,
+    # n'altère pas le YAML) : la forme dans le topology.yaml sera figée une fois validée
+    # sur un vrai nœud (banc en cours de stabilisation).
+    if getattr(args, "node_side", False):
+        inv = _inventory_for(load_topology(_resolve(args.file)))
+        print("\nNode-side (hors API k8s, ADR 0081) :", file=sys.stderr)
+        for n in result.topology.get("nodes", []):
+            name = n.get("name")
+            if not name:
+                continue
+            ns = _discover_nodeside(name, inventory_path=inv)
+            if ns is None:
+                print(f"  {name} : injoignable (node_exec)", file=sys.stderr)
+                continue
+            disks = ", ".join(f"{d.name}({d.size})" for d in ns.disks) or "—"
+            print(
+                f"  {name} : CRI={ns.cri or '?'} · CNI={ns.cni or '?'} · "
+                f"durcissement={ns.hardening or '?'} · disques={disks}",
+                file=sys.stderr,
+            )
     return 0
 
 
@@ -3090,6 +3138,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--server",
         default="https://127.0.0.1:6443",
         help="endpoint réécrit dans le kubeconfig rapatrié (défaut : port-forward Lima)",
+    )
+    p_discover.add_argument(
+        "--node-side",
+        action="store_true",
+        help="sonder aussi le node-side (CRI/CNI/disques/durcissement) via node_exec (ADR 0081)",
     )
 
     p_refresh = sub.add_parser(
