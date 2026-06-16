@@ -11,7 +11,11 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from nestor.isolation import classify_inventory_target  # noqa: E402
+from nestor.isolation import (  # noqa: E402
+    IsolationError,
+    classify_inventory_target,
+    resolve_node_target,
+)
 
 # Inventaire PROD (forme de bootstrap/hosts.yaml) : groupe cloud, target_kind prod,
 # hôtes génériques cp1/node1-3 (ADR 0023) + un control_host localhost.
@@ -112,6 +116,64 @@ class FailClosed(unittest.TestCase):
             }
         }
         self.assertFalse(classify_inventory_target(inv, "lima")[0])
+
+
+# Inventaire BANC réel (forme générée par write_inventory) : ansible_host lima-<vm> +
+# ansible_ssh_common_args -F ~/.lima/<vm>/ssh.config, user lima.
+_BANC_GEN_INV = {
+    "cloud": {
+        "children": {"control": None, "workers": None},
+        "vars": {"ansible_user": "lima", "target_kind": "lima"},
+    },
+    "control": {
+        "hosts": {
+            "node1": {
+                "ansible_host": "lima-node1",
+                "ansible_ssh_common_args": "-F /home/u/.lima/node1/ssh.config",
+            }
+        }
+    },
+    "workers": {"hosts": {"node2": {"ansible_host": "lima-node2"}}},
+    "control_host": {"hosts": {"localhost": {"ansible_connection": "local"}}},
+}
+
+
+class ResolveNodeTarget(unittest.TestCase):
+    """ADR 0081 : résoudre <node> → cible (transport/hôte/user/ssh-args) depuis l'inventaire."""
+
+    def test_lima_node_resolves_to_limactl_transport(self):
+        t = resolve_node_target(_BANC_GEN_INV, "node1")
+        self.assertEqual(t.transport, "lima")  # banc → limactl, pas SSH
+        self.assertEqual(t.host, "lima-node1")
+        self.assertEqual(t.user, "lima")  # remonté des vars du groupe cloud
+        self.assertEqual(t.ssh_args, "-F /home/u/.lima/node1/ssh.config")
+
+    def test_prod_node_resolves_to_ssh_transport(self):
+        t = resolve_node_target(_PROD_INV, "cp1")
+        self.assertEqual(t.transport, "ssh")  # prod → SSH direct
+        self.assertEqual(t.host, "10.0.0.11")  # ansible_host (IP générique, ADR 0023)
+        self.assertEqual(t.user, "debian")  # vars cloud
+
+    def test_node_in_workers_group_is_found(self):
+        # la résolution traverse tout l'arbre de groupes, pas que `control`.
+        t = resolve_node_target(_PROD_INV, "node2")
+        self.assertEqual(t.host, "10.0.0.13")
+
+    def test_host_attr_user_overrides_group_var(self):
+        inv = {
+            "cloud": {"vars": {"ansible_user": "debian", "target_kind": "prod"}},
+            "control": {"hosts": {"cp1": {"ansible_host": "10.0.0.9", "ansible_user": "root"}}},
+        }
+        self.assertEqual(resolve_node_target(inv, "cp1").user, "root")  # l'hôte prime
+
+    def test_host_fallback_when_no_ansible_host(self):
+        # sans ansible_host, on retombe sur le NOM du nœud (jamais deviner une IP).
+        inv = {"cloud": {"vars": {"target_kind": "prod"}}, "control": {"hosts": {"cp1": {}}}}
+        self.assertEqual(resolve_node_target(inv, "cp1").host, "cp1")
+
+    def test_unknown_node_raises(self):
+        with self.assertRaises(IsolationError):
+            resolve_node_target(_PROD_INV, "ghost")
 
 
 if __name__ == "__main__":

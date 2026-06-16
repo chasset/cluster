@@ -1328,6 +1328,43 @@ def _assert_inventory_safe(action: str, inventory_path: str, topo: Topology) -> 
         )
 
 
+# ── node_exec : exécuter une commande SUR un nœud (ADR 0081) ─────────────────────────────
+# Façade I/O qui réunit les DEUX transports (limactl pour le banc Lima, SSH pour la prod)
+# derrière une signature unique, consommée par `discover` (rapatrier le kubeconfig, lire le
+# node-side) et `remove` (wipe node-side). La RÉSOLUTION <node>→cible est PURE
+# (`isolation.resolve_node_target`) ; ici, uniquement le sous-processus borné. C'est
+# l'irréductible bash de l'ADR 0049 (exec de CLI) — Python l'APPELLE, ne le réimplémente pas.
+
+
+def _node_exec(node: str, argv: list[str], *, inventory_path: str, timeout: int = 30):
+    """Exécute `argv` SUR le nœud `node`, transport résolu de l'inventaire (ADR 0081).
+
+    `lima` → `limactl shell <host> -- argv` ; `ssh` → `ssh [args] user@host -- argv`. Renvoie
+    le CompletedProcess (rc/stdout/stderr) ou None si injoignable/usage. La cible vient de
+    `inventory_path` (source UNIQUE, ADR 0053) ; un nœud absent lève `_UsageError`."""
+    try:
+        with open(inventory_path, encoding="utf-8") as f:
+            inv = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        raise _UsageError(f"inventaire illisible ({inventory_path}) : {exc}") from exc
+    try:
+        target = _isolation.resolve_node_target(inv, node)
+    except _isolation.IsolationError as exc:
+        raise _UsageError(str(exc)) from exc
+    if target.transport == "lima":
+        cmd = ["limactl", "shell", target.host, "--", *argv]
+    else:
+        dest = f"{target.user}@{target.host}" if target.user else target.host
+        ssh_opts = shlex.split(target.ssh_args) if target.ssh_args else []
+        cmd = ["ssh", *ssh_opts, dest, "--", *argv]
+    try:
+        return subprocess.run(  # noqa: S603 — argv contrôlé ; transport résolu de l'inventaire
+            cmd, check=False, capture_output=True, text=True, timeout=timeout
+        )
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
 def cmd_scale(args: argparse.Namespace) -> int:
     """`scale` : ajuste les replicas des workloads stateless au nombre de nœuds (ADR 0072).
 
