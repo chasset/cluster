@@ -148,7 +148,29 @@ vecteur d'armement de (a)) exige `lima` explicite dès que la prod coexiste,
 **annonce sur stderr** ce qu'il charge, et pose un marqueur d'intention lisible
 par le garde-fou de (a).
 
-Ces quatre règles sont **opposables** : une revue ou la CI peut refuser un
+### (e) `topology.py` porte le miroir Python de (a) et (d)
+
+L'outil `cluster` (`scripts/topology.py`) interroge le cluster via `kubectl`.
+Sans garde, un banc absent le faisait retomber sur `~/.kube/config` (= la prod)
+: sa section RÉEL affichait des nœuds de prod, et pire,
+`up`/`next`/`destroy`/`scale --apply` pouvaient **muter la prod** par erreur.
+Deux protections, miroir de (a) et (d) :
+
+- **Repli kubeconfig SÛR** (`_bench_kubeconfig`) : `KUBECONFIG` exporté
+  (intention, cf. (a)) → respecté ; sinon le banc s'il existe ; **sinon un
+  kubeconfig VIDE** (`/dev/null`), **jamais `~/.kube/config`**. Un banc absent
+  rend des lectures vides (« pas de banc », honnête), il ne lit plus la prod par
+  accident.
+- **Garde de mutation** (`_assert_bench_target`) : les commandes BANC mutantes
+  REFUSENT (code 2, miroir du `exit 2` de (d)) si le banc est absent ET que le
+  contexte courant ne vise pas le banc (marqueur `server: https://127.0.0.1:` de
+  (a)). Échappatoire = `KUBECONFIG` exporté (intention explicite, ADR 0065). La
+  lecture (`preview`) n'est pas bloquée mais **avertit** ; `discover` (usage
+  prod légitime, [ADR 0074](0074-cluster-discover-reconstruire-topologie.md))
+  n'est jamais gardé. `stack select` invalide le kubeconfig de l'ancienne stack
+  et avertit si aucun banc n'est monté.
+
+Ces quatre règles (a-d) sont **opposables** : une revue ou la CI peut refuser un
 résultat produit par un chemin à cible ambiante (kubectl nu, inventaire non
 marqué, export deviné). Elles ne **bypassent** aucun garde-fou et n'introduisent
 **aucune valeur de déploiement versionnée** : étiquettes (`cluster-banc`,

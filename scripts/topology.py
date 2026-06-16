@@ -134,6 +134,34 @@ _BENCH_KUBECONFIG = os.path.join(_ROOT, "bench", "lima", ".work", "kubeconfig")
 # Borne l'attente du scan réel (preview/up) sur limactl/kubectl : un cluster injoignable ou
 # un démon Lima bloqué ne doit JAMAIS figer le refresh (leçon du timeout ha._vm_exec).
 _REFRESH_TIMEOUT_S = 8
+
+
+def _bench_kubeconfig() -> str:
+    """Le kubeconfig que `cluster` doit RÉELLEMENT utiliser, par priorité (ADR 0053) :
+
+    1. `KUBECONFIG` exporté → intention EXPLICITE de l'opérateur (respectée) ;
+    2. le banc Lima s'il existe → la cible nominale de l'outil ;
+    3. sinon → `/dev/null` (kubeconfig VIDE), JAMAIS `~/.kube/config`.
+
+    Le point (3) est le correctif de fond : `cluster` est un outil de BANC ; sans
+    banc ni intention explicite, il ne doit PAS retomber silencieusement sur le
+    contexte du poste (= la prod). Pointer `/dev/null` fait échouer kubectl
+    proprement → les lectures renvoient « vide » (honnête : pas de banc), au lieu de
+    lire/muter la prod par accident."""
+    explicit = os.environ.get("KUBECONFIG")
+    if explicit:
+        return explicit
+    if os.path.exists(_BENCH_KUBECONFIG):
+        return _BENCH_KUBECONFIG
+    return os.devnull  # vide : kubectl échoue → "pas de banc", jamais la prod
+
+
+def _kubectl_env() -> dict[str, str]:
+    """Env pour un appel kubectl du banc : force KUBECONFIG vers la cible sûre
+    (`_bench_kubeconfig`) — jamais le ~/.kube/config implicite de la prod."""
+    return {**os.environ, "KUBECONFIG": _bench_kubeconfig()}
+
+
 # Chemins nommés connus de l'historique (ADR 0045 §6) pour le verdict par chemin.
 _CHEMINS_NOMMES = ["atlas", "storage-real", "cluster-dataops"]
 
@@ -411,8 +439,34 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
 
     # Garde-fou : valider AVANT d'activer (ne pas pointer le symlink sur un fichier cassé).
     topo = load_topology(target_abs)
+    # Stack active AVANT le switch : si on change de cible, le kubeconfig banc en place
+    # pointe l'ANCIENNE stack (mauvais cluster, ou la prod si l'ancien banc est détruit).
+    # On l'invalide (ADR 0053) → la prochaine `up`/`bootstrap` le régénère pour la
+    # nouvelle stack. Re-sélectionner la MÊME stack ne touche à rien (pas de régression
+    # d'accès à un banc vivant).
+    ancienne = _active_stack_name(None)
+    nouvelle = topo.catalog.get("topology")
     _activate_symlink(target_rel)
-    print(f"✓ activée : topology.yaml → {target_rel} (chemin dérivé : {default_target(topo)})")
+    invalide = ""
+    if ancienne is not None and ancienne != nouvelle and os.path.exists(_BENCH_KUBECONFIG):
+        os.remove(_BENCH_KUBECONFIG)
+        invalide = (
+            f"\n  kubeconfig banc invalidé (pointait `{ancienne}`) — "
+            "`cluster up` le régénère pour la nouvelle stack."
+        )
+    print(
+        f"✓ activée : topology.yaml → {target_rel} "
+        f"(chemin dérivé : {default_target(topo)}){invalide}"
+    )
+    # Avertir TÔT (pas seulement au preview) si la stack n'a pas de banc monté : sans
+    # kubeconfig banc, les commandes de lecture retombent sur ~/.kube/config = la prod
+    # (ADR 0053). L'utilisateur sait ainsi qu'il doit monter le banc avant tout preview.
+    if not os.path.exists(_BENCH_KUBECONFIG) and not _context_targets_bench():
+        print(
+            "  ⚠ banc non monté : `cluster preview` lira le contexte kubectl courant "
+            "(potentiellement la PROD). Monter le banc d'abord : `cluster up`.",
+            file=sys.stderr,
+        )
     return 0
 
 
@@ -450,12 +504,9 @@ def _real_vms() -> list[str]:
 def _ready_nodes() -> list[str]:
     """Noms des nœuds k8s à l'état Ready (`kubectl get nodes`). Vide si injoignable.
 
-    Kubeconfig : `KUBECONFIG` exporté s'il existe, sinon REPLI sur le kubeconfig du
-    banc (`_BENCH_KUBECONFIG`, écrit par run-phases.sh) — sans quoi `preview` lit
-    `~/.kube/config` (pas le banc) et voit 0 nœud Ready alors que le socle tourne."""
-    kubeconfig = os.environ.get("KUBECONFIG") or (
-        _BENCH_KUBECONFIG if os.path.exists(_BENCH_KUBECONFIG) else None
-    )
+    Kubeconfig : `KUBECONFIG` exporté, sinon le banc, sinon un kubeconfig VIDE — jamais
+    `~/.kube/config` (la prod). Cf. `_bench_kubeconfig` (ADR 0053) : un banc absent
+    rend une liste vide (« pas de banc »), il ne lit pas la prod par accident."""
     try:
         out = subprocess.run(  # noqa: S603 — argv fixe, pas d'entrée shell
             # --request-timeout borne l'attente côté kubectl (cluster injoignable) ;
@@ -464,7 +515,7 @@ def _ready_nodes() -> list[str]:
             check=False,
             capture_output=True,
             text=True,
-            env={**os.environ, **({"KUBECONFIG": kubeconfig} if kubeconfig else {})},
+            env=_kubectl_env(),
             timeout=_REFRESH_TIMEOUT_S,
         )
     except (OSError, ValueError, subprocess.TimeoutExpired):
@@ -501,9 +552,6 @@ def _resource_exists(kind: str, name: str, namespace: str | None) -> bool:
     """`True` si la ressource k8s existe sur le banc (kubectl get, borné). Toute
     erreur (absente, cluster injoignable, kind inconnu) → False (prudent : on ne
     marque « à-jour » que sur une présence CONSTATÉE)."""
-    kubeconfig = os.environ.get("KUBECONFIG") or (
-        _BENCH_KUBECONFIG if os.path.exists(_BENCH_KUBECONFIG) else None
-    )
     argv = ["kubectl", "get", kind, name, "--request-timeout=5s"]
     if namespace:
         argv += ["-n", namespace]
@@ -513,7 +561,7 @@ def _resource_exists(kind: str, name: str, namespace: str | None) -> bool:
             check=False,
             capture_output=True,
             text=True,
-            env={**os.environ, **({"KUBECONFIG": kubeconfig} if kubeconfig else {})},
+            env=_kubectl_env(),  # banc, sinon vide — jamais la prod (ADR 0053)
             timeout=_REFRESH_TIMEOUT_S,
         )
     except (OSError, ValueError, subprocess.TimeoutExpired):
@@ -634,6 +682,7 @@ def cmd_destroy(args: argparse.Namespace) -> int:
 
     Codes : 0 succès (ou rien à détruire) ; 1 échec du down délégué ; 2 confirmation
     refusée / hors TTY sans --yes."""
+    _assert_bench_target("cluster destroy")
     path = _resolve(args.file)
     topo = load_topology(path)
     stack = topo.catalog.get("topology", "—")
@@ -918,11 +967,7 @@ def cmd_access(args: argparse.Namespace) -> int:
     via l'arm `run-phases.sh access`, en passant les options telles quelles
     (`--stop` / `--print-hosts` / `--no-hosts`). Code 0/1 = celui de access.sh ; 2 si
     le banc n'a pas de kubeconfig (socle non monté)."""
-    if not os.path.exists(_BENCH_KUBECONFIG):
-        raise _UsageError(
-            f"kubeconfig du banc absent ({_BENCH_KUBECONFIG}) — monter le cluster d'abord "
-            "(`cluster up`)"
-        )
+    _assert_bench_target("cluster access")
     # Reconstruit les flags d'access.sh depuis les options parsées (un set fixe, sûr).
     flags = [
         flag
@@ -941,18 +986,16 @@ def cmd_access(args: argparse.Namespace) -> int:
 
 
 def _kubectl(*args: str, timeout: int = _REFRESH_TIMEOUT_S):
-    """Lance `kubectl <args>` sur le banc (kubeconfig en repli), borné. Renvoie le
-    CompletedProcess (rc/stdout) ou None si injoignable — l'appelant décide."""
-    kubeconfig = os.environ.get("KUBECONFIG") or (
-        _BENCH_KUBECONFIG if os.path.exists(_BENCH_KUBECONFIG) else None
-    )
+    """Lance `kubectl <args>` sur le banc (kubeconfig en repli sûr), borné. Renvoie le
+    CompletedProcess (rc/stdout) ou None si injoignable — l'appelant décide. Le
+    kubeconfig vise le banc, sinon un kubeconfig VIDE — jamais la prod (ADR 0053)."""
     try:
         return subprocess.run(  # noqa: S603 — argv contrôlé (table de workloads)
             ["kubectl", *args, "--request-timeout=5s"],
             check=False,
             capture_output=True,
             text=True,
-            env={**os.environ, **({"KUBECONFIG": kubeconfig} if kubeconfig else {})},
+            env=_kubectl_env(),
             timeout=timeout,
         )
     except (OSError, ValueError, subprocess.TimeoutExpired):
@@ -975,6 +1018,74 @@ def _argocd_managed(name: str, namespace: str) -> bool:
     return out is not None and out.returncode == 0 and out.stdout.strip() == "argocd"
 
 
+# ── Garde d'isolation banc/prod (ADR 0053) ───────────────────────────────────
+# Sans kubeconfig banc, kubectl/le client retombent sur ~/.kube/config = la PROD.
+# Une commande BANC mutante (up/next/destroy/scale --apply/ha-3cp/…) ne doit JAMAIS
+# s'exécuter sur une cible non prouvée-banc : elle pourrait muter la prod par erreur.
+
+
+def _active_kubeconfig() -> str | None:
+    """Cible kubeconfig EXPLICITE/banc, ou None si ni l'un ni l'autre (= sans cible
+    sûre). Sert à la garde/preview pour savoir si on est « hors banc » ; le repli
+    réel vers `/dev/null` (jamais la prod) est porté par `_bench_kubeconfig`."""
+    return os.environ.get("KUBECONFIG") or (
+        _BENCH_KUBECONFIG if os.path.exists(_BENCH_KUBECONFIG) else None
+    )
+
+
+def _context_targets_bench() -> bool:
+    """`True` si le contexte kubectl COURANT vise PROUVABLEMENT le banc Lima.
+
+    Marqueur principal (ADR 0053) : le banc expose l'API en port-forward localhost
+    (`server: https://127.0.0.1:<port>`, bench/lima/lib.sh) — disjoint de toute prod
+    (VIP/hostname réel). Read-only, borné, FAIL-CLOSED : toute incertitude → False
+    (on ne peut pas prouver le banc → on traite comme non-banc). Sonde via la cible
+    SÛRE (`_kubectl_env` : banc ou vide, jamais la prod)."""
+    env = _kubectl_env()
+    try:
+        out = subprocess.run(  # noqa: S603 — argv fixe, lecture seule
+            [
+                "kubectl",
+                "config",
+                "view",
+                "--minify",
+                "-o",
+                "jsonpath={.clusters[0].cluster.server}",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=_REFRESH_TIMEOUT_S,
+        )
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return False  # injoignable → on ne peut PAS prouver le banc → refus
+    server = out.stdout.strip()
+    return out.returncode == 0 and server.startswith(("https://127.0.0.1:", "https://localhost:"))
+
+
+def _assert_bench_target(action: str) -> None:
+    """Garde d'isolation (ADR 0053) : une commande BANC mutante ne s'exécute QUE sur
+    une cible prouvée-banc. Si le kubeconfig du banc est absent ET que le contexte
+    courant ne vise pas le banc, REFUS (code 2) — protège la prod d'une mutation par
+    erreur. Échappatoire prod EXPLICITE : `KUBECONFIG` exporté = intention assumée
+    (ADR 0065) — la garde ne bloque alors pas (et `discover` n'est jamais gardé,
+    ADR 0074)."""
+    if os.environ.get("KUBECONFIG"):
+        return  # intention explicite assumée par l'opérateur
+    if os.path.exists(_BENCH_KUBECONFIG) and _context_targets_bench():
+        return  # banc présent ET contexte = banc : nominal
+    raise _UsageError(
+        f"REFUS : `{action}` est une commande BANC mais le kubeconfig du banc est "
+        f"absent ({os.path.relpath(_BENCH_KUBECONFIG, _ROOT)}) et le contexte kubectl "
+        "courant ne vise pas le banc Lima (127.0.0.1). Cette commande pourrait MUTER "
+        "la PRODUCTION par erreur (ADR 0053).\n"
+        "  • Monter le banc d'abord : `bench/lima/run-phases.sh up`\n"
+        "  • Ou, si l'intention est délibérée hors-banc, exporter KUBECONFIG "
+        'explicitement : `eval "$(bench/lima/env.sh export)"`'
+    )
+
+
 def cmd_scale(args: argparse.Namespace) -> int:
     """`scale` : ajuste les replicas des workloads stateless au nombre de nœuds (ADR 0072).
 
@@ -984,6 +1095,8 @@ def cmd_scale(args: argparse.Namespace) -> int:
     managé par ArgoCD (un scale impératif serait écrasé au sync — ADR 0046). Code 0
     si tout est appliqué/à-jour ; 1 si un `kubectl scale` échoue ; 2 si banc
     injoignable (usage)."""
+    if args.apply:
+        _assert_bench_target("cluster scale --apply")
     ready = _ready_nodes()
     if not ready:
         raise _UsageError(
@@ -1120,6 +1233,15 @@ def cmd_preview(args: argparse.Namespace) -> int:
 
     Read-only : ne LANCE ni ne DÉTRUIT rien (`next` applique ; `destroy` détruit). Code 0
     (informatif) ; chemin incohérent avec le backend → usage (2)."""
+    # Lecture seule : on ne BLOQUE pas (preview/discover doivent rester possibles),
+    # mais on AVERTIT si la sonde retombe sur ~/.kube/config sans viser le banc — la
+    # section RÉEL refléterait alors la PROD, pas le banc (ADR 0053).
+    if _active_kubeconfig() is None and not _context_targets_bench():
+        print(
+            "⚠ lecture hors banc : aucun kubeconfig banc et le contexte kubectl ne vise "
+            "pas le banc Lima — la section RÉEL peut refléter la PRODUCTION (ADR 0053).",
+            file=sys.stderr,
+        )
     path = _resolve(args.file)
     topo = load_topology(path)
     runs = load_runs(args.history or _RUNS_HISTORY)
@@ -1285,6 +1407,7 @@ def cmd_up(args: argparse.Namespace) -> int:
     Là où `next` monte UNE couche (1er drift), `up` monte TOUTE la séquence. Code 0
     si le montage réussit ; 1 si run-phases.sh échoue ; 2 (usage) si confirmation
     refusée / chemin incohérent avec le backend."""
+    _assert_bench_target("cluster up")
     path = _resolve(args.file)
     topo = load_topology(path)
     target = args.target or default_target(topo)
@@ -1395,6 +1518,7 @@ def cmd_next(args: argparse.Namespace) -> int:
     # les VMs ET monte k8s+CNI ensemble (des VMs sans k8s ne servent à rien) ; un nœud
     # déjà Ready le rend idempotent. Au `next` suivant, la 1re couche applicative se monte.
     if sugg.phase in ("up", "bootstrap"):
+        _assert_bench_target("cluster next (socle)")
         stack_name = topo.catalog.get("topology", "—")
         runphases = os.path.join(_ROOT, "bench", "lima", "run-phases.sh")
         print(f"→ {sugg.phase} : montage du socle (VMs + Kubernetes + CNI) via run-phases.sh…")
@@ -1426,6 +1550,7 @@ def cmd_next(args: argparse.Namespace) -> int:
             "— le générer (`topology.py generate -o bootstrap/hosts.yaml`) "
             "ou le copier depuis bootstrap/hosts.example.yaml"
         )
+    _assert_bench_target(f"cluster next ({sugg.phase})")
     playbook = os.path.relpath(os.path.join(_ROOT, sugg.playbook), private_data_dir)
     print(f"→ lancement de {sugg.phase} ({sugg.playbook}) via ansible-runner…")
     try:
@@ -1457,6 +1582,7 @@ def cmd_ha_3cp(args: argparse.Namespace) -> int:
     run-phases.sh. La logique (séquence, super-admin→admin, gates etcd) est testée
     sans banc (tests/test_ha.py) ; ce câblage est la seule I/O réelle.
     """
+    _assert_bench_target("ha-3cp")
     import time
 
     private_data_dir = os.path.join(_ROOT, "bootstrap")
@@ -1555,6 +1681,7 @@ def cmd_bootstrap_seq(args: argparse.Namespace) -> int:
     0049) ; cette commande reçoit cp_ip/inventaire déjà dérivés du banc et rappelle
     `ha-cni <iface>` pour la CNI. La logique (séquence, fail-fast) est testée sans
     banc (tests/test_bootstrap.py)."""
+    _assert_bench_target("bootstrap-seq")
     private_data_dir = os.path.join(_ROOT, "bootstrap")
     inventory = (
         args.inventory
@@ -1672,6 +1799,7 @@ def cmd_roundtrip(args: argparse.Namespace) -> int:
     toute suppression définitive, CONFIRMATION sur TTY (ou `--yes` hors TTY). Code 0
     si réversible, 1 si une étape échoue / confirmation refusée, 2 si usage.
     """
+    _assert_bench_target("cluster roundtrip")
     try:
         result = _roundtrip.run_roundtrip(args.phase, allow_full=args.full, assume_yes=args.yes)
     except _roundtrip.RoundtripError as exc:

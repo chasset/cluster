@@ -38,6 +38,46 @@ _SPEC = importlib.util.spec_from_file_location(
 cli = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(cli)
 
+# ── Blindage anti-provisionnement (filet de sécurité module) ──────────────────
+# Aucun test ne doit JAMAIS lancer un VRAI run-phases.sh / limactl / ansible-runner
+# (un test mal stubé a déjà provisionné 4 VMs Lima en démarrant un montage réel).
+# setUpModule remplace cli.subprocess.run par un DEFAULT-DENY : tout appel touchant
+# le provisioning ÉCHOUE bruyamment (CI rouge) au lieu de monter un banc en silence.
+# Les tests qui veulent observer un argv réinstallent leur _spy par-dessus ; leur
+# addCleanup restaure ce garde-fou (jamais le vrai subprocess.run).
+_REAL_SUBPROCESS_RUN = cli.subprocess.run  # capturé une fois, JAMAIS rendu aux tests
+_FORBIDDEN_TOKENS = ("run-phases.sh", "limactl", "ansible-runner")
+
+
+def _deny_run(argv, *a, **k):
+    """Default-deny : intercepte tout appel subprocess de provisioning réel."""
+    flat = " ".join(map(str, argv)) if isinstance(argv, (list, tuple)) else str(argv)
+    if any(tok in flat for tok in _FORBIDDEN_TOKENS) or ("kubectl" in flat and "scale" in flat):
+        raise AssertionError(
+            f"TEST NON BLINDÉ : appel subprocess RÉEL de provisionnement intercepté — {flat!r}. "
+            "Le test doit stuber cli.subprocess.run (et toutes les closures internes "
+            "_runphases/run_cni/set_inventory de cmd_ha_3cp/cmd_bootstrap_seq)."
+        )
+    # kubectl get / config view (lecture) : neutralisé en CompletedProcess vide (déterminisme).
+    return subprocess.CompletedProcess(args=argv, returncode=0, stdout="", stderr="")
+
+
+_REAL_ASSERT_BENCH = cli._assert_bench_target  # garde d'isolation réelle
+
+
+def setUpModule():
+    cli.subprocess.run = _deny_run
+    # Garde d'isolation neutralisée PAR DÉFAUT : les tests métier (up/next/destroy/…)
+    # n'ont pas de vrai banc et ne doivent pas être bloqués par elle. La classe
+    # `BenchTargetGuard` la RÉACTIVE explicitement pour la tester (cf. _REAL_ASSERT_BENCH).
+    cli._assert_bench_target = lambda action: None
+
+
+def tearDownModule():
+    cli.subprocess.run = _REAL_SUBPROCESS_RUN
+    cli._assert_bench_target = _REAL_ASSERT_BENCH
+
+
 from cluster_topology import (  # noqa: E402
     derive_run_params,
     load_topology,
@@ -69,10 +109,20 @@ target_kind: prod
 
 
 def _capture(argv):
-    """Lance main(argv) ; renvoie (code, stdout, stderr)."""
+    """Lance main(argv) ; renvoie (code, stdout, stderr).
+
+    Isole os.environ : `main()` appelle `_default_kubeconfig_to_bench()` qui POSE
+    `os.environ["KUBECONFIG"]` quand le banc « existe » (stub) — sans restauration,
+    ce KUBECONFIG fuiterait vers les _capture suivants et fausserait la garde
+    d'isolation (qui retourne tôt si KUBECONFIG est exporté). On restaure l'env."""
+    saved_env = os.environ.copy()
     out, err = io.StringIO(), io.StringIO()
-    with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
-        code = cli.main(argv)
+    try:
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = cli.main(argv)
+    finally:
+        os.environ.clear()
+        os.environ.update(saved_env)
     return code, out.getvalue(), err.getvalue()
 
 
@@ -1041,10 +1091,83 @@ class Access(unittest.TestCase):
         self.assertEqual(code, 2)
 
     def test_refuses_without_bench(self):
+        # La garde d'isolation (neutralisée par défaut dans setUpModule) est RÉACTIVÉE
+        # ici pour vérifier qu'access refuse quand le banc est absent ET le contexte
+        # ne vise pas le banc (ADR 0053). Pas de KUBECONFIG exporté, pas de banc.
         self._stub(bench=False)
+        cli._assert_bench_target = _REAL_ASSERT_BENCH
+        self.addCleanup(setattr, cli, "_assert_bench_target", lambda action: None)
+        orig_ctx = cli._context_targets_bench
+        cli._context_targets_bench = lambda: False
+        self.addCleanup(setattr, cli, "_context_targets_bench", orig_ctx)
         code, _, err = _capture(["access"])
-        self.assertEqual(code, 2)  # _UsageError → code 2
-        self.assertIn("kubeconfig du banc absent", err)
+        self.assertEqual(code, 2)  # _UsageError → code 2 (garde d'isolation, ADR 0053)
+        self.assertIn("REFUS", err)
+        self.assertIn("ADR 0053", err)
+
+
+class BenchTargetGuard(unittest.TestCase):
+    """Garde d'isolation (ADR 0053) : les mutations banc refusent une cible non-banc.
+
+    Teste la VRAIE garde (_REAL_ASSERT_BENCH), neutralisée ailleurs par setUpModule.
+    On contrôle les 3 entrées : KUBECONFIG exporté, présence du banc, contexte kubectl."""
+
+    def _arm(self, *, bench_exists, targets_bench, kubeconfig_env=None):
+        cli._assert_bench_target = _REAL_ASSERT_BENCH
+        self.addCleanup(setattr, cli, "_assert_bench_target", lambda action: None)
+        orig_exists = cli.os.path.exists
+        cli.os.path.exists = lambda p: (
+            bench_exists if p == cli._BENCH_KUBECONFIG else orig_exists(p)
+        )
+        self.addCleanup(setattr, cli.os.path, "exists", orig_exists)
+        orig_ctx = cli._context_targets_bench
+        cli._context_targets_bench = lambda: targets_bench
+        self.addCleanup(setattr, cli, "_context_targets_bench", orig_ctx)
+        if kubeconfig_env is not None:
+            os.environ["KUBECONFIG"] = kubeconfig_env
+            self.addCleanup(os.environ.pop, "KUBECONFIG", None)
+
+    def test_refuses_when_no_bench_and_ctx_not_bench(self):
+        # banc absent + contexte ≠ banc + pas de KUBECONFIG → REFUS (la prod en danger).
+        self._arm(bench_exists=False, targets_bench=False)
+        with self.assertRaises(cli._UsageError) as ctx:
+            cli._assert_bench_target("cluster up")
+        self.assertIn("REFUS", str(ctx.exception))
+
+    def test_passes_when_kubeconfig_explicitly_exported(self):
+        # KUBECONFIG exporté = intention explicite (ADR 0065) → la garde laisse passer.
+        self._arm(bench_exists=False, targets_bench=False, kubeconfig_env="/tmp/whatever")
+        cli._assert_bench_target("cluster up")  # ne lève pas
+
+    def test_passes_when_bench_present_and_ctx_bench(self):
+        # banc présent ET contexte = banc (127.0.0.1) → nominal, pas de refus.
+        self._arm(bench_exists=True, targets_bench=True)
+        cli._assert_bench_target("cluster up")  # ne lève pas
+
+    def test_refuses_when_bench_present_but_ctx_not_bench(self):
+        # banc présent mais contexte pointant AILLEURS (ex. prod) → refus (couvre le
+        # cas que l'ancienne garde os.path.exists ne voyait pas).
+        self._arm(bench_exists=True, targets_bench=False)
+        with self.assertRaises(cli._UsageError):
+            cli._assert_bench_target("cluster up")
+
+
+class ModuleGuard(unittest.TestCase):
+    """Le filet anti-provisionnement (setUpModule) interdit tout run-phases/limactl réel."""
+
+    def test_deny_run_blocks_real_runphases(self):
+        with self.assertRaises(AssertionError) as ctx:
+            _deny_run(["bash", "/x/bench/lima/run-phases.sh", "socle"])
+        self.assertIn("NON BLINDÉ", str(ctx.exception))
+
+    def test_deny_run_blocks_limactl(self):
+        with self.assertRaises(AssertionError):
+            _deny_run(["limactl", "start", "node1"])
+
+    def test_deny_run_allows_kubectl_get(self):
+        # une lecture kubectl get est neutralisée (CompletedProcess vide), pas bloquée.
+        out = _deny_run(["kubectl", "get", "nodes"])
+        self.assertEqual(out.returncode, 0)
 
 
 class Scale(unittest.TestCase):
