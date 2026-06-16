@@ -1,4 +1,4 @@
-"""Tests de l'outil déclaratif cluster_topology (ADR 0056 / ADR 0017).
+"""Tests de l'outil déclaratif nestor (ADR 0056 / ADR 0017).
 
 unittest (stdlib). Deux niveaux :
   - fonctions PURES (dérivations control/worker, validation) sur des dicts injectés ;
@@ -14,13 +14,13 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology import load_topology, render_prod_inventory  # noqa: E402
-from cluster_topology.generator import render_lima_inventory  # noqa: E402
-from cluster_topology.model import (  # noqa: E402
+from nestor import load_topology, render_prod_inventory  # noqa: E402
+from nestor.generator import render_lima_inventory  # noqa: E402
+from nestor.model import (  # noqa: E402
     TopologyError,
     topology_from_dict,
 )
-from cluster_topology.profile import (  # noqa: E402
+from nestor.profile import (  # noqa: E402
     consumes_storage,
     derive_osd_expected,
     derive_run_params,
@@ -361,6 +361,9 @@ class StorageDerivationParity(unittest.TestCase):
         self.assertEqual(rp["gitea_storage_class"], "rook-ceph-block-replicated")
         self.assertEqual(rp["cnpg_s3_backing"], "rgw")
         self.assertEqual(rp["cnpg_s3_endpoint"], "http://rook-ceph-rgw-datalake.rook-ceph:80")
+        # Loki partage le MÊME backing/endpoint S3 que CNPG (parité run-phases.sh:1153).
+        self.assertEqual(rp["loki_s3_backing"], "rgw")
+        self.assertEqual(rp["loki_s3_endpoint"], "http://rook-ceph-rgw-datalake.rook-ceph:80")
         self.assertTrue(rp["argocd_apply_gateway"])
 
     def test_run_params_light_local_path(self):
@@ -371,6 +374,10 @@ class StorageDerivationParity(unittest.TestCase):
         self.assertEqual(rp["profiles"], ["base", "metrics", "store", "obs"])
         self.assertEqual(rp["cnpg_storage_class"], "local-path")
         self.assertEqual(rp["cnpg_s3_backing"], "seaweedfs")
+        # SANS loki_s3_backing=seaweedfs, le play monitoring SKIPPE SeaweedFS (défaut
+        # rgw) → Loki casse en local-path. Régression réelle constatée au banc.
+        self.assertEqual(rp["loki_s3_backing"], "seaweedfs")
+        self.assertEqual(rp["loki_s3_endpoint"], "http://seaweedfs.s3.svc.cluster.local:8333")
         self.assertFalse(rp["argocd_apply_gateway"])
 
 

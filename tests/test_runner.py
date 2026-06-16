@@ -1,4 +1,4 @@
-"""Tests de la couche d'exécution (cluster_topology/runner.py, P5).
+"""Tests de la couche d'exécution (nestor/runner.py, P5).
 
 On _stubbe_ l'indirection `_runner_run` (qui wrappe ansible_runner.run) : aucun
 play réel, aucun SSH, aucun cluster en CI. On vérifie le mapping rc/status et que
@@ -12,7 +12,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology import runner  # noqa: E402
+from nestor import runner  # noqa: E402
 
 
 class _FakeRun:

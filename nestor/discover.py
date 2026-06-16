@@ -1,4 +1,4 @@
-"""Reconstruction d'un `topology.yaml` depuis un cluster réel (`cluster discover`, ADR 0074).
+"""Reconstruction d'un `topology.yaml` depuis un cluster réel (`nestor discover`, ADR 0074).
 
 INVERSE de `generate` : à partir de sondes du réel (fournies par la façade —
 kubectl/SSH = I/O bash, ADR 0049), assemble (1) une topologie déclarative, (2) la

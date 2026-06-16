@@ -15,7 +15,7 @@
 # (le stockage est tiré par GitOps qui crée des PVC ; metrics-server n'a, lui,
 # aucune dépendance stockage — la fausse dépendance qu'imposait la chaîne est levée).
 #
-# `cluster preview` montre la séquence dérivée ; `cluster up` la monte via l'arm
+# `nestor preview` montre la séquence dérivée ; `nestor up` la monte via l'arm
 # générique `layers` de run-phases.sh (Python décide l'ordre, bash exécute, ADR 0063).
 #
 # Ce fichier est VERSIONNÉ (exemple générique) ; le `topology.yaml` réel (symlink

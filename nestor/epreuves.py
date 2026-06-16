@@ -23,8 +23,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cluster_topology.model import Topology
-from cluster_topology.profile import required_profiles
+from nestor.model import Topology
+from nestor.profile import required_profiles
 
 # Terrains particuliers (run-all.sh) : un scénario offensif ne se joue que sur un
 # banc jetable, JAMAIS en prod (ADR 0025) ; un scénario SSH/etcdctl exige l'accès

@@ -1,4 +1,4 @@
-"""Tests du smoke-test de réversibilité (cluster_topology/smoke.py, P6).
+"""Tests du smoke-test de réversibilité (nestor/smoke.py, P6).
 
 On injecte un FAUX client (`api=`) : aucun cluster réel, aucun réseau en CI. La
 preuve réelle d'un smoke-test passe par un run de banc (ADR 0034/0052). On couvre
@@ -12,7 +12,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology import smoke  # noqa: E402
+from nestor import smoke  # noqa: E402
 
 
 class _ApiExc(Exception):

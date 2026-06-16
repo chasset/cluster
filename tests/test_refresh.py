@@ -1,4 +1,4 @@
-"""Tests du module PUR d'état réel (cluster_topology/refresh.py).
+"""Tests du module PUR d'état réel (nestor/refresh.py).
 
 unittest stdlib, fixtures pures (listes de nœuds déclarés / VMs réelles / nœuds
 Ready) — aucun subprocess. Vérifie la classification présente/orpheline/manquante
@@ -11,7 +11,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.refresh import classify_refresh  # noqa: E402
+from nestor.refresh import classify_refresh  # noqa: E402
 
 
 class ClassifyRefresh(unittest.TestCase):

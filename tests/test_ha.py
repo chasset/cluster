@@ -1,4 +1,4 @@
-"""Tests de l'orchestration ha-3cp (cluster_topology/ha.py).
+"""Tests de l'orchestration ha-3cp (nestor/ha.py).
 
 Pur/injecté : `launch` (← runner.launch_phase), `run_cni`, les gates et `sleep`
 sont stubés — AUCUN banc, AUCUN cluster, AUCUN ansible-runner réel. On valide la
@@ -15,7 +15,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology import ha  # noqa: E402
+from nestor import ha  # noqa: E402
 
 
 class PureFunctions(unittest.TestCase):

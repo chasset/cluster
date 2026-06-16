@@ -18,8 +18,8 @@ cohabiter etcd et OSD (risque d'affamer etcd) et corrèle les pannes »).
 Cet ADR statue sur un cas que ni 0002 ni 0047 ne couvrent : **rendre le control
 plane HA sur le parc prod RÉEL — 4 nœuds physiques identiques déjà déployés en 1
 CP** — sans 6e/7e machine et sans réinstallation. Le parc compte 4 nœuds
-(`dirqual1`…`dirqual4`), 251 GiB RAM / 80 vCPU chacun, partitionnés à
-**l'identique avec une LV `etcd` dédiée montée sur les 4** (choix d'uniformité,
+(`cp1`…`node3`), 251 GiB RAM / 80 vCPU chacun, partitionnés à **l'identique avec
+une LV `etcd` dédiée montée sur les 4** (choix d'uniformité,
 [RUNBOOK](../../bootstrap/RUNBOOK.md)) — donc promouvoir un nœud en control
 plane ne demande **aucun repartitionnement**.
 
@@ -49,24 +49,24 @@ contraintes matérielles du parc.**
 
 ### 1. Topologie cible — 4 nœuds de calcul, dont 3 control planes
 
-| Nœud       | Control plane (API + etcd) | Worker (pods) | Ceph OSD | mon Ceph |
-| ---------- | -------------------------- | ------------- | -------- | -------- |
-| `dirqual1` | ✅                         | ✅            | ✅       | ❌       |
-| `dirqual2` | ✅                         | ✅            | ✅       | ✅       |
-| `dirqual3` | ✅                         | ✅            | ✅       | ✅       |
-| `dirqual4` | ❌ (worker pur)            | ✅            | ✅       | ✅       |
+| Nœud    | Control plane (API + etcd) | Worker (pods) | Ceph OSD | mon Ceph |
+| ------- | -------------------------- | ------------- | -------- | -------- |
+| `cp1`   | ✅                         | ✅            | ✅       | ❌       |
+| `node1` | ✅                         | ✅            | ✅       | ✅       |
+| `node2` | ✅                         | ✅            | ✅       | ✅       |
+| `node3` | ❌ (worker pur)            | ✅            | ✅       | ✅       |
 
 - **etcd : 3 membres** (sur les 3 CP), pas 4 — quorum **impair**, survie à la
-  perte d'**1** nœud. `dirqual4` reste worker pur, sans membre etcd.
+  perte d'**1** nœud. `node3` reste worker pur, sans membre etcd.
 - **Les 4 nœuds restent schedulables** (taint CP retiré, uniforme) : on ne perd
   aucun nœud de calcul — le contre-argument de
   [ADR 0002](0002-control-plane-unique-avec-endpoint.md) ne tient plus.
-- **mon Ceph dispersés HORS de l'alignement etcd** (`dirqual2/3/4`, pas
-  `dirqual1`) : on **découple les deux quorums** — perdre 1 nœud ne doit pas
-  amputer simultanément 1/3 du quorum etcd ET 1/3 du quorum mon sur le **même**
-  nœud. À forcer via `placement.mon` dans
+- **mon Ceph dispersés HORS de l'alignement etcd** (`node1/2/3`, pas `cp1`) : on
+  **découple les deux quorums** — perdre 1 nœud ne doit pas amputer
+  simultanément 1/3 du quorum etcd ET 1/3 du quorum mon sur le **même** nœud. À
+  forcer via `placement.mon` dans
   [`storage/ceph/cluster.yaml`](../../storage/ceph/cluster.yaml) (sinon Rook
-  peut coller une mon sur `dirqual1`).
+  peut coller une mon sur `cp1`).
 
 ### 2. VIP de l'API — kube-vip ARP, hors pool LB-IPAM Cilium
 
@@ -74,7 +74,7 @@ Le mécanisme d'endpoint flottant est celui déjà décidé par
 [ADR 0047](0047-topologie-ha-3cp-control-plane-dedie.md) : **kube-vip en pod
 statique, mode ARP** (porté par kubelet, sans CNI ni API → brise l'œuf-poule).
 `cluster-api:6443` ([ADR 0002](0002-control-plane-unique-avec-endpoint.md))
-**pointe la VIP** au lieu de l'IP de `dirqual1`.
+**pointe la VIP** au lieu de l'IP de `cp1`.
 
 **Frontière nette VIP/Cilium (le point sensible de l'hyperconvergence)** :
 kube-vip (ARP) et le L2 announcement de Cilium
@@ -87,13 +87,13 @@ ne collisionnent **que** s'ils revendiquent la même IP. Deux garde-fous :
    k8s : Cilium ne l'allouera jamais.
 2. **Piège SPÉCIFIQUE à l'hyperconvergence** : aujourd'hui le
    `CiliumL2AnnouncementPolicy` exclut les nœuds control-plane des annonceurs
-   L2. Quand `dirqual2/3` deviennent CP **tout en restant workers**, Cilium
-   cesserait d'y annoncer les Services applicatifs → il ne resterait que
-   `dirqual4` comme annonceur ⇒ **SPOF d'exposition applicative**. Décision :
-   **lever l'exclusion control-plane** du `nodeSelector` L2 (les 4 nœuds
-   annoncent les Services applicatifs) — sûr précisément parce que la VIP API
-   est hors pool (garde-fou 1). En CP _dédiés_ (0047) ce piège n'existe pas ; il
-   est propre à l'hyperconvergence.
+   L2. Quand `node1/2` deviennent CP **tout en restant workers**, Cilium
+   cesserait d'y annoncer les Services applicatifs → il ne resterait que `node3`
+   comme annonceur ⇒ **SPOF d'exposition applicative**. Décision : **lever
+   l'exclusion control-plane** du `nodeSelector` L2 (les 4 nœuds annoncent les
+   Services applicatifs) — sûr précisément parce que la VIP API est hors pool
+   (garde-fou 1). En CP _dédiés_ (0047) ce piège n'existe pas ; il est propre à
+   l'hyperconvergence.
 
 ### 3. etcd stacked, quorum 3, backup conservé
 
@@ -106,7 +106,7 @@ ne collisionnent **que** s'ils revendiquent la même IP. Deux garde-fous :
 
 ### 4. Promotion in-place, prouvée au banc d'abord
 
-- La promotion se fait **in-place** : `dirqual2/3` sont déjà workers →
+- La promotion se fait **in-place** : `node1/2` sont déjà workers →
   `kubeadm reset` (worker → propre) puis `kubeadm join --control-plane`. Un
   worker ne se « promeut » pas sans reset (contrainte kubeadm). Séquence **un CP
   à la fois**, membre etcd `healthy` avant le suivant (la fenêtre etcd N=2 est
@@ -118,12 +118,11 @@ ne collisionnent **que** s'ils revendiquent la même IP. Deux garde-fous :
   minimum pour un quorum etcd impair de 3 et un failover de VIP) via un **chemin
   nommé codé**
   ([ADR 0045](0045-chemins-installation-banc-couches.md)/[0046](0046-corriger-le-code-pas-l-etat.md)).
-  Le 4ᵉ nœud de la prod (`dirqual4`, worker pur sans membre etcd) n'ajoute
-  aucune mécanique HA à prouver : 3 VM suffisent au banc, 4 nœuds en prod. Le
-  run prouve : kube-vip up → VIP répond → repointage `cluster-api → VIP` → 3ᵉ
-  membre etcd → **survie à l'arrêt d'1 CP** → **absence de collision ARP**
-  VIP/Services LB → **exposition survit à la perte d'1 nœud** → idempotence
-  `changed=0`.
+  Le 4ᵉ nœud de la prod (`node3`, worker pur sans membre etcd) n'ajoute aucune
+  mécanique HA à prouver : 3 VM suffisent au banc, 4 nœuds en prod. Le run
+  prouve : kube-vip up → VIP répond → repointage `cluster-api → VIP` → 3ᵉ membre
+  etcd → **survie à l'arrêt d'1 CP** → **absence de collision ARP** VIP/Services
+  LB → **exposition survit à la perte d'1 nœud** → idempotence `changed=0`.
 
 ## Statut
 
@@ -153,16 +152,16 @@ variante hyperconvergée).
   ([ADR 0034](0034-validation-e2e-from-scratch.md)). Si la mesure montre une
   instabilité du quorum sous charge, re-tainter les CP (sacrifier du calcul) ou
   revenir au modèle dédié 0047 reste l'échappatoire.
-- **Pannes partiellement corrélées** : perdre 1 nœud parmi `dirqual2/3` ôte d'un
-  coup 1 CP, 1 mon et 12 OSD. Mitigation : mon dispersés hors `dirqual1`,
-  réplication Ceph `size=3 failureDomain=host` (tolère 1 nœud), etcd quorum 3
-  (tolère 1 nœud) — les domaines tiennent à **1 panne simultanée**.
+- **Pannes partiellement corrélées** : perdre 1 nœud parmi `node1/2` ôte d'un
+  coup 1 CP, 1 mon et 12 OSD. Mitigation : mon dispersés hors `cp1`, réplication
+  Ceph `size=3 failureDomain=host` (tolère 1 nœud), etcd quorum 3 (tolère 1
+  nœud) — les domaines tiennent à **1 panne simultanée**.
 - **Deux mécanismes de VIP** (kube-vip pour le CP, Cilium pour l'applicatif) :
   frontière à tenir, VIP API hors pool LB-IPAM **impérativement**, exclusion L2
   control-plane à lever.
 - **Backup etcd étendu aux 3 CP** : le rôle
   [`etcd-backup`](../../bootstrap/roles/etcd-backup/) cible `hosts: control` →
-  ajouter `dirqual2/3` au groupe `control` suffit.
+  ajouter `node1/2` au groupe `control` suffit.
 - **Implémentation = issue de suite (#250, amendée)** — cet ADR cadre, n'outille
   pas :
   1. rôle **kube-vip** (pod statique, image épinglée par digest d'index

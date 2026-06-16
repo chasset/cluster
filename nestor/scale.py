@@ -1,4 +1,4 @@
-"""Dérivation du scaling applicatif (`cluster scale`, ADR 0072).
+"""Dérivation du scaling applicatif (`nestor scale`, ADR 0072).
 
 Logique PURE (aucune I/O, aucun kubectl) : à partir du nombre de **workers Ready**
 (lu par la façade) et d'une **allowlist** de workloads scalables, calcule la cible

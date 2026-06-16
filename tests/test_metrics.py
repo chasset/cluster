@@ -1,4 +1,4 @@
-"""Tests de l'exposition des métriques (cluster_topology/metrics.py, P6).
+"""Tests de l'exposition des métriques (nestor/metrics.py, P6).
 
 unittest stdlib, pur (Run construit en mémoire). Vérifie qu'on LIT et met en forme
 les métriques consignées sans en dériver de nouvelles.
@@ -10,8 +10,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.history import Run  # noqa: E402
-from cluster_topology.metrics import format_metrics, metrics_of  # noqa: E402
+from nestor.history import Run  # noqa: E402
+from nestor.metrics import format_metrics, metrics_of  # noqa: E402
 
 
 def _run(**over):

@@ -1,4 +1,4 @@
-"""Tests du round-trip par clôture de dépendances (cluster_topology/roundtrip.py).
+"""Tests du round-trip par clôture de dépendances (nestor/roundtrip.py).
 
 Pur/injecté : `run_phase`/`signal_present`/`confirm_fn` sont stubés — aucun banc,
 aucun cluster. Couvre le graphe de clôture, l'ordre destroy/rebuild, le garde-fou
@@ -14,7 +14,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology import roundtrip  # noqa: E402
+from nestor import roundtrip  # noqa: E402
 
 
 class Closure(unittest.TestCase):
@@ -226,6 +226,66 @@ class Failures(unittest.TestCase):
         )
         self.assertFalse(res.reversible)
         self.assertEqual(res.steps[-1].nom, "vérifier sain")
+
+
+class RemoveNominal(unittest.TestCase):
+    """`run_remove` : la MOITIÉ destruction de roundtrip (détruire + vérifier, sans rebuild)."""
+
+    def test_monitoring_removed(self):
+        fb = FakeBench(present=roundtrip.phase_signal("monitoring"))
+        res = roundtrip.run_remove(
+            "monitoring", run_phase=fb.run_phase, signal_present=fb.signal_present, confirm_fn=_yes
+        )
+        self.assertTrue(res.removed)
+        # détruire + vérifier supprimé, PAS de reconstruction.
+        self.assertEqual([s.nom for s in res.steps], ["supprimer", "vérifier supprimé"])
+        # aucun appel de re-montage (que des rollback).
+        self.assertTrue(all(c[0][0] == "rollback" for c in fb.calls))
+
+    def test_closure_destroyed_aval_to_amont(self):
+        fb = FakeBench(
+            present=roundtrip.phase_signal("gitops") + roundtrip.phase_signal("gitops-seed")
+        )
+        res = roundtrip.run_remove(
+            "gitops", run_phase=fb.run_phase, signal_present=fb.signal_present, confirm_fn=_yes
+        )
+        self.assertTrue(res.removed)
+        rollbacks = [c[0] for c in fb.calls]
+        # seed (aval) supprimé AVANT gitops (amont).
+        self.assertEqual(rollbacks, [("rollback", "gitops-seed"), ("rollback", "gitops")])
+
+    def test_uses_banc_jetable(self):
+        fb = FakeBench(present=roundtrip.phase_signal("monitoring"))
+        roundtrip.run_remove(
+            "monitoring", run_phase=fb.run_phase, signal_present=fb.signal_present, confirm_fn=_yes
+        )
+        self.assertEqual(fb.calls[0][1], {"BANC_JETABLE": "1"})
+
+    def test_refused_confirmation_destroys_nothing(self):
+        fb = FakeBench(present=roundtrip.phase_signal("monitoring"))
+        res = roundtrip.run_remove(
+            "monitoring",
+            run_phase=fb.run_phase,
+            signal_present=fb.signal_present,
+            confirm_fn=lambda layers, *, assume_yes: False,
+        )
+        self.assertFalse(res.removed)
+        self.assertEqual(fb.calls, [])  # AUCUNE destruction
+
+    def test_storage_requires_full(self):
+        with self.assertRaises(roundtrip.RoundtripError):
+            roundtrip.run_remove("ceph", confirm_fn=_yes)  # clôture stockage → opt-in --full
+
+    def test_residual_signal_is_not_removed(self):
+        # Le rollback "réussit" (rc=0) mais le signal subsiste → vérifier supprimé KO.
+        res = roundtrip.run_remove(
+            "monitoring",
+            run_phase=lambda a, **k: 0,
+            signal_present=lambda s, **k: list(s),  # tout reste présent
+            confirm_fn=_yes,
+        )
+        self.assertFalse(res.removed)
+        self.assertEqual(res.steps[-1].nom, "vérifier supprimé")
 
 
 if __name__ == "__main__":

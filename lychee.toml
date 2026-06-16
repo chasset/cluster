@@ -12,4 +12,7 @@ exclude = ["bench/multi-node/inventory\\.yaml"]
 
 # Ne pas vérifier les fragments/ancres (#section) : trop de faux positifs sur
 # les titres accentués/emoji ; markdownlint couvre déjà la structure.
+# NB : la CI épingle lychee v0.23 (lychee-action) — ce champ y est un BOOLÉEN.
+# (L'enum `none|anchor-only|…` n'arrive qu'en 0.24 ; ne pas l'utiliser tant que
+# la CI est en 0.23, sinon « TOML parse error ».)
 include_fragments = false

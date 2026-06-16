@@ -60,12 +60,20 @@ rollback_phase_targeted_resources() {
             # OBC du backing S3 de Loki, posée par platform-loki DANS rook-ceph
             # (ns ≠ monitoring). Sans elle, le CephObjectStore datalake reste bloqué
             # en Deleting (finalizer : un bucket dépendant subsiste). #319-suite.
-            printf -- '-n rook-ceph objectbucketclaim.objectbucket.io loki-buckets\n' ;;
+            # CONDITIONNEL au backend : l'OBC n'existe QU'en ceph. En local-path le
+            # backing est SeaweedFS (creds statiques, pas d'OBC) et la CRD
+            # objectbucketclaim est ABSENTE → un `kubectl delete` échouerait (« the
+            # server doesn't have a resource type ») au lieu d'un no-op → on n'émet rien.
+            [ "$(_rb_backend)" = ceph ] \
+                && printf -- '-n rook-ceph objectbucketclaim.objectbucket.io loki-buckets\n'
+            : ;;
         dataops)
-            # OBC du backing S3 de CNPG/Barman, posée par platform-cnpg DANS
-            # rook-ceph (ns ≠ postgres). Même raison que monitoring : libère le
-            # datalake. (Sans incidence en profil léger : pas d'OBC → no-op delete.)
-            printf -- '-n rook-ceph objectbucketclaim.objectbucket.io cnpg-backups\n' ;;
+            # OBC du backing S3 de CNPG/Barman, posée par platform-cnpg DANS rook-ceph
+            # (ns ≠ postgres). Même raison que monitoring : libère le datalake.
+            # CONDITIONNEL au backend (cf. monitoring) : pas d'OBC ni de CRD en local-path.
+            [ "$(_rb_backend)" = ceph ] \
+                && printf -- '-n rook-ceph objectbucketclaim.objectbucket.io cnpg-backups\n'
+            : ;;
         gitops-seed)
             # Données dans Gitea (org/repo) + Application Argo CD seed — best-effort.
             printf -- '-n argocd applications.argoproj.io atlas\n' ;;

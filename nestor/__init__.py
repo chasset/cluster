@@ -1,4 +1,4 @@
-"""cluster_topology — outil déclaratif des topologies (ADR 0056).
+"""nestor — outil déclaratif des topologies (ADR 0056).
 
 `topology.yaml` est la source de vérité unique d'une topologie ; ce paquet en
 DÉRIVE, SANS ÉTAT, les entrées que les outils consomment déjà (inventaire
@@ -11,12 +11,12 @@ générer les DEUX inventaires BYTE-IDENTIQUES à l'existant — prod
 (`bootstrap/hosts.example.yaml`) et banc Lima (sortie de `write_inventory`,
 bench/lima/lib.sh) ; DÉRIVER le profil (inclusion cumulative ADR 0039 + faisceau
 `-e` à parité bash : `derive_run_params`, ceph_osd_expected, etc.). La logique
-(chargement, dérivation, rendu) est pure et testée (tests/test_cluster_topology.py,
+(chargement, dérivation, rendu) est pure et testée (tests/test_nestor.py,
 ADR 0017). La FAÇADE CLI/CI qui expose cette surface (generate/validate/status/
 diff) relève de P3 et vit dans `scripts/topology.py` (façade fine, hors paquet).
 """
 
-from cluster_topology.discover import (
+from nestor.discover import (
     DiscoverResult,
     Unknown,
     assemble,
@@ -26,35 +26,42 @@ from cluster_topology.discover import (
     detect_exposition,
     detect_platforms,
 )
-from cluster_topology.epreuves import EPREUVES, Epreuve, filter_epreuves
-from cluster_topology.facts import parse_facts
-from cluster_topology.gates import (
+from nestor.epreuves import EPREUVES, Epreuve, filter_epreuves
+from nestor.facts import parse_facts
+from nestor.gates import (
     GateError,
     GateResult,
     gate_nodes_ready,
     gate_osds_up,
     gate_pvc_bound,
 )
-from cluster_topology.generator import render_lima_inventory, render_prod_inventory
-from cluster_topology.history import Run, load_runs, verdict_for_run
-from cluster_topology.layers import layers_from_profile, resolve_layers
-from cluster_topology.metrics import RunMetrics, format_metrics, metrics_of
-from cluster_topology.model import Topology, TopologyError, load_topology
-from cluster_topology.plan import (
+from nestor.generator import render_lima_inventory, render_prod_inventory
+from nestor.history import Run, load_runs, verdict_for_run
+from nestor.layers import layers_from_profile, phase_deps, resolve_layers
+from nestor.metrics import RunMetrics, format_metrics, metrics_of
+from nestor.model import Topology, TopologyError, load_topology
+from nestor.plan import (
     KNOWN_TARGETS,
     PlanError,
     Suggestion,
     default_target,
     diff_phases,
     expected_phase_sequence,
+    installable_now,
     observed_done_phases,
     phase_label,
+    phase_playbook,
     suggest_next,
 )
-from cluster_topology.profile import consumes_storage, derive_run_params
-from cluster_topology.refresh import RefreshState, classify_refresh
-from cluster_topology.roundtrip import RoundtripResult, run_roundtrip
-from cluster_topology.scaffold import (
+from nestor.profile import consumes_storage, derive_run_params
+from nestor.refresh import RefreshState, classify_refresh
+from nestor.roundtrip import (
+    RemoveResult,
+    RoundtripResult,
+    run_remove,
+    run_roundtrip,
+)
+from nestor.scaffold import (
     QUESTION_LB_MODE,
     QUESTIONS,
     InitPlan,
@@ -100,9 +107,12 @@ __all__ = [
     "default_target",
     "diff_phases",
     "expected_phase_sequence",
+    "installable_now",
     "layers_from_profile",
     "observed_done_phases",
+    "phase_deps",
     "phase_label",
+    "phase_playbook",
     "resolve_layers",
     "suggest_next",
     "RunMetrics",
@@ -110,6 +120,8 @@ __all__ = [
     "format_metrics",
     "RoundtripResult",
     "run_roundtrip",
+    "RemoveResult",
+    "run_remove",
     "RefreshState",
     "classify_refresh",
     "InitPlan",

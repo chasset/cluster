@@ -125,6 +125,14 @@ ni l'un ni l'autre n'était détectable par l'analyse statique (lint).
 
 - **L2 = bascule, pas répartition de charge** : une IP est portée par un seul
   nœud à la fois (cohérent avec le cluster non-HA, ADR 0002/0009).
-- **CA interne** : certificats non reconnus sans import du root (ADR 0021).
+- **CA interne — avertissement TLS attendu** : le certificat du Gateway est
+  signé par une **CA interne** (réseau privé, pas d'autorité publique — ADR
+  0003/0021), **sur le banc comme en prod**. Le navigateur affiche donc «
+  connexion non sécurisée » à `https://*.cluster.lan` : c'est **normal et sans
+  danger** ici (réseau privé, TLS bien présent, juste une racine non publique).
+  On **accepte le certificat une fois** ; les sondes (`access.sh`, scénario 28)
+  utilisent `curl -k`. Pour supprimer l'avertissement : importer le root
+  (`root-ca-secret`) dans le trust store du poste — non fait par défaut (poste
+  dev jetable).
 - **Plages prod en TODO** : pool LB-IPAM et hostname `.lan` sont des
   **placeholders** à fixer avec l'admin réseau avant la prod.

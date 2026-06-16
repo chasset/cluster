@@ -79,12 +79,11 @@ différé.**
   dérivation (P2), ni les épreuves/historique (P4).
   `validate`/`generate`/`diff`/`status`/ `epreuves`/`runs` restent inchangés.
 - **G5 — couche d'exécution isolée.** Le seul module qui importe
-  `ansible_runner` est l'adaptateur `cluster_topology/runner.py` (frontière
-  pur/I-O nette, [ADR 0017](0017-langage-des-scripts.md)). Cela garde la porte
-  ouverte à un autre moteur (l'ADR 0056 §7 a écarté Terraform/Pulumi pour raison
-  technique, pas par couplage) et rend P5 **testable sans cluster**
-  (l'adaptateur est _stubbé_ en CI ; la preuve réelle passe par un run de banc
-  consigné,
+  `ansible_runner` est l'adaptateur `nestor/runner.py` (frontière pur/I-O nette,
+  [ADR 0017](0017-langage-des-scripts.md)). Cela garde la porte ouverte à un
+  autre moteur (l'ADR 0056 §7 a écarté Terraform/Pulumi pour raison technique,
+  pas par couplage) et rend P5 **testable sans cluster** (l'adaptateur est
+  _stubbé_ en CI ; la preuve réelle passe par un run de banc consigné,
   [ADR 0034](0034-validation-e2e-from-scratch.md)/[0052](0052-reproductibilite-des-resultats.md)).
 
 ## Conséquences
@@ -92,9 +91,8 @@ différé.**
 - `pyproject.toml` gagne **une** dépendance justifiée (`ansible-runner`),
   épinglée dans `uv.lock`. La lib `kubernetes` (déjà présente) suffit pour lire
   l'état réel — **aucune nouvelle dépendance d'état**.
-- P5 devient actionnable : module pur `cluster_topology/plan.py` (séquence
-  attendue, diff, suggestion) + adaptateur `cluster_topology/runner.py` +
-  sous-commande `next`.
+- P5 devient actionnable : module pur `nestor/plan.py` (séquence attendue, diff,
+  suggestion) + adaptateur `nestor/runner.py` + sous-commande `next`.
 - Les tests P5 **_stubbent_** l'adaptateur (`launch_phase` monkeypatché) : aucun
   SSH ni cluster en CI. `ansible-runner` est une dépendance **runtime**, pas
   **exécutée** par la suite de tests.

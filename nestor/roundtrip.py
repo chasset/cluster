@@ -149,12 +149,12 @@ def _signal_present(signal: list[str], *, api=None) -> list[str]:
     present: list[str] = []
     needs_api = any(s.startswith("ns/") for s in signal)
     if needs_api and api is None:
-        from cluster_topology import smoke
+        from nestor import smoke
 
         api = smoke._core_v1()
     for item in signal:
         if item.startswith("ns/"):
-            from cluster_topology import smoke
+            from nestor import smoke
 
             if smoke._ns_exists(api, item[3:]):
                 present.append(item)
@@ -296,4 +296,80 @@ def run_roundtrip(
     result.steps.append(
         RoundtripStep("vérifier sain", ok, "signal revenu" if ok else f"manquant : {manquants}")
     )
+    return result
+
+
+@dataclass
+class RemoveResult:
+    """Verdict d'un `remove` (suppression d'une couche + clôture). `removed` = OK."""
+
+    phase: str
+    layers: list[str] = field(default_factory=list)
+    steps: list[RoundtripStep] = field(default_factory=list)
+
+    @property
+    def removed(self) -> bool:
+        return bool(self.steps) and all(s.ok for s in self.steps)
+
+
+def run_remove(
+    phase: str,
+    *,
+    backend: str | None = None,
+    allow_full: bool = False,
+    assume_yes: bool = False,
+    run_phase=_run_phase,
+    signal_present=_signal_present,
+    confirm_fn=confirm,
+) -> RemoveResult:
+    """Détruire une couche ET sa CLÔTURE descendante, puis vérifier qu'elle a disparu.
+
+    C'est la MOITIÉ « détruire » de `run_roundtrip` (sans reconstruction) : `cluster
+    remove`. Réutilise exactement les mêmes briques (clôture, garde stockage,
+    confirmation, `run-phases.sh rollback`, vérification du signal) — pas de logique de
+    destruction dupliquée. Détruire une couche entraîne celle de ses dépendantes
+    (clôture descendante, ADR 0066) : on les retire en ordre AVAL→AMONT.
+
+    `backend` : le backend de stockage de la stack (local-path|ceph). DOIT être posé
+    (`STORAGE_BACKEND`) pour que rollback-lib cible les BONNES ressources : l'OBC Ceph
+    `cnpg-backups`/`loki-buckets` n'existe QU'en ceph — sans le backend, _rb_backend
+    retombe sur `ceph` par défaut et tente de supprimer une CRD `objectbucketclaim`
+    ABSENTE en local-path (rollback rc≠0). `None` → on laisse le défaut de rollback-lib.
+
+    `allow_full` : autorise une clôture qui touche le stockage (≈ démontage du socle).
+    `assume_yes` : saute la confirmation (CI). I/O injectables (tests sans banc)."""
+    layers = closure(phase)  # ordre de montage (amont→aval)
+    if involves_storage(phase) and not allow_full:
+        raise RoundtripError(
+            f"`{phase}` entraîne une clôture de stockage {layers} (≈ démontage du socle) "
+            "— exiger l'opt-in `--full`"
+        )
+    result = RemoveResult(phase=phase, layers=layers)
+
+    # Garde-fou données : confirmation avant toute suppression définitive.
+    if not confirm_fn(layers, assume_yes=assume_yes):
+        result.steps.append(RoundtripStep("confirmation", False, "suppression non confirmée"))
+        return result
+
+    # Env du rollback : BANC_JETABLE (destructif assumé) + STORAGE_BACKEND (cible les
+    # bonnes ressources par backend — l'OBC Ceph n'existe pas en local-path).
+    rollback_env = {"BANC_JETABLE": "1"}
+    if backend:
+        rollback_env["STORAGE_BACKEND"] = backend
+
+    # 1. Détruire chaque couche de la clôture (ordre inverse : aval→amont).
+    destroy_order = list(reversed(layers))
+    for p in destroy_order:
+        rc = run_phase(["rollback", p], env_extra=rollback_env)
+        if rc != 0:
+            result.steps.append(RoundtripStep(f"supprimer {p}", False, f"rollback rc={rc}"))
+            return result
+    result.steps.append(RoundtripStep("supprimer", True, f"clôture défaite : {destroy_order}"))
+
+    # 2. Vérifier supprimé : aucun signal d'infra de la clôture ne subsiste.
+    full_signal = [s for p in layers for s in phase_signal(p)]
+    still = signal_present(full_signal)
+    ok = not still
+    detail = "signal absent" if ok else f"encore présent : {still}"
+    result.steps.append(RoundtripStep("vérifier supprimé", ok, detail))
     return result

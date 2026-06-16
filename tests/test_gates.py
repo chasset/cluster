@@ -1,4 +1,4 @@
-"""Tests des gates d'infra (cluster_topology/gates.py).
+"""Tests des gates d'infra (nestor/gates.py).
 
 unittest stdlib, prédicats INJECTÉS (read_phase/ready_count/osd_up_count stubés) +
 sleep no-op — aucune attente réelle, aucun cluster. Vérifie l'attente bornée et le
@@ -11,7 +11,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.gates import (  # noqa: E402
+from nestor.gates import (  # noqa: E402
     gate_nodes_ready,
     gate_osds_up,
     gate_pvc_bound,

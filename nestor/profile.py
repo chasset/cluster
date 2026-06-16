@@ -13,12 +13,12 @@ l'outil en DÉDUIT, par des fonctions PURES :
      le banc ne versionne aucun group_vars de profil, tout part en `-e`).
 
 Aucune I/O ici : tout dérive d'une Topology (déjà chargée). Testé par
-tests/test_cluster_topology.py (ADR 0017).
+tests/test_nestor.py (ADR 0017).
 """
 
 from __future__ import annotations
 
-from cluster_topology.model import Topology, TopologyError
+from nestor.model import Topology, TopologyError
 
 # ── Inclusion cumulative des profils (ADR 0039) ─────────────────────────────
 # Chaque profil inclut les précédents. L'ordre EST le graphe de dépendances de
@@ -134,9 +134,15 @@ def derive_run_params(topo: Topology) -> dict:
         "monitoring_storage_class": sc,
         "loki_storage_class": sc,
         "gitea_storage_class": sc,
-        # backing S3 (CNPG + Loki) et endpoint.
+        # backing S3 (CNPG + Loki) et endpoint — MÊME backing pour les deux
+        # consommateurs (parité run-phases.sh:1035/1153 qui passe les deux jeux de
+        # clés). SANS `loki_s3_backing`, le play monitoring retombe sur le défaut
+        # `rgw` (when: …| default('rgw')) → SeaweedFS SKIPPÉ en local-path → Loki
+        # casse (S3 RGW inexistant). Cf. bootstrap/monitoring.yaml tag seaweedfs.
         "cnpg_s3_backing": params["s3_backing"],
         "cnpg_s3_endpoint": params["s3_endpoint"],
+        "loki_s3_backing": params["s3_backing"],
+        "loki_s3_endpoint": params["s3_endpoint"],
         "argocd_apply_gateway": params["argocd_apply_gateway"],
     }
     osd = derive_osd_expected(topo)

@@ -2,7 +2,7 @@
 #
 # topology.yaml — SOURCE DE VÉRITÉ UNIQUE d'une topologie (ADR 0056).
 #
-# Une topologie complète se DÉCRIT ici ; l'outil `cluster_topology` en DÉRIVE les
+# Une topologie complète se DÉCRIT ici ; l'outil `nestor` en DÉRIVE les
 # entrées que les outils consomment déjà (inventaire Ansible, group_vars de
 # profil, table de nœuds + profils Lima). Aucun moteur à état par-dessus k8s : le
 # générateur est SANS ÉTAT, Ansible reste le moteur de convergence (ADR 0056 §7).

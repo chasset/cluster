@@ -117,7 +117,7 @@ exposition) ; **inconnu → énuméré** (ns/kind/nom + version si lisible).
 Pendant qu'il sonde tout le réel, `discover` constate aussi l'**ÉTAT** et émet
 un **bilan de santé** — la déclaration reconstruite (§1) dit _ce qui est là_, le
 bilan dit _si ça va_. Il agrège, sans rien réinventer, les primitives de santé
-existantes (`bootstrap/lib/health-classify.sh`, `cluster_topology/gates.py`) :
+existantes (`bootstrap/lib/health-classify.sh`, `nestor/gates.py`) :
 
 - **nœuds** : Ready / NotReady (classification `health-classify.sh`,
   `classify_nodes_ready`) ;

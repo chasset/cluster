@@ -1,4 +1,4 @@
-"""Tests de la dérivation de scaling (cluster_topology/scale.py, ADR 0072).
+"""Tests de la dérivation de scaling (nestor/scale.py, ADR 0072).
 
 Logique PURE : aucun cluster, aucun kubectl. On vérifie le clamp, le plafond, le
 plancher (jamais 0), et le refus des workloads ArgoCD-managés.
@@ -10,7 +10,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.scale import (  # noqa: E402
+from nestor.scale import (  # noqa: E402
     SCALABLE_WORKLOADS,
     plan_scale,
     target_replicas,

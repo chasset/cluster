@@ -1,4 +1,4 @@
-"""Tests du parsing du contrat machine (cluster_topology/facts.py).
+"""Tests du parsing du contrat machine (nestor/facts.py).
 
 unittest stdlib, fixtures = sorties KEY=VALUE figées — aucun subprocess, aucun banc.
 """
@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.facts import parse_facts  # noqa: E402
+from nestor.facts import parse_facts  # noqa: E402
 
 
 class ParseFacts(unittest.TestCase):

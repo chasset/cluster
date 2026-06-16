@@ -1,4 +1,4 @@
-"""Tests de l'orchestration du socle k8s (cluster_topology/bootstrap.py).
+"""Tests de l'orchestration du socle k8s (nestor/bootstrap.py).
 
 unittest stdlib, I/O INJECTÉE (launch/run_cni stubés) — aucun subprocess, aucun banc.
 Vérifie la séquence ordonnée des 6 playbooks, les extravars, et le fail-fast.
@@ -10,7 +10,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.bootstrap import (  # noqa: E402
+from nestor.bootstrap import (  # noqa: E402
     BootstrapError,
     bootstrap_extravars,
     bootstrap_playbooks,

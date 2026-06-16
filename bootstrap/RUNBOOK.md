@@ -222,8 +222,8 @@ Exemple pour `cp1` :
 auto ens10f0np0
 iface ens10f0np0 inet static
     address 10.0.0.11/22
-    gateway 10.67.0.1          # à adapter : passerelle réelle du /22
-    dns-nameservers 10.67.0.1  # à adapter : résolveur(s) DNS
+    gateway 10.0.0.1           # à adapter : passerelle réelle du /22
+    dns-nameservers 10.0.0.1   # à adapter : résolveur(s) DNS
 ```
 
 Appliquer avec `sudo systemctl restart networking` (ou au redémarrage).
@@ -462,12 +462,29 @@ d'autres clusters (un banc Lima `cluster-banc`, par ex.) sans collision.
 ```bash
 mkdir -p ~/.kube
 scp control1:/home/debian/.kube/config /tmp/cluster-prod.config
-# Fusion (--flatten) puis sélection EXPLICITE du contexte voulu — jamais d'écrasement.
+# Fusion (--flatten) — jamais d'écrasement (cohabite avec d'autres clusters).
 KUBECONFIG=~/.kube/config:/tmp/cluster-prod.config \
   kubectl config view --flatten > ~/.kube/config.merged && mv ~/.kube/config.merged ~/.kube/config
-kubectl config use-context kubernetes-admin@cluster-prod
 rm -f /tmp/cluster-prod.config
 ```
+
+> ⚠️ **NE PAS laisser la prod en contexte par défaut** (`current-context`) de
+> `~/.kube/config` — c'est un pistolet chargé (ADR 0053). Dans un terminal frais
+> SANS `KUBECONFIG` exporté, un `kubectl` nu vise le contexte courant : si c'est
+> `cluster-prod`, tu MUTES la prod par accident (vécu : `kubectl get pods -A`
+> après un terminal neuf tombait sur la prod). L'outil `nestor` ne pose
+> `KUBECONFIG` que pour SES commandes (`env`/`stack select`) ; il ne touche
+> jamais `~/.kube/config` (ta config perso). Donc **la cible de `kubectl` nu est
+> TON affaire** :
+>
+> - poser un contexte INOFFENSIF par défaut (banc, ou un contexte vide) :
+>   `kubectl config use-context cluster-banc` (ou `default`) ;
+> - viser la prod TOUJOURS **explicitement** :
+>   `kubectl --context kubernetes-admin@cluster-prod get …` ;
+> - ou, pour une session prod assumée, `eval "$(bench/lima/env.sh export)"` côté
+>   banc et un `export KUBECONFIG=…` côté prod — jamais le contexte par défaut.
+
+<!-- séparateur : deux blockquotes distincts (MD028) -->
 
 > Cluster prod **déjà installé** sans `clusterName` (contexte homonyme
 > `kubernetes-admin@kubernetes`) ? Rejouer `bootstrap/initialisation.yaml` n'est

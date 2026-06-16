@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from cluster_topology.history import Run
+from nestor.history import Run
 
 # Clés du bloc `metriques` consigné (metro_metrics_block, metrology.sh).
 _METRIC_KEYS = ("cpu_core_s", "ram_peak_mib", "ram_mean_mib")

@@ -257,7 +257,7 @@ write_inventory() {
 }
 
 # NB : la séquence des 6 playbooks du socle (checks→…→join-workers) est désormais
-# orchestrée EN PYTHON (cluster_topology/bootstrap.py, via runner.launch_phase ;
+# orchestrée EN PYTHON (nestor/bootstrap.py, via runner.launch_phase ;
 # « Python parle Ansible », ADR 0063), appelée par topology.py bootstrap-seq. La
 # fonction bash bootstrap_node_sequence a été retirée (plus aucun appelant).
 

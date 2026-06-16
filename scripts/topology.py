@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Façade CLI/CI de l'outil déclaratif des topologies (ADR 0056 §2, palier P3).
 
-Le paquet `cluster_topology/` porte la LOGIQUE PURE (chargement, validation,
+Le paquet `nestor/` porte la LOGIQUE PURE (chargement, validation,
 dérivation, rendu byte-identique) ; ce script n'est qu'une FAÇADE FINE par-dessus :
 il lit `argv`, appelle la surface publique du paquet, formate la sortie et mappe
 les exceptions en codes de sortie. Aucune logique de dérivation nouvelle ici
@@ -71,16 +71,18 @@ import os
 import shlex
 import subprocess
 import sys
+from collections.abc import Callable
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import yaml  # noqa: E402
 
-from cluster_topology import (  # noqa: E402
+from nestor import (  # noqa: E402
     QUESTION_LB_MODE,
     QUESTIONS,
     PlanError,
     ScaffoldError,
+    Topology,
     TopologyError,
     build_topology_dict,
     catalog_entry,
@@ -92,11 +94,14 @@ from cluster_topology import (  # noqa: E402
     expected_phase_sequence,
     filter_epreuves,
     format_metrics,
+    installable_now,
     load_runs,
     load_topology,
     metrics_of,
     observed_done_phases,
+    phase_deps,
     phase_label,
+    phase_playbook,
     plan_init,
     render_lima_inventory,
     render_prod_inventory,
@@ -104,14 +109,17 @@ from cluster_topology import (  # noqa: E402
     suggest_next,
     verdict_for_run,
 )
-from cluster_topology import bootstrap as _bootstrap  # noqa: E402
-from cluster_topology import discover as _discover  # noqa: E402
-from cluster_topology import ha as _ha  # noqa: E402
-from cluster_topology import roundtrip as _roundtrip  # noqa: E402
-from cluster_topology import runner as _runner  # noqa: E402
-from cluster_topology import scale as _scale  # noqa: E402
-from cluster_topology import smoke as _smoke  # noqa: E402
-from cluster_topology.history import (  # noqa: E402
+from nestor import bootstrap as _bootstrap  # noqa: E402
+from nestor import discover as _discover  # noqa: E402
+from nestor import ha as _ha  # noqa: E402
+from nestor import isolation as _isolation  # noqa: E402
+from nestor import refresh_fuse as _refresh_fuse  # noqa: E402
+from nestor import refresh_plan as _refresh_plan  # noqa: E402
+from nestor import roundtrip as _roundtrip  # noqa: E402
+from nestor import runner as _runner  # noqa: E402
+from nestor import scale as _scale  # noqa: E402
+from nestor import smoke as _smoke  # noqa: E402
+from nestor.history import (  # noqa: E402
     last_run_for_target,
     last_run_for_topology,
     latest_run,
@@ -131,9 +139,71 @@ _RUNS_HISTORY = os.path.join(_ROOT, "bench", "lima", "runs-history.yaml")
 # ICI (sinon il interroge ~/.kube/config — pas le banc — et voit 0 nœud Ready alors que
 # le socle est monté : faux « à installer », scorie de fidélité du RÉEL).
 _BENCH_KUBECONFIG = os.path.join(_ROOT, "bench", "lima", ".work", "kubeconfig")
+# Inventaire Ansible du BANC Lima, écrit par run-phases.sh (write_inventory → WORKDIR/
+# inventory.yaml ; target_kind: lima, hôtes node1/node2). DISTINCT de bootstrap/hosts.yaml
+# (l'inventaire PROD). `next` doit viser CELUI-CI pour une topo lima — sinon un montage
+# banc SSH sur la prod (faille ADR 0053). Choisi par `_inventory_for(topo)`.
+_BENCH_INVENTORY = os.path.join(_ROOT, "bench", "lima", ".work", "inventory.yaml")
 # Borne l'attente du scan réel (preview/up) sur limactl/kubectl : un cluster injoignable ou
 # un démon Lima bloqué ne doit JAMAIS figer le refresh (leçon du timeout ha._vm_exec).
 _REFRESH_TIMEOUT_S = 8
+
+
+def _warn(message: str) -> None:
+    """Avertissement sur STDERR, en JAUNE GRAS si stderr est un terminal (sinon brut,
+    pour ne pas polluer pipes/CI). Même convention que `warn()` de bench/lima/lib.sh."""
+    if sys.stderr.isatty():
+        print(f"\033[1;33m⚠ {message}\033[0m", file=sys.stderr)
+    else:
+        print(f"⚠ {message}", file=sys.stderr)
+
+
+def _bench_kubeconfig() -> str:
+    """Le kubeconfig que `cluster` doit RÉELLEMENT utiliser, par priorité (ADR 0053) :
+
+    1. `KUBECONFIG` exporté → intention EXPLICITE de l'opérateur (respectée) ;
+    2. le banc Lima s'il existe → la cible nominale de l'outil ;
+    3. sinon → `/dev/null` (kubeconfig VIDE), JAMAIS `~/.kube/config`.
+
+    Le point (3) est le correctif de fond : `cluster` est un outil de BANC ; sans
+    banc ni intention explicite, il ne doit PAS retomber silencieusement sur le
+    contexte du poste (= la prod). Pointer `/dev/null` fait échouer kubectl
+    proprement → les lectures renvoient « vide » (honnête : pas de banc), au lieu de
+    lire/muter la prod par accident."""
+    explicit = os.environ.get("KUBECONFIG")
+    if explicit:
+        return explicit
+    if os.path.exists(_BENCH_KUBECONFIG):
+        return _BENCH_KUBECONFIG
+    return os.devnull  # vide : kubectl échoue → "pas de banc", jamais la prod
+
+
+def _kubectl_env() -> dict[str, str]:
+    """Env pour un appel kubectl du banc : force KUBECONFIG vers la cible sûre
+    (`_bench_kubeconfig`) — jamais le ~/.kube/config implicite de la prod."""
+    return {**os.environ, "KUBECONFIG": _bench_kubeconfig()}
+
+
+def _kubeconfig_reaches_api(kubeconfig: str) -> bool:
+    """`True` si ce kubeconfig joint RÉELLEMENT l'API (pas juste un fichier présent).
+
+    Un kubeconfig peut exister mais être vide/cassé (server absent) ou pointer une API
+    tombée (forward mort) → kubectl retombe sur localhost. On sonde `/healthz` borné.
+    Read-only, FAIL-CLOSED : toute erreur → False."""
+    try:
+        out = subprocess.run(  # noqa: S603 — argv fixe, lecture seule
+            ["kubectl", "get", "--raw=/healthz", "--request-timeout=4s"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "KUBECONFIG": kubeconfig},
+            timeout=_REFRESH_TIMEOUT_S,
+        )
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return False
+    return out.returncode == 0 and out.stdout.strip() == "ok"
+
+
 # Chemins nommés connus de l'historique (ADR 0045 §6) pour le verdict par chemin.
 _CHEMINS_NOMMES = ["atlas", "storage-real", "cluster-dataops"]
 
@@ -186,6 +256,20 @@ def _render_inventory(topo, kind: str, lima_home: str | None) -> str:
             raise _UsageError("--kind lima exige --lima-home (chemin du $HOME du poste)")
         return render_lima_inventory(topo, lima_home)
     return render_prod_inventory(topo)
+
+
+def _inventory_for(topo: Topology) -> str:
+    """Chemin de l'inventaire Ansible de la TOPOLOGIE active (ADR 0053).
+
+    Le cœur de l'isolation : un montage `next` vise l'inventaire de SA cible —
+    `bench/lima/.work/inventory.yaml` (target_kind: lima, généré par le banc) pour une
+    topo lima, `bootstrap/hosts.yaml` (prod) sinon. Sans ça, `next` utilisait TOUJOURS
+    l'inventaire prod codé en dur → un montage banc SSHait sur la prod (faille
+    constatée). La garde `_assert_inventory_safe` reste le filet ; ICI on choisit
+    d'emblée le BON inventaire."""
+    if topo.target_kind == "lima":
+        return _BENCH_INVENTORY
+    return os.path.join(_ROOT, "bootstrap", "hosts.yaml")
 
 
 class _UsageError(Exception):
@@ -267,6 +351,31 @@ def _confirm(prompt: str, *, default: bool, no_input: bool) -> bool:
         if answer in ("n", "non", "no"):
             return False
         print("    réponds o(ui) ou n(on)", file=sys.stderr)
+
+
+def _choisir_couche(
+    choix: list[str], libelle: Callable[[str], str], *, no_input: bool
+) -> str | None:
+    """Menu numéroté quand PLUSIEURS couches sont montables (choix d'ordre, ADR 0066).
+
+    `choix` est ordonné selon le chemin (le 1er = ordre conventionnel = DÉFAUT).
+    `libelle(phase)` rend le texte humain affiché. Renvoie la phase choisie, ou None
+    si l'opérateur annule (saisie vide hors défaut interdite : Entrée = défaut). Sous
+    `no_input` (CI/non-TTY/--yes) : renvoie le défaut sans prompter — pas de menu
+    interactif à l'aveugle."""
+    if no_input:
+        return choix[0]
+    print("Plusieurs couches sont installables maintenant — laquelle monter ?", file=sys.stderr)
+    for i, phase in enumerate(choix, 1):
+        marque = "  (défaut)" if i == 1 else ""
+        print(f"  {i}) {libelle(phase)}{marque}", file=sys.stderr)
+    while True:
+        rep = input(f"Numéro [1-{len(choix)}, défaut 1] : ").strip()
+        if not rep:
+            return choix[0]
+        if rep.isdigit() and 1 <= int(rep) <= len(choix):
+            return choix[int(rep) - 1]
+        print(f"    réponds un numéro entre 1 et {len(choix)} (ou Entrée pour 1)", file=sys.stderr)
 
 
 def _activate_symlink(target_rel: str) -> None:
@@ -380,14 +489,25 @@ def cmd_stack_new(args: argparse.Namespace) -> int:
 
 
 def cmd_stack_select(args: argparse.Namespace) -> int:
-    """`stack select` : active une topologie EXISTANTE (repointe le symlink topology.yaml).
+    """`stack select` : active une topologie EXISTANTE et POSE le KUBECONFIG de la cible.
 
-    Calque `pulumi stack select` : choisit la stack courante parmi le catalogue.
+    Calque `pulumi stack select` : choisit la stack courante parmi le catalogue,
+    repointe le symlink `topology.yaml`, et — comme `nestor env` — imprime sur
+    STDOUT une ligne `export KUBECONFIG=…` à `eval` dans le shell :
 
-    Résout `topologies/<nom>(.example).yaml` → VALIDE le schéma (garde-fou : on
-    n'active pas un fichier cassé, contrairement à `ln -sf`) → repointe le symlink →
-    confirme le chemin dérivé. Accepte un modèle versionné (`<nom>.example`) comme
-    cible (activer le banc générique est légitime).
+        eval "$(nestor stack select banc)"
+
+    Le KUBECONFIG posé est celui de la cible (ADR 0053) : le **banc de la stack**
+    s'il est monté (`bench/lima/.work/kubeconfig`), sinon **`/dev/null`** (vide) —
+    JAMAIS `~/.kube/config` (la prod). Un `kubectl`/`cilium` direct dans le shell
+    vise alors la bonne cible, ou échoue proprement (« pas de banc »), au lieu de
+    taper la prod par accident. Un process NE PEUT PAS exporter dans le shell PARENT
+    (invariant Unix) → le patron `eval`, comme `ssh-agent`/`nestor env`.
+
+    TOUS les messages humains vont sur STDERR (inertes pour `eval`) ; seule la ligne
+    `export` va sur STDOUT. Sans `eval` (appel nu `nestor stack select`), la stack
+    est bien activée et les messages s'affichent ; seul le KUBECONFIG du shell n'est
+    pas posé (la ligne export apparaît, inoffensive).
 
     Codes : 0 succès ; 1 fichier absent / schéma invalide ; 2 usage (nom invalide).
     """
@@ -412,7 +532,34 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
     # Garde-fou : valider AVANT d'activer (ne pas pointer le symlink sur un fichier cassé).
     topo = load_topology(target_abs)
     _activate_symlink(target_rel)
-    print(f"✓ activée : topology.yaml → {target_rel} (chemin dérivé : {default_target(topo)})")
+    print(
+        f"✓ activée : topology.yaml → {target_rel} (chemin dérivé : {default_target(topo)})",
+        file=sys.stderr,
+    )
+
+    # KUBECONFIG cible : le banc s'il est monté ET JOIGNABLE, sinon /dev/null (jamais la
+    # prod, ADR 0053). On NE supprime PAS le kubeconfig (le détruire casserait l'accès à
+    # un banc vivant ; il sera de toute façon réécrit par le prochain up/bootstrap). On
+    # vise /dev/null seulement s'il n'existe pas OU ne répond plus (banc d'une autre
+    # stack, ou API tombée) — `_context_targets_bench` le sonde sans toucher au fichier.
+    if os.path.exists(_BENCH_KUBECONFIG) and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
+        cible = os.path.abspath(_BENCH_KUBECONFIG)
+    else:
+        cible = os.devnull
+        _warn(
+            "cluster non installé (ou banc injoignable) — pas de connexion possible "
+            "pour l'instant (le monter : `nestor up`)."
+        )
+    # La ligne `export …` n'est utile QU'à `eval`. En appel direct (stdout = TTY), on
+    # ne la déverse pas brute dans le terminal — on suggère plutôt `eval`. Si stdout
+    # est capturé (`eval "$(…)"`/pipe), on l'imprime pour que le shell la pose.
+    if sys.stdout.isatty():
+        print(
+            f'  pointer le shell : `eval "$(nestor stack select {args.name})"`',
+            file=sys.stderr,
+        )
+    else:
+        print(f"export KUBECONFIG={shlex.quote(cible)}")
     return 0
 
 
@@ -450,12 +597,9 @@ def _real_vms() -> list[str]:
 def _ready_nodes() -> list[str]:
     """Noms des nœuds k8s à l'état Ready (`kubectl get nodes`). Vide si injoignable.
 
-    Kubeconfig : `KUBECONFIG` exporté s'il existe, sinon REPLI sur le kubeconfig du
-    banc (`_BENCH_KUBECONFIG`, écrit par run-phases.sh) — sans quoi `preview` lit
-    `~/.kube/config` (pas le banc) et voit 0 nœud Ready alors que le socle tourne."""
-    kubeconfig = os.environ.get("KUBECONFIG") or (
-        _BENCH_KUBECONFIG if os.path.exists(_BENCH_KUBECONFIG) else None
-    )
+    Kubeconfig : `KUBECONFIG` exporté, sinon le banc, sinon un kubeconfig VIDE — jamais
+    `~/.kube/config` (la prod). Cf. `_bench_kubeconfig` (ADR 0053) : un banc absent
+    rend une liste vide (« pas de banc »), il ne lit pas la prod par accident."""
     try:
         out = subprocess.run(  # noqa: S603 — argv fixe, pas d'entrée shell
             # --request-timeout borne l'attente côté kubectl (cluster injoignable) ;
@@ -464,7 +608,7 @@ def _ready_nodes() -> list[str]:
             check=False,
             capture_output=True,
             text=True,
-            env={**os.environ, **({"KUBECONFIG": kubeconfig} if kubeconfig else {})},
+            env=_kubectl_env(),
             timeout=_REFRESH_TIMEOUT_S,
         )
     except (OSError, ValueError, subprocess.TimeoutExpired):
@@ -478,65 +622,94 @@ def _ready_nodes() -> list[str]:
     return ready
 
 
-# Signal d'infra CANONIQUE par couche applicative : la ressource k8s la plus
-# caractéristique dont la PRÉSENCE prouve que la couche est déployée. Constaté sur
-# le cluster (comme « nœud Ready ») pour que `preview` PLAN reflète le RÉEL des
-# couches, pas seulement l'historique (un run sur cache n'est pas consigné → faux
-# « à installer » alors que la couche TOURNE). Dérivé des `phase_targeted_resources`
-# (rollback-lib.sh, ADR 0066) — la même ressource que le rollback ciblerait.
-# Format : phase → (kind, name, namespace|None). Les phases sans signal stable
-# (storage-simple = StorageClass globale ; couches Ceph hors périmètre local-path)
-# restent jugées par l'historique.
-_LAYER_SIGNAL: dict[str, tuple[str, str, str | None]] = {
-    "metrics-server": ("deployment", "metrics-server", "kube-system"),
-    "storage-simple": ("deployment", "local-path-provisioner", "local-path-storage"),
-    "monitoring": ("namespace", "monitoring", None),
-    "gitops": ("namespace", "argocd", None),
-    "dataops": ("namespace", "dagster", None),
-    "gitops-seed": ("application", "atlas", "argocd"),
+# Signal de SANTÉ canonique par couche applicative : la ressource k8s du DERNIER
+# maillon dont la PRÉSENCE + l'état READY prouvent que la couche est posée ET saine.
+# Pas le namespace (créé tôt, présent même si la couche a échoué à mi-chemin : un ns
+# `monitoring` qui existe mais sans Loki Ready a fait afficher la couche « ✓ » à tort)
+# — on vise la ressource DISCRIMINANTE que le rôle lui-même éprouve (sa gate Ready) :
+#   monitoring → StatefulSet loki Ready (platform-loki) — absent si SeaweedFS manque ;
+#   gitops     → Deployment argocd-server Ready (platform-argocd) ;
+#   dataops    → Deployment dagster Ready (platform-dagster) ;
+#   metrics-server / storage-simple → leur Deployment Ready.
+# Format : phase → (kind, name, namespace|None, ready). `ready=True` (workloads) exige
+# readyReplicas≥1 ; `ready=False` (Application Argo : CRD sans replicas) = présence.
+# Constaté sur le cluster (comme « nœud Ready ») pour que `preview`/`next` reflètent le
+# RÉEL — une couche à moitié posée n'est PAS « à-jour ». Miroir des gates de rôles et de
+# `gate_pred` (run-phases.sh) — même ressource, même critère Ready.
+_LAYER_SIGNAL: dict[str, tuple[str, str, str | None, bool]] = {
+    "metrics-server": ("deployment", "metrics-server", "kube-system", True),
+    "storage-simple": ("deployment", "local-path-provisioner", "local-path-storage", True),
+    "monitoring": ("statefulset", "loki", "monitoring", True),
+    "gitops": ("deployment", "argocd-server", "argocd", True),
+    "dataops": ("deployment", "dagster", "dagster", True),
+    "gitops-seed": ("application", "atlas", "argocd", False),
 }
 
+# Kinds dont la SANTÉ se lit via `status.readyReplicas` (workloads répliqués).
+_READY_REPLICAS_KINDS = frozenset({"deployment", "statefulset", "daemonset", "replicaset"})
 
-def _resource_exists(kind: str, name: str, namespace: str | None) -> bool:
-    """`True` si la ressource k8s existe sur le banc (kubectl get, borné). Toute
-    erreur (absente, cluster injoignable, kind inconnu) → False (prudent : on ne
-    marque « à-jour » que sur une présence CONSTATÉE)."""
-    kubeconfig = os.environ.get("KUBECONFIG") or (
-        _BENCH_KUBECONFIG if os.path.exists(_BENCH_KUBECONFIG) else None
-    )
+
+def _kubectl_resource(kind, name, namespace, jsonpath=None):
+    """`kubectl get <kind> <name>` borné, env banc (jamais la prod, ADR 0053).
+    Renvoie le CompletedProcess, ou None sur erreur d'exécution (cluster injoignable…)."""
     argv = ["kubectl", "get", kind, name, "--request-timeout=5s"]
     if namespace:
         argv += ["-n", namespace]
+    if jsonpath:
+        argv += ["-o", f"jsonpath={jsonpath}"]
     try:
-        out = subprocess.run(  # noqa: S603 — argv fixe (table _LAYER_SIGNAL), pas d'entrée shell
+        return subprocess.run(  # noqa: S603 — argv fixe (table _LAYER_SIGNAL), pas d'entrée shell
             argv,
             check=False,
             capture_output=True,
             text=True,
-            env={**os.environ, **({"KUBECONFIG": kubeconfig} if kubeconfig else {})},
+            env=_kubectl_env(),
             timeout=_REFRESH_TIMEOUT_S,
         )
     except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
+def _resource_exists(kind: str, name: str, namespace: str | None) -> bool:
+    """`True` si la ressource k8s EXISTE sur le banc (présence seule, sans santé).
+    Toute erreur (absente, cluster injoignable, kind inconnu) → False (prudent)."""
+    out = _kubectl_resource(kind, name, namespace)
+    return out is not None and out.returncode == 0
+
+
+def _resource_healthy(kind: str, name: str, namespace: str | None, ready: bool) -> bool:
+    """La ressource est-elle posée ET saine ? `ready=False` → présence seule (CRD type
+    Application sans replicas). `ready=True` → pour un workload répliqué, readyReplicas≥1
+    (le DERNIER maillon : un Loki à 0/1 réplica n'est PAS sain → la couche n'est pas
+    « à-jour »). Lecture bornée, fail-closed (toute incertitude → False)."""
+    if not ready or kind not in _READY_REPLICAS_KINDS:
+        return _resource_exists(kind, name, namespace)
+    out = _kubectl_resource(kind, name, namespace, jsonpath="{.status.readyReplicas}")
+    if out is None or out.returncode != 0:
         return False
-    return out.returncode == 0
+    try:
+        return int((out.stdout or "").strip() or "0") >= 1
+    except (ValueError, AttributeError):
+        return False
 
 
 def _observed_layers(phases: list[str]) -> set[str]:
-    """Couches applicatives PROUVÉES déployées par l'état RÉEL du cluster (signal
-    d'infra présent). Ne teste QUE les phases de `phases` qui ont un signal connu
-    (_LAYER_SIGNAL) — un seul `kubectl get` par couche, borné. Le RÉEL prime sur
-    l'absence de trace d'historique (ADR 0052/0056 §7), comme pour up/bootstrap."""
+    """Couches applicatives PROUVÉES posées ET SAINES par l'état RÉEL du cluster.
+    Ne teste QUE les phases de `phases` qui ont un signal connu (_LAYER_SIGNAL) — un
+    `kubectl get` borné par couche. Une couche dont le dernier maillon n'est pas Ready
+    (ex. monitoring sans Loki) n'est PAS retenue : le RÉEL prime sur l'historique (ADR
+    0052/0056 §7), mais « réel » = SAIN, pas « namespace présent »."""
     done: set[str] = set()
     for ph in phases:
         sig = _LAYER_SIGNAL.get(ph)
-        if sig and _resource_exists(*sig):
+        if sig and _resource_healthy(*sig):
             done.add(ph)
     return done
 
 
 # ── Sondes de `discover` (ADR 0074) : I/O kubectl irréductible (ADR 0049). Lisent
 #    le réel et le RÉDUISENT à des structures simples ; toute la logique (mapping,
-#    backend, exposition, santé) est PURE dans cluster_topology/discover.py.
+#    backend, exposition, santé) est PURE dans nestor/discover.py.
 
 
 def _discover_node_roles() -> list[dict]:
@@ -634,6 +807,7 @@ def cmd_destroy(args: argparse.Namespace) -> int:
 
     Codes : 0 succès (ou rien à détruire) ; 1 échec du down délégué ; 2 confirmation
     refusée / hors TTY sans --yes."""
+    _assert_bench_target("nestor destroy")
     path = _resolve(args.file)
     topo = load_topology(path)
     stack = topo.catalog.get("topology", "—")
@@ -817,7 +991,7 @@ def cmd_epreuves(args: argparse.Namespace) -> int:
         else:
             print(f"  {e.num} [{e.type:<5}] {e.categorie:<13} {e.nom}")
     if runtime:
-        print("  ✓ prête = sa couche tourne ; ○ = topo OK mais couche à monter (`cluster up`).")
+        print("  ✓ prête = sa couche tourne ; ○ = topo OK mais couche à monter (`nestor up`).")
     else:
         print("  (jouable selon la topologie ; l'état réel est vérifié au lancement, P5)")
     if args.all:
@@ -899,9 +1073,18 @@ def cmd_env(args: argparse.Namespace) -> int:
         )
     bench = os.path.abspath(_BENCH_KUBECONFIG)
     current = os.environ.get("KUBECONFIG")
-    if current and not args.force and os.path.abspath(current) != bench:
-        # KUBECONFIG déjà posé, ≠ banc : on NE l'écrase PAS (sauf --force). Rappel commenté
-        # (sur stdout pour rester `eval`-safe : un commentaire shell est inerte).
+    # `/dev/null` (placeholder posé par `stack select` quand le banc n'existait pas
+    # encore) ou un chemin VIDE/INEXISTANT ne sont PAS une intention explicite de
+    # l'utilisateur : on les remplace par le banc sans exiger --force (sinon on reste
+    # bloqué sur /dev/null après le montage). Seul un VRAI kubeconfig tiers est respecté.
+    placeholder = (
+        not current
+        or os.path.abspath(current) == os.path.abspath(os.devnull)
+        or not os.path.exists(current)
+    )
+    if current and not args.force and not placeholder and os.path.abspath(current) != bench:
+        # KUBECONFIG tiers RÉEL déjà posé : on NE l'écrase PAS (sauf --force). Rappel
+        # commenté (sur stdout pour rester `eval`-safe : un commentaire shell est inerte).
         print(f"# KUBECONFIG déjà défini ({current}) — `env --force` pour viser le banc")
         return 0
     # Ligne eval-able. `eval "$(topology.py env)"` exporte dans le shell courant.
@@ -918,11 +1101,7 @@ def cmd_access(args: argparse.Namespace) -> int:
     via l'arm `run-phases.sh access`, en passant les options telles quelles
     (`--stop` / `--print-hosts` / `--no-hosts`). Code 0/1 = celui de access.sh ; 2 si
     le banc n'a pas de kubeconfig (socle non monté)."""
-    if not os.path.exists(_BENCH_KUBECONFIG):
-        raise _UsageError(
-            f"kubeconfig du banc absent ({_BENCH_KUBECONFIG}) — monter le cluster d'abord "
-            "(`cluster up`)"
-        )
+    _assert_bench_target("nestor access")
     # Reconstruit les flags d'access.sh depuis les options parsées (un set fixe, sûr).
     flags = [
         flag
@@ -941,18 +1120,16 @@ def cmd_access(args: argparse.Namespace) -> int:
 
 
 def _kubectl(*args: str, timeout: int = _REFRESH_TIMEOUT_S):
-    """Lance `kubectl <args>` sur le banc (kubeconfig en repli), borné. Renvoie le
-    CompletedProcess (rc/stdout) ou None si injoignable — l'appelant décide."""
-    kubeconfig = os.environ.get("KUBECONFIG") or (
-        _BENCH_KUBECONFIG if os.path.exists(_BENCH_KUBECONFIG) else None
-    )
+    """Lance `kubectl <args>` sur le banc (kubeconfig en repli sûr), borné. Renvoie le
+    CompletedProcess (rc/stdout) ou None si injoignable — l'appelant décide. Le
+    kubeconfig vise le banc, sinon un kubeconfig VIDE — jamais la prod (ADR 0053)."""
     try:
         return subprocess.run(  # noqa: S603 — argv contrôlé (table de workloads)
             ["kubectl", *args, "--request-timeout=5s"],
             check=False,
             capture_output=True,
             text=True,
-            env={**os.environ, **({"KUBECONFIG": kubeconfig} if kubeconfig else {})},
+            env=_kubectl_env(),
             timeout=timeout,
         )
     except (OSError, ValueError, subprocess.TimeoutExpired):
@@ -975,6 +1152,106 @@ def _argocd_managed(name: str, namespace: str) -> bool:
     return out is not None and out.returncode == 0 and out.stdout.strip() == "argocd"
 
 
+# ── Garde d'isolation banc/prod (ADR 0053) ───────────────────────────────────
+# Sans kubeconfig banc, kubectl/le client retombent sur ~/.kube/config = la PROD.
+# Une commande BANC mutante (up/next/destroy/scale --apply/ha-3cp/…) ne doit JAMAIS
+# s'exécuter sur une cible non prouvée-banc : elle pourrait muter la prod par erreur.
+
+
+def _active_kubeconfig() -> str | None:
+    """Cible kubeconfig EXPLICITE/banc, ou None si ni l'un ni l'autre (= sans cible
+    sûre). Sert à la garde/preview pour savoir si on est « hors banc » ; le repli
+    réel vers `/dev/null` (jamais la prod) est porté par `_bench_kubeconfig`."""
+    return os.environ.get("KUBECONFIG") or (
+        _BENCH_KUBECONFIG if os.path.exists(_BENCH_KUBECONFIG) else None
+    )
+
+
+def _context_targets_bench() -> bool:
+    """`True` si le contexte kubectl COURANT vise PROUVABLEMENT le banc Lima.
+
+    Marqueur principal (ADR 0053) : le banc expose l'API en port-forward localhost
+    (`server: https://127.0.0.1:<port>`, bench/lima/lib.sh) — disjoint de toute prod
+    (VIP/hostname réel). Read-only, borné, FAIL-CLOSED : toute incertitude → False
+    (on ne peut pas prouver le banc → on traite comme non-banc). Sonde via la cible
+    SÛRE (`_kubectl_env` : banc ou vide, jamais la prod)."""
+    env = _kubectl_env()
+    try:
+        out = subprocess.run(  # noqa: S603 — argv fixe, lecture seule
+            [
+                "kubectl",
+                "config",
+                "view",
+                "--minify",
+                "-o",
+                "jsonpath={.clusters[0].cluster.server}",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=_REFRESH_TIMEOUT_S,
+        )
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return False  # injoignable → on ne peut PAS prouver le banc → refus
+    server = out.stdout.strip()
+    return out.returncode == 0 and server.startswith(("https://127.0.0.1:", "https://localhost:"))
+
+
+def _assert_bench_target(action: str) -> None:
+    """Garde d'isolation (ADR 0053) : une commande BANC mutante ne s'exécute QUE sur
+    une cible prouvée-banc. Si le kubeconfig du banc est absent ET que le contexte
+    courant ne vise pas le banc, REFUS (code 2) — protège la prod d'une mutation par
+    erreur. Échappatoire prod EXPLICITE : `KUBECONFIG` exporté = intention assumée
+    (ADR 0065) — la garde ne bloque alors pas (et `discover` n'est jamais gardé,
+    ADR 0074)."""
+    if os.environ.get("KUBECONFIG"):
+        return  # intention explicite assumée par l'opérateur
+    if os.path.exists(_BENCH_KUBECONFIG) and _context_targets_bench():
+        return  # banc présent ET contexte = banc : nominal
+    raise _UsageError(
+        f"REFUS : `{action}` est une commande BANC mais le kubeconfig du banc est "
+        f"absent ({os.path.relpath(_BENCH_KUBECONFIG, _ROOT)}) et le contexte kubectl "
+        "courant ne vise pas le banc Lima (127.0.0.1). Cette commande pourrait MUTER "
+        "la PRODUCTION par erreur (ADR 0053).\n"
+        "  • Monter le banc d'abord : `bench/lima/run-phases.sh up`\n"
+        "  • Ou, si l'intention est délibérée hors-banc, exporter KUBECONFIG "
+        'explicitement : `eval "$(bench/lima/env.sh export)"`'
+    )
+
+
+def _assert_inventory_safe(action: str, inventory_path: str, topo: Topology) -> None:
+    """Garde de CIBLE ANSIBLE (ADR 0053) : un montage qui vise le banc (target_kind=lima)
+    ne s'exécute PAS sur un inventaire de PROD.
+
+    Complément INDISPENSABLE de `_assert_bench_target` : celle-ci ne valide que le
+    KUBECONFIG (chemin kubectl), mais un play `hosts: cloud` SSHe sur les nœuds de
+    L'INVENTAIRE — chemin disjoint du KUBECONFIG. Un banc KUBECONFIG + un inventaire
+    prod a déjà reconfiguré des nœuds de PROD (`next dataops`). On valide ICI, en
+    Python et AVANT ansible-runner, que l'inventaire vise la même topologie que
+    l'intention (`topo.target_kind`) — indépendant de la discipline par-play
+    (l'audit-log côté playbook a un trou par play oublié).
+
+    Lève `_UsageError` (REFUS) si l'inventaire peut SSHer sur une cible non prouvée
+    conforme. Un inventaire purement local (que `localhost`) passe toujours."""
+    try:
+        with open(inventory_path, encoding="utf-8") as f:
+            inv = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        raise _UsageError(f"inventaire illisible ({inventory_path}) : {exc}") from exc
+    ok, raison = _isolation.classify_inventory_target(inv, topo.target_kind)
+    if not ok:
+        raise _UsageError(
+            f"REFUS : `{action}` vise la topologie `{topo.target_kind}` mais "
+            f"l'inventaire `{os.path.relpath(inventory_path, _ROOT)}` n'est pas une cible "
+            f"sûre — {raison} (ADR 0053). Risque de MUTER la mauvaise cible (la PROD).\n"
+            "  • Banc : utiliser l'inventaire Lima (target_kind: lima) — il est généré "
+            "par le montage du banc (`bench/lima/run-phases.sh up`).\n"
+            "  • Régénérer l'inventaire de la stack active : "
+            "`nestor artifact generate -o bootstrap/hosts.yaml`."
+        )
+
+
 def cmd_scale(args: argparse.Namespace) -> int:
     """`scale` : ajuste les replicas des workloads stateless au nombre de nœuds (ADR 0072).
 
@@ -984,10 +1261,12 @@ def cmd_scale(args: argparse.Namespace) -> int:
     managé par ArgoCD (un scale impératif serait écrasé au sync — ADR 0046). Code 0
     si tout est appliqué/à-jour ; 1 si un `kubectl scale` échoue ; 2 si banc
     injoignable (usage)."""
+    if args.apply:
+        _assert_bench_target("nestor scale --apply")
     ready = _ready_nodes()
     if not ready:
         raise _UsageError(
-            "banc injoignable (aucun nœud Ready) — monter le cluster d'abord (`cluster up`)"
+            "banc injoignable (aucun nœud Ready) — monter le cluster d'abord (`nestor up`)"
         )
     # Capacité d'exécution = nœuds Ready (le banc détaint les control → schedulables).
     workers_ready = len(ready)
@@ -1017,7 +1296,7 @@ def cmd_scale(args: argparse.Namespace) -> int:
             print(f"  ✗ {wl.name:<10} → échec : {detail}", file=sys.stderr)
             rc = 1
     if not args.apply:
-        print("→ PLAN (rien appliqué) — `cluster scale --apply` pour exécuter.")
+        print("→ PLAN (rien appliqué) — `nestor scale --apply` pour exécuter.")
     return rc
 
 
@@ -1058,8 +1337,8 @@ def cmd_discover(args: argparse.Namespace) -> int:
     Read-only. Code 0 si le cluster est joignable ; 2 (usage) sinon."""
     if not _ready_nodes():
         raise _UsageError(
-            "banc injoignable (aucun nœud Ready) — exporter KUBECONFIG ou `cluster env`, "
-            "ou monter le cluster (`cluster up`)"
+            "banc injoignable (aucun nœud Ready) — exporter KUBECONFIG ou `nestor env`, "
+            "ou monter le cluster (`nestor up`)"
         )
     result = _discover.assemble(
         nodes=_discover_node_roles(),
@@ -1073,8 +1352,8 @@ def cmd_discover(args: argparse.Namespace) -> int:
 
     # 1. le topology.yaml reconstruit (valide — passe stack validate, ADR 0074 §5)
     header = (
-        "# topology.yaml reconstruit par `cluster discover` (ADR 0074) — valeurs\n"
-        "# génériques (ADR 0023). Vérifier avant usage : `cluster stack validate`.\n"
+        "# topology.yaml reconstruit par `nestor discover` (ADR 0074) — valeurs\n"
+        "# génériques (ADR 0023). Vérifier avant usage : `nestor stack validate`.\n"
     )
     body = yaml.safe_dump(result.topology, sort_keys=False, allow_unicode=True)
     rendered = header + body
@@ -1106,6 +1385,125 @@ def cmd_discover(args: argparse.Namespace) -> int:
     return 0
 
 
+def _real_layers_backend() -> tuple[list[str], str | None]:
+    """Couches saines + backend RÉELS du cluster, dérivés des sondes de `discover`.
+
+    Réutilise `_discover.assemble` (façade fine, ADR 0074/0076 §6) : on ne réimplémente
+    aucune détection. Renvoie (layers triées, backend) ; backend None si le cluster est
+    injoignable / aucune StorageClass reconnue (→ `refresh` ne PROPOSE rien dessus)."""
+    if not _ready_nodes():  # cluster injoignable → rien de fiable à rapatrier
+        return [], None
+    result = _discover.assemble(
+        nodes=_discover_node_roles(),
+        namespaces=_discover_namespaces(),
+        crd_groups=_discover_crd_groups(),
+        storageclass_provisioners=_discover_sc_provisioners(),
+        gateways_present=_discover_gateways_present(),
+    )
+    topo = result.topology
+    return list(topo.get("layers", [])), topo.get("storage", {}).get("backend")
+
+
+def cmd_refresh(args: argparse.Namespace) -> int:
+    """`refresh` : matérialise une évolution VOULUE du réel dans `topology.yaml` (ADR 0076).
+
+    3ᵉ geste réel↔déclaration (après `preview`=constater, `discover`=adopter de zéro) :
+    RÉALIGNE la topo active sur le réel (couche montée, backend changé délibérément).
+    Borné par l'ADR 0046 — JAMAIS d'écriture silencieuse : diff AFFICHÉ + confirmation,
+    puis FUSION en place (préserve commentaires/`status`, édition texte chirurgicale §4).
+    `--dry-run` : diff seul, rien écrit. `--yes` : confirme (CI/hors-TTY).
+
+    Périmètre v1 (ADR 0076 §2) : `layers` (couches saines) + `storage.backend`. Les
+    différences de NŒUDS sont SIGNALÉES (pas fusionnées : le nom k8s `lima-node1` ≠ le
+    nom déclaré `node1` exige une normalisation — différée, issue #357). Le SCALE
+    (runtime, ADR 0072) n'est jamais rapatrié. Suppression (déclaré absent) signalée,
+    jamais appliquée sans `--prune` (§3, v2).
+
+    Code 0 (à jour, ou fusion appliquée) ; 2 (usage : cluster injoignable, fichier non
+    éditable sûrement) ; le refus de confirmation n'est pas une erreur (0, rien fait)."""
+    path = _resolve(args.file)
+    topo = load_topology(path)
+    # Le RÉEL : couches saines + backend (sondes discover). Cluster injoignable → on
+    # refuse net (refresh n'a aucun réel à rapatrier — ce n'est pas « rien à faire »).
+    real_layers, real_backend = _real_layers_backend()
+    if real_backend is None and not real_layers:
+        raise _UsageError(
+            "cluster injoignable (aucun nœud Ready / aucune couche lue) — exporter "
+            "KUBECONFIG ou `nestor env`, ou monter le cluster (`nestor up`)"
+        )
+    # Le DÉCLARÉ, AU MÊME GRAIN que le réel : `discover` émet des PHASES (storage-simple,
+    # monitoring, gitops, dataops…), tandis que `declared_layers` peut être des ALIAS de
+    # profil (base/metrics/store/obs). On RÉSOUT le déclaré en phases (resolve_layers, le
+    # même graphe qu'`up`) — sinon tout matche faux (aliases ≠ phases). Backend du
+    # déclaré pour résoudre la variante stockage (storage-simple vs ceph/sc).
+    declared_backend = topo.storage.get("backend", "local-path")
+    try:
+        declared_phase_layers = resolve_layers(topo.declared_layers, declared_backend)
+    except TopologyError as exc:
+        raise _UsageError(str(exc)) from exc
+    # Les nœuds ne sont PAS fusionnés en v1 : on passe le MÊME jeu en déclaré et réel
+    # pour neutraliser leur diff (nom k8s lima-node1 ≠ déclaré node1, #357).
+    declared_nodes = [{"name": n.name, "roles": n.roles} for n in topo.nodes]
+    plan = _refresh_plan.plan_refresh(
+        declared_nodes=declared_nodes,
+        declared_layers=declared_phase_layers,
+        declared_backend=declared_backend,
+        real_nodes=declared_nodes,  # v1 : pas de diff de nœuds (cf. docstring / #357)
+        real_layers=real_layers,
+        real_backend=real_backend,
+    )
+
+    if not plan.has_signals:
+        print(f"`{os.path.basename(path)}` : déjà aligné sur le réel — rien à rapatrier.")
+        return 0
+
+    # Diff AFFICHÉ (ADR 0046 : on regarde avant d'écrire). Les absences sont dans le plan
+    # (signalées) mais NON appliquées (pas de --prune en v1).
+    print("Écart réel ↔ déclaration (refresh) :")
+    for line in _refresh_plan.format_plan(plan):
+        print(line)
+
+    if not plan.has_additions:
+        # Que des absences (rien à matérialiser) : on a SIGNALÉ, on n'écrit pas.
+        print("→ rien à matérialiser (seules des absences, signalées ci-dessus).")
+        return 0
+
+    if args.dry_run:
+        print("→ --dry-run : aucune écriture (diff seul).")
+        return 0
+
+    # --yes confirme (CI) ; hors TTY sans --yes, _confirm renvoie le défaut (False) →
+    # refus plutôt qu'écrire à l'aveugle (ADR 0046 : jamais de matérialisation silencieuse).
+    no_input = args.yes or not sys.stdin.isatty()
+    question = "Matérialiser ces ajouts dans la déclaration ?"
+    if not _confirm(question, default=args.yes, no_input=no_input):
+        print("refresh annulé (rien écrit).", file=sys.stderr)
+        return 0
+
+    # FUSION en place (édition texte, préserve le reste — ADR 0076 §4). Fail-closed :
+    # un fichier de forme inattendue lève FuseError → usage, JAMAIS de corruption.
+    with open(path, encoding="utf-8") as f:
+        source = f.read()
+    try:
+        fused = _refresh_fuse.fuse_topology(source, plan)
+    except _refresh_fuse.FuseError as exc:
+        raise _UsageError(f"fusion impossible ({exc}) — éditer `{path}` à la main") from exc
+    # On REVALIDE le résultat avant d'écrire (le fichier fusionné doit rester une topo
+    # valide — sinon on n'écrit pas et on signale). Import local : topology_from_dict
+    # n'est pas dans l'API du paquet, on le prend du modèle.
+    from nestor.model import topology_from_dict
+
+    try:
+        topology_from_dict(yaml.safe_load(fused))
+    except (TopologyError, yaml.YAMLError) as exc:
+        raise _UsageError(f"fusion produirait une topo invalide ({exc}) — annulé") from exc
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(fused)
+    n_lignes = len(_refresh_plan.format_plan(plan))
+    print(f"✓ `{os.path.basename(path)}` mis à jour ({n_lignes} ligne(s)).")
+    return 0
+
+
 def cmd_preview(args: argparse.Namespace) -> int:
     """`preview` : LA vue complète d'une stack — VOULU + RÉEL + PLAN (calque `pulumi preview`).
 
@@ -1120,6 +1518,26 @@ def cmd_preview(args: argparse.Namespace) -> int:
 
     Read-only : ne LANCE ni ne DÉTRUIT rien (`next` applique ; `destroy` détruit). Code 0
     (informatif) ; chemin incohérent avec le backend → usage (2)."""
+    # Lecture seule : on ne BLOQUE pas. Quand aucun banc n'est monté, la sonde vise
+    # /dev/null (jamais la prod, ADR 0053) → la section RÉEL est VIDE. On le DIT
+    # simplement plutôt que de laisser croire à un cluster éteint.
+    if _active_kubeconfig() is None and not _context_targets_bench():
+        _warn(
+            "cluster non installé — pas de connexion possible pour l'instant "
+            "(le monter : `nestor up`). L'état réel ci-dessous est vide."
+        )
+    # MISMATCH SHELL ↔ preview (ADR 0053) : `_default_kubeconfig_to_bench` a posé le banc
+    # pour CE process (l'opérateur n'avait pas exporté KUBECONFIG) — mais le shell, lui,
+    # reste sans KUBECONFIG (process ≠ parent). preview lit donc le BANC pendant qu'un
+    # `kubectl` nu dans le shell vise ~/.kube/config (souvent la PROD). On AVERTIT (non
+    # bloquant) d'aligner le shell. Seulement si le banc est JOIGNABLE (sinon le 1er
+    # warning « cluster non installé » suffit).
+    elif _KUBECONFIG_AUTO_BENCH and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
+        _warn(
+            "preview lit le BANC, mais ton shell n'a pas KUBECONFIG exporté — un `kubectl` "
+            "direct vise ~/.kube/config (souvent la PROD). Aligne le shell : "
+            'eval "$(nestor env)".'
+        )
     path = _resolve(args.file)
     topo = load_topology(path)
     runs = load_runs(args.history or _RUNS_HISTORY)
@@ -1175,10 +1593,12 @@ def cmd_preview(args: argparse.Namespace) -> int:
     storage_part = (
         f"  ·  stockage : {topo.storage.get('backend', 'local-path')}" if consomme_stockage else ""
     )
-    print(
-        f"  couches        : {couches_label}{storage_part}  ·  "
-        f"exposition : {topo.exposition.get('mode', '—')}"
-    )
+    # exposition : le mode EFFECTIF (dérivé), pas la déclaration brute — un bloc
+    # `exposition` absent ne veut pas dire « pas d'exposition » : le défaut global est
+    # `gateway` (ADR 0071). On annote « (défaut) » quand rien n'est déclaré.
+    expo_declare = isinstance(topo.exposition, dict) and topo.exposition.get("mode")
+    expo_label = topo.exposition_mode + ("" if expo_declare else " (défaut)")
+    print(f"  couches        : {couches_label}{storage_part}  ·  exposition : {expo_label}")
 
     # ── RÉEL (ex-`refresh`) : l'état lu du réel (non stocké, ADR 0056 §7) ─────────
     declared = topo.control_nodes + topo.worker_nodes
@@ -1198,9 +1618,10 @@ def cmd_preview(args: argparse.Namespace) -> int:
     # Le RÉEL PRIME sur l'absence de trace (ADR 0052/0056 §7) : un cluster qui TOURNE
     # ne « s'installe » pas, même si l'historique ne le matche pas (run non consigné /
     # ancien label de topologie). On retire les phases socle (up/bootstrap) observées
-    # faites du RÉEL, ET les couches applicatives dont le signal d'infra est présent
-    # sur le banc (metrics-server déployé, ns monitoring/argocd…) — sinon une couche
-    # montée sur cache socle (non consignée) s'afficherait « à installer » à tort.
+    # faites du RÉEL, ET les couches applicatives PROUVÉES SAINES sur le banc (dernier
+    # maillon Ready : Loki pour monitoring, argocd-server pour gitops…). « Sain », pas
+    # « namespace présent » : une couche posée à MOITIÉ (ns créé mais Loki absent)
+    # RESTE « à installer » — sinon un montage échoué à mi-chemin s'afficherait « ✓ ».
     a_appliquer -= observed_done_phases(declared, real.vms_present, real.nodes_ready)
     a_appliquer -= _observed_layers([p for p in seq if p in a_appliquer])
     # jamais monté ≠ rejeu : `jamais` (aucun run de la stack) → « à installer » (inédit) ;
@@ -1247,6 +1668,31 @@ def _confirm_apply(target: str, *, assume_yes: bool) -> bool:
     return rep.strip().lower() in ("oui", "o", "yes", "y")
 
 
+def _nodes_override(topo) -> str:
+    """csv `nom:rôle` des nœuds déclarés (la TOPOLOGIE pilote le banc, ADR 0056).
+
+    Un nœud `control` (même control+worker, le banc le détaint) → `:control` ; un
+    worker pur → `:worker`. Partagé par `up` et `next` (délégation socle)."""
+    return ",".join(
+        f"{n.name}:{'control' if n.has_role('control') else 'worker'}" for n in topo.nodes
+    )
+
+
+def _runphases_env(topo, stack_name: str) -> dict[str, str]:
+    """Env passé à run-phases.sh (NODES_OVERRIDE/STACK_NAME/EXPOSITION_MODE) — partagé
+    par `up` (chemin complet) et `next` (délégation des phases amont up/bootstrap).
+    Garantit que les deux entrées lancent le banc avec les MÊMES paramètres dérivés."""
+    return {
+        **os.environ,
+        "NODES_OVERRIDE": _nodes_override(topo),
+        "STACK_NAME": stack_name,
+        # exposition.mode CONSÉQUENT (ADR 0020/0071) : Gateway en hostNetwork (80/443
+        # sur l'IP du nœud) en mode `gateway` (défaut) ; `none` n'arme rien. Alias
+        # lb-ipam/hostport déjà résolus par exposition_mode.
+        "EXPOSITION_MODE": topo.exposition_mode,
+    }
+
+
 def cmd_up(args: argparse.Namespace) -> int:
     """`up` : monte la stack active de bout en bout (calque `pulumi up`).
 
@@ -1260,6 +1706,7 @@ def cmd_up(args: argparse.Namespace) -> int:
     Là où `next` monte UNE couche (1er drift), `up` monte TOUTE la séquence. Code 0
     si le montage réussit ; 1 si run-phases.sh échoue ; 2 (usage) si confirmation
     refusée / chemin incohérent avec le backend."""
+    _assert_bench_target("nestor up")
     path = _resolve(args.file)
     topo = load_topology(path)
     target = args.target or default_target(topo)
@@ -1301,12 +1748,8 @@ def cmd_up(args: argparse.Namespace) -> int:
         return 2
 
     # NODES_OVERRIDE : la TOPOLOGIE pilote les nœuds du banc (inversion de frontière,
-    # ADR 0056 — la stack active décide, le harnais exécute). On bâtit le csv "nom:rôle"
-    # dans l'ordre déclaré : un nœud `control` (même control+worker, le banc le détaint)
-    # → `:control` ; un worker pur → `:worker`. ha-3cp garde son override interne (3 CP).
-    nodes_override = ",".join(
-        f"{n.name}:{'control' if n.has_role('control') else 'worker'}" for n in topo.nodes
-    )
+    # ADR 0056 — la stack active décide, le harnais exécute). ha-3cp garde son
+    # override interne (3 CP). Construit avec `next` via le helper partagé.
 
     # Délégation à run-phases.sh <chemin> : la séquence prouvée au banc (provisioning
     # VM + bootstrap + orchestration ha-3cp + apps), bash garde le moteur (ADR 0049).
@@ -1328,16 +1771,7 @@ def cmd_up(args: argparse.Namespace) -> int:
     rc = subprocess.run(  # noqa: S603 — chemin codé, séquence dérivée d'une topo validée
         argv,
         check=False,
-        env={
-            **os.environ,
-            "NODES_OVERRIDE": nodes_override,
-            "STACK_NAME": stack_name,
-            # exposition.mode CONSÉQUENT (ADR 0020/0071 réécrit) : le banc expose le
-            # Gateway en hostNetwork (80/443 sur l'IP du nœud) en mode `gateway` (le
-            # défaut) ; `none` n'arme aucune bordure. `exposition_mode` a déjà résolu
-            # les alias historiques lb-ipam/hostport → gateway.
-            "EXPOSITION_MODE": topo.exposition_mode,
-        },
+        env=_runphases_env(topo, stack_name),
     ).returncode
     if rc != 0:
         print(f"échec du montage ({libelle} rc={rc}).", file=sys.stderr)
@@ -1346,60 +1780,91 @@ def cmd_up(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_next(args: argparse.Namespace) -> int:
-    """`next` : applique la PROCHAINE couche manquante du plan (1er drift).
+# Libellés HUMAINS des phases AMONT — `next` les distingue comme `preview` : `up` =
+# créer les VMs SEULES, `bootstrap` = Kubernetes + CRI + CNI (pas tout le socle d'un
+# coup). Sert au message ET à la confirmation (un seul vocabulaire, pas de jargon).
+_LIBELLES_AMONT = {
+    "up": "créer les VMs",
+    "bootstrap": "monter Kubernetes (CRI + kubeadm + CNI Cilium)",
+}
 
-    PAS le calque `pulumi up` complet (qui provisionnerait les VMs et monterait TOUTE
-    la séquence) — `next` ne monte qu'UNE couche unitaire via ansible-runner (parité
-    state.sh : le 1er drift). Lancer `next` EST la décision humaine (G2, ADR 0063) ;
-    ré-invoquer `next` monte la suivante (jamais d'auto-enchaînement silencieux). Le
-    vrai `up` (entrée complète : provisioning + orchestration) reste à coder.
 
-    Code 0 si la couche est montée (ou rien à monter) ; 1 si le run échoue ; 2 (usage)
-    si la couche n'est pas un play unitaire / inventaire absent / chemin incohérent.
-    """
-    path = _resolve(args.file)
-    topo = load_topology(path)
-    runs = load_runs(args.history or _RUNS_HISTORY)
-    now = int(dt.datetime.now(tz=dt.UTC).timestamp())
-    target = args.target  # None → plan.default_target le déduit
-    run = _run_for_target(runs, target)
-    etat_frais, _ = verdict_for_run(run, target, now)
-    done = set(run.phases) if run is not None else set()
-    run_params = derive_run_params(topo)
-    try:
-        sugg = suggest_next(topo, target, done, etat_frais, run_params=run_params)
-    except PlanError as exc:
-        raise _UsageError(str(exc)) from exc
+def _quoi_couche(phase: str) -> str:
+    """Texte humain de l'action de montage d'une `phase` (amont OU couche applicative)."""
+    return _LIBELLES_AMONT.get(phase, f"monter la couche `{phase}`")
 
-    print(sugg.message)
-    if sugg.phase is None:
-        return 0  # rien à monter (stack à jour)
 
-    # Lancer `up` EST la décision. La couche doit avoir un playbook unitaire.
-    if sugg.playbook is None:
+def _quoi_couche_label(phase: str) -> str:
+    """Libellé d'une phase pour le MENU : nom technique + label métier lisible.
+
+    Ex. `storage-simple — stockage local-path`. Réutilise plan.phase_label (source
+    unique des libellés métier) ; tombe sur le seul nom si pas de label distinct."""
+    label = phase_label(phase)
+    return f"{phase} — {label}" if label != phase else phase
+
+
+def _monter_phase(topo: Topology, phase: str, run_params: dict) -> int:
+    """Monte UNE phase choisie : amont (run-phases.sh up/bootstrap) ou play unitaire
+    (ansible-runner). Renvoie 0 (ok) / 1 (échec run) ou lève _UsageError (usage).
+
+    Extrait de cmd_next pour être partagé par le chemin « 1re couche » et le menu
+    multi-couches : une fois la phase CHOISIE, son montage est identique."""
+    playbook_rel = phase_playbook(phase)
+    # Phases AMONT (`up`/`bootstrap`) : pas de playbook unitaire — provisioning bash
+    # (limactl, cni.sh, ADR 0049). On délègue à l'arm run-phases.sh du MÊME nom.
+    if phase in ("up", "bootstrap"):
+        _assert_bench_target(f"nestor next ({phase})")
+        stack_name = topo.catalog.get("topology", "—")
+        runphases = os.path.join(_ROOT, "bench", "lima", "run-phases.sh")
+        print(f"→ {phase} : {_quoi_couche(phase)} via run-phases.sh…")
+        rc = subprocess.run(  # noqa: S603 — chemin codé, env dérivé d'une topo validée
+            ["bash", runphases, phase],
+            check=False,
+            env=_runphases_env(topo, stack_name),
+        ).returncode
+        if rc != 0:
+            print(f"échec de la phase `{phase}` (rc={rc}).", file=sys.stderr)
+            return 1
+        print(f"✓ `{phase}` terminée — relancer `next` pour l'étape suivante ({stack_name}).")
+        return 0
+    # Toute autre phase sans playbook unitaire (cas théorique) = erreur d'usage.
+    if playbook_rel is None:
         raise _UsageError(
-            f"la phase `{sugg.phase}` n'est pas un play unitaire lançable "
+            f"la phase `{phase}` n'est pas un play unitaire lançable "
             "(déléguée au chemin nommé run-phases.sh) — la lancer via run-phases.sh"
         )
     private_data_dir = os.path.join(_ROOT, "bootstrap")
-    inventory = os.path.join(private_data_dir, "hosts.yaml")
+    # Inventaire de la TOPOLOGIE active (ADR 0053) : banc Lima pour une topo lima, prod
+    # sinon. PLUS de chemin prod codé en dur — c'est ce qui faisait SSHer `next` (topo
+    # banc) sur la prod. La garde _assert_inventory_safe reste le filet en aval.
+    inventory = _inventory_for(topo)
     ansible_cfg = os.path.join(private_data_dir, "ansible.cfg")
     # L'inventaire réel est gitignoré (ADR 0023) — sans lui, ansible-runner
-    # prendrait le chemin pour un nom d'hôte (erreur cryptique). On l'arrête net
-    # avec un message qui pointe vers l'exemple versionné.
+    # prendrait le chemin pour un nom d'hôte (erreur cryptique). On l'arrête net.
     if not os.path.exists(inventory):
+        rel = os.path.relpath(inventory, _ROOT)
+        if topo.target_kind == "lima":
+            raise _UsageError(
+                f"inventaire du banc absent : {rel} — monter le banc d'abord "
+                "(`bench/lima/run-phases.sh up`, qui génère l'inventaire Lima)"
+            )
         raise _UsageError(
-            f"inventaire absent : {os.path.relpath(inventory, _ROOT)} "
-            "— le générer (`topology.py generate -o bootstrap/hosts.yaml`) "
+            f"inventaire absent : {rel} "
+            "— le générer (`nestor artifact generate -o bootstrap/hosts.yaml`) "
             "ou le copier depuis bootstrap/hosts.example.yaml"
         )
-    playbook = os.path.relpath(os.path.join(_ROOT, sugg.playbook), private_data_dir)
-    print(f"→ lancement de {sugg.phase} ({sugg.playbook}) via ansible-runner…")
+    _assert_bench_target(f"nestor next ({phase})")
+    # Garde de CIBLE ANSIBLE (ADR 0053) : valide que l'INVENTAIRE vise la topologie
+    # voulue AVANT de lancer ansible-runner. _assert_bench_target ne couvre que le
+    # KUBECONFIG ; un play `hosts: cloud` SSHe sur les nœuds de l'inventaire (chemin
+    # disjoint). Sans ça, un banc KUBECONFIG + un inventaire prod mute la PROD.
+    _assert_inventory_safe(f"nestor next ({phase})", inventory, topo)
+    playbook = os.path.relpath(os.path.join(_ROOT, playbook_rel), private_data_dir)
+    print(f"→ lancement de {phase} ({playbook_rel}) via ansible-runner…")
     try:
         result = _runner.launch_phase(
             playbook,
-            sugg.run_params,
+            run_params,
             private_data_dir,
             inventory,
             ansible_config=ansible_cfg,
@@ -1415,6 +1880,113 @@ def cmd_next(args: argparse.Namespace) -> int:
     return 0 if result.rc == 0 else 1
 
 
+def cmd_next(args: argparse.Namespace) -> int:
+    """`next` : monte une couche montable du plan — au CHOIX si plusieurs le sont.
+
+    PAS le calque `pulumi up` complet (qui monterait TOUTE la séquence) — `next` ne
+    monte qu'UNE couche par invocation (parité state.sh). Quand PLUSIEURS couches
+    sont montables maintenant (deps réelles satisfaites — p. ex. `metrics-server` et
+    `storage-simple`, indépendants, ADR 0066), `next` les PROPOSE en menu et
+    l'opérateur choisit l'ordre ; le défaut reste l'ordre conventionnel du chemin.
+    Les phases AMONT (créer les VMs, socle k8s) sont des prérequis DURS : jamais un
+    menu. Lancer `next` EST la décision humaine (G2, ADR 0063) ; ré-invoquer monte la
+    suivante (jamais d'auto-enchaînement silencieux).
+
+    Code 0 si la couche est montée (ou rien à monter) ; 1 si le run échoue ; 2 (usage)
+    si la couche n'est pas un play unitaire / inventaire absent / chemin incohérent /
+    montage annulé.
+    """
+    path = _resolve(args.file)
+    topo = load_topology(path)
+    runs = load_runs(args.history or _RUNS_HISTORY)
+    now = int(dt.datetime.now(tz=dt.UTC).timestamp())
+    target = args.target  # None → plan.default_target le déduit
+    run = _run_for_target(runs, target)
+    etat_frais, _ = verdict_for_run(run, target, now)
+    done = set(run.phases) if run is not None else set()
+    # Le RÉEL prime sur l'historique (même logique que `preview`, ADR 0052/0056 §7) :
+    # un vieux run consigne `up`/`bootstrap`, mais si les VMs ont été détruites, ces
+    # phases ne sont PLUS faites. On RESTREINT `done` aux phases socle réellement
+    # observées (VMs présentes / nœud Ready) — sans ça, `next` saute la création des
+    # VMs et propose `storage-simple` sur un banc inexistant. `next` respecte ainsi le
+    # PLAN de `preview` (qui fait ce même calcul).
+    declared = topo.control_nodes + topo.worker_nodes
+    observed_socle = observed_done_phases(declared, _real_vms(), _ready_nodes())
+    done -= {"up", "bootstrap"} - observed_socle  # retire le socle que le réel CONTREDIT
+    run_params = derive_run_params(topo)
+    # Les couches MONTABLES maintenant (deps réelles satisfaites). La carte de
+    # dépendances vient du graphe atomique (bash, `phase_deps`) — fournie en PARESSEUX :
+    # `installable_now` ne l'invoque QU'au-delà du garde-fou amont (inutile de sheller
+    # le graphe pour décider de créer les VMs). En cas d'indisponibilité du graphe, le
+    # fournisseur lève → on retombe proprement en erreur d'usage.
+    backend = topo.storage.get("backend", "local-path")
+    try:
+        cible_eff = target or default_target(topo)
+        seq = expected_phase_sequence(topo, target)
+    except (PlanError, TopologyError) as exc:
+        raise _UsageError(str(exc)) from exc
+    # Le RÉEL prime AUSSI pour les couches APPLICATIVES (même calcul que `preview`,
+    # ADR 0052/0056 §7) : une couche dont le signal d'infra est présent sur le banc
+    # (metrics-server déployé, ns monitoring/argocd…) est FAITE, même sans trace
+    # d'historique (run non consigné / cache socle) ET même si le run n'est pas frais.
+    # Sans ça, `next` re-propose une couche déjà installée. `observed` = socle observé
+    # + couches applicatives observées : `installable_now` les retire TOUJOURS (prime
+    # sur la fraîcheur — sinon un run `jamais`/`perime` rejouerait toute la séquence).
+    observed_layers = _observed_layers([p for p in seq if p not in ("up", "bootstrap")])
+    observed = observed_socle | observed_layers
+    try:
+        montables = installable_now(
+            topo,
+            target,
+            done,
+            etat_frais,
+            deps_fn=lambda: phase_deps(backend),
+            observed_done=observed,
+        )
+    except (PlanError, TopologyError) as exc:
+        raise _UsageError(str(exc)) from exc
+
+    if not montables:
+        # Rien à monter : suggest_next porte le message « à jour » détaillé.
+        sugg = suggest_next(topo, target, done, etat_frais, run_params=run_params)
+        print(sugg.message)
+        return 0
+
+    # Hors TTY SANS --yes : on ne monte JAMAIS en silence (ni menu auto, ni montage
+    # mono-couche à l'aveugle). Refus net — l'opérateur doit voir/choisir, ou passer
+    # --yes (CI). Ce garde-fou vaut pour les DEUX chemins (sinon le menu, qui prend le
+    # défaut sous no_input, monterait sans confirmation explicite).
+    off_tty = not sys.stdin.isatty()
+    if off_tty and not args.yes:
+        print("montage refusé hors TTY sans --yes (pas de montage silencieux).", file=sys.stderr)
+        return 2
+    no_input = args.yes  # à ce stade : soit TTY (on prompte), soit --yes (on saute)
+    # Menu si PLUSIEURS couches montables ; sinon la seule. Choisir un numéro dans le
+    # menu EST déjà la décision explicite → on NE redemande PAS de confirmation ensuite
+    # (un seul geste, pas de double [o/N] redondant).
+    a_choisi_au_menu = len(montables) > 1
+    if a_choisi_au_menu:
+        phase = _choisir_couche(montables, _quoi_couche_label, no_input=no_input)
+        if phase is None:
+            print("montage annulé.", file=sys.stderr)
+            return 2
+    else:
+        phase = montables[0]
+
+    quoi = _quoi_couche(phase)
+    print(f"Prochaine étape sur `{cible_eff}` : {quoi}.")
+    # Confirmation AVANT de monter (l'étape MUTE le banc) — SEULEMENT s'il n'y a pas eu
+    # de menu (chemin mono-couche : la confirmation est l'unique garde-fou). Après un
+    # menu, le choix du numéro a déjà valu décision (pas de friction en double). --yes
+    # saute la confirmation (CI).
+    if not a_choisi_au_menu and not _confirm(
+        f"{quoi[0].upper()}{quoi[1:]} ?", default=args.yes, no_input=no_input
+    ):
+        print("montage annulé.", file=sys.stderr)
+        return 2
+    return _monter_phase(topo, phase, run_params)
+
+
 def cmd_ha_3cp(args: argparse.Namespace) -> int:
     """Orchestre le montage HA `ha-3cp` (ADR 0047/0055, #250) — la partie ANSIBLE.
 
@@ -1425,6 +1997,7 @@ def cmd_ha_3cp(args: argparse.Namespace) -> int:
     run-phases.sh. La logique (séquence, super-admin→admin, gates etcd) est testée
     sans banc (tests/test_ha.py) ; ce câblage est la seule I/O réelle.
     """
+    _assert_bench_target("ha-3cp")
     import time
 
     private_data_dir = os.path.join(_ROOT, "bootstrap")
@@ -1523,6 +2096,7 @@ def cmd_bootstrap_seq(args: argparse.Namespace) -> int:
     0049) ; cette commande reçoit cp_ip/inventaire déjà dérivés du banc et rappelle
     `ha-cni <iface>` pour la CNI. La logique (séquence, fail-fast) est testée sans
     banc (tests/test_bootstrap.py)."""
+    _assert_bench_target("bootstrap-seq")
     private_data_dir = os.path.join(_ROOT, "bootstrap")
     inventory = (
         args.inventory
@@ -1640,6 +2214,7 @@ def cmd_roundtrip(args: argparse.Namespace) -> int:
     toute suppression définitive, CONFIRMATION sur TTY (ou `--yes` hors TTY). Code 0
     si réversible, 1 si une étape échoue / confirmation refusée, 2 si usage.
     """
+    _assert_bench_target("nestor test roundtrip")
     try:
         result = _roundtrip.run_roundtrip(args.phase, allow_full=args.full, assume_yes=args.yes)
     except _roundtrip.RoundtripError as exc:
@@ -1651,6 +2226,41 @@ def cmd_roundtrip(args: argparse.Namespace) -> int:
     verdict = "réversible" if result.reversible else "NON réversible (voir ci-dessus)"
     print(f"→ {verdict}")
     return 0 if result.reversible else 1
+
+
+def cmd_remove(args: argparse.Namespace) -> int:
+    """`remove` : supprime UNE couche applicative et sa clôture descendante (inverse de `next`).
+
+    DESTRUCTIF (efface la couche + ses données) : délègue à `run-phases.sh rollback`
+    (périmètre dans rollback-lib.sh, ADR 0054), en ordre aval→amont. Détruire une couche
+    entraîne celle de ses dépendantes (clôture, ADR 0066) — affichées et confirmées
+    AVANT. Une clôture de STOCKAGE (≈ démontage du socle) exige `--full`. `--yes` saute
+    la confirmation (hors TTY).
+
+    Mêmes gardes d'isolation que `next` (ADR 0053) : le rollback vise le banc (kubeconfig
+    + node-side ceph) → `_assert_bench_target` ; `BANC_JETABLE=1` est imposé par
+    run-phases.sh (jamais la prod). Le backend de la stack est THREADÉ à rollback-lib
+    (STORAGE_BACKEND) pour cibler les bonnes ressources : sans lui, le rollback
+    retomberait sur `ceph` et tenterait de supprimer une OBC absente en local-path.
+    Code 0 si supprimé, 1 si une étape échoue / confirmation refusée, 2 si usage."""
+    _assert_bench_target(f"nestor remove ({args.phase})")
+    topo = load_topology(_resolve(args.file))
+    backend = topo.storage.get("backend", "local-path")
+    try:
+        result = _roundtrip.run_remove(
+            args.phase, backend=backend, allow_full=args.full, assume_yes=args.yes
+        )
+    except _roundtrip.RoundtripError as exc:
+        raise _UsageError(str(exc)) from exc
+    print(f"Remove — couche `{result.phase}` → clôture {result.layers} :")
+    for step in result.steps:
+        marque = "✓" if step.ok else "✗"
+        print(f"  {marque} {step.nom} — {step.detail}")
+    if result.removed:
+        print(f"→ couche supprimée — re-monter avec `nestor next` ({result.phase}).")
+        return 0
+    print("→ suppression INCOMPLÈTE (voir ci-dessus).")
+    return 1
 
 
 # Verbes du groupe `stack` (calque `pulumi stack` : GESTION des stacks).
@@ -1698,8 +2308,10 @@ _DISPATCH = {
     "access": cmd_access,  # accès dev (URLs + secrets) — délègue à access.sh (ADR 0048)
     "scale": cmd_scale,  # ajuste les replicas au nb de nœuds Ready (ADR 0072, runtime)
     "discover": cmd_discover,  # reconstruit un topology.yaml depuis le réel (ADR 0074, inverse de generate)  # noqa: E501
+    "refresh": cmd_refresh,  # réaligne la topo active sur le réel voulu (ADR 0076, fusion + confirmation)  # noqa: E501
     "up": cmd_up,  # calque `pulumi up` : monte TOUTE la séquence (délègue à run-phases.sh)
     "next": cmd_next,  # applique la PROCHAINE couche (1er drift, granularité fine)
+    "remove": cmd_remove,  # supprime UNE couche + sa clôture (inverse de next, ADR 0054)
     "destroy": cmd_destroy,  # calque `pulumi destroy`
     # Groupes noun-verb (annexe rangée) : artefacts dérivés/constatés + épreuves.
     "artifact": cmd_artifact,
@@ -1725,19 +2337,55 @@ def _run(args: argparse.Namespace) -> int:
         return 1
 
 
+class _GroupedHelp(argparse.RawDescriptionHelpFormatter):
+    """Aide du parser RACINE : garde l'epilog (commandes groupées courantes/annexes)
+    mais MASQUE la liste détaillée des sous-commandes d'argparse — sinon le menu
+    afficherait DEUX listes (la native, à plat et illisible, + notre epilog groupé).
+    On neutralise donc le rendu des actions `_SubParsersAction`."""
+
+    def _format_action(self, action):
+        if isinstance(action, argparse._SubParsersAction):
+            return ""  # pas de liste détaillée : l'epilog groupé est la seule source
+        return super()._format_action(action)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        prog="cluster",
+        prog="nestor",
+        formatter_class=_GroupedHelp,
         description=(
-            "Monte et inspecte un cluster Kubernetes décrit dans un fichier. "
-            "Tu décris ce que tu veux (nœuds, couches) ; l'outil le construit. "
-            "Commandes courantes : `cluster preview` (voir ce qui serait fait), "
-            "`cluster up` (construire), `cluster destroy` (tout supprimer)."
+            "Monte et inspecte un cluster Kubernetes décrit dans un fichier.\n"
+            "Tu décris ce que tu veux (nœuds, couches) ; l'outil le construit."
+        ),
+        # Liste des commandes GROUPÉES par usage (courantes vs annexes). argparse les
+        # mettrait sinon dans un seul mur illisible : le formatter `_GroupedHelp` masque
+        # la liste brute des sous-commandes et n'affiche QUE cet epilog. Détail d'une
+        # commande : `nestor <commande> -h`.
+        epilog=(
+            "Commandes courantes (dans l'ordre d'un workflow) :\n"
+            "  stack       choisir/créer/lister les configurations (new·ls·select·validate)\n"
+            "  preview     voir l'état sans rien changer (voulu / réel / à monter)\n"
+            "  next        monter UNE couche : la prochaine qui manque\n"
+            "  remove      supprimer UNE couche (et ses dépendantes) — inverse de next\n"
+            "  up          construire le cluster en entier (machines + couches)\n"
+            "  destroy     supprimer les machines (VMs) de la stack active\n"
+            "\n"
+            "Commandes annexes :\n"
+            '  env         brancher kubectl sur le banc : eval "$(nestor env)"\n'
+            "  access      ouvrir l'accès dev (URLs des services + identifiants)\n"
+            "  scale       ajuster les replicas au nombre de nœuds\n"
+            "  discover    reconstruire un topology.yaml depuis un cluster réel\n"
+            "  refresh     réaligner la déclaration sur le réel voulu (couche·backend)\n"
+            "  artifact    fichiers générés + historique (generate·diff·runs·metrics)\n"
+            "  test        vérifier le cluster (scenarios·smoke·roundtrip)\n"
+            "\n"
+            "Détail d'une commande : `nestor <commande> -h`."
         ),
     )
     # ha-3cp n'est PAS un sous-parser ici (commande interne routée à part dans main) :
     # le menu ne liste donc que les commandes publiques, sans `==SUPPRESS==` parasite.
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    # metavar="<commande>" : masque le mur `{stack,artifact,…}` dans la ligne d'usage.
+    sub = ap.add_subparsers(dest="cmd", required=True, metavar="<commande>")
 
     def _add_file(p: argparse.ArgumentParser) -> None:
         p.add_argument(
@@ -1877,7 +2525,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_env = sub.add_parser(
         "env",
-        help='brancher kubectl sur le cluster du banc : eval "$(cluster env)" dans ton shell',
+        help='brancher kubectl sur le cluster du banc : eval "$(nestor env)" dans ton shell',
     )
     p_env.add_argument(
         "--force", action="store_true", help="imprime le banc même si KUBECONFIG est déjà défini"
@@ -1887,7 +2535,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "access",
         help="ouvrir l'accès dev : URLs des services + identifiants (--stop pour fermer)",
     )
-    # Options déclarées explicitement (apparaissent dans `cluster access --help` ;
+    # Options déclarées explicitement (apparaissent dans `nestor access --help` ;
     # argparse.REMAINDER ne capture pas les `--flags` en tête — limite connue).
     p_access.add_argument("--stop", action="store_true", help="ferme les forwards SSH ouverts")
     p_access.add_argument(
@@ -1920,6 +2568,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="nom de la topologie reconstruite (défaut : discovered)",
     )
 
+    p_refresh = sub.add_parser(
+        "refresh",
+        help="réaligner la déclaration sur une évolution voulue du réel (couche/backend)",
+    )
+    _add_file(p_refresh)
+    p_refresh.add_argument(
+        "--dry-run", action="store_true", help="afficher le diff seulement (n'écrit rien)"
+    )
+    p_refresh.add_argument(
+        "--yes", action="store_true", help="confirmer la fusion (requis hors TTY)"
+    )
+
     p_destroy = sub.add_parser(
         "destroy", help="supprimer les machines (VMs) de la configuration active"
     )
@@ -1946,6 +2606,31 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_next.add_argument(
         "--history", default=None, help="chemin du runs-history.yaml (défaut : bench/lima/)"
+    )
+    p_next.add_argument(
+        "--yes", action="store_true", help="monter sans demander confirmation (requis hors TTY)"
+    )
+
+    p_remove = sub.add_parser(
+        "remove",
+        help="supprimer UNE couche et ses dépendantes (inverse de next, DESTRUCTIF banc)",
+    )
+    _add_file(p_remove)
+    p_remove.add_argument(
+        "--phase",
+        required=True,
+        choices=list(_roundtrip.KNOWN_PHASES),
+        help="couche à supprimer (sa clôture descendante est retirée avec elle)",
+    )
+    p_remove.add_argument(
+        "--full",
+        action="store_true",
+        help="autoriser une clôture de STOCKAGE (ceph/sc/datalake → ≈ démontage du socle)",
+    )
+    p_remove.add_argument(
+        "--yes",
+        action="store_true",
+        help="supprimer sans demander confirmation (requis hors TTY)",
     )
 
     p_met = artifact_sub.add_parser(
@@ -2053,6 +2738,13 @@ _INTERNAL_PARSERS = {
 }
 
 
+# Posé par `_default_kubeconfig_to_bench` quand IL a dû pointer le banc lui-même (le
+# shell de l'opérateur n'avait PAS KUBECONFIG exporté). Signal pour `preview` : le
+# process voit le banc, mais le SHELL ne l'a pas → un `kubectl` nu y vise ~/.kube/config
+# (souvent la prod). Variable de PROCESS (le défaut process-local ne change pas le shell).
+_KUBECONFIG_AUTO_BENCH = False
+
+
 def _default_kubeconfig_to_bench() -> None:
     """Sans KUBECONFIG exporté, pointe le banc Lima par défaut (`_BENCH_KUBECONFIG`).
 
@@ -2061,9 +2753,13 @@ def _default_kubeconfig_to_bench() -> None:
     OU kubectl, qui lisent `KUBECONFIG`/`~/.kube/config`. Sans ce défaut, elles visent
     le contexte courant du poste (souvent l'endpoint prod-exemple de hosts.example.yaml)
     et échouent/`—` alors que le banc tourne. On NE force PAS si l'opérateur a déjà
-    exporté KUBECONFIG (intention explicite respectée)."""
+    exporté KUBECONFIG (intention explicite respectée). Mémorise dans
+    `_KUBECONFIG_AUTO_BENCH` qu'on a posé le défaut (≠ l'opérateur) — le shell, lui,
+    reste sans KUBECONFIG (process ≠ parent)."""
+    global _KUBECONFIG_AUTO_BENCH
     if not os.environ.get("KUBECONFIG") and os.path.exists(_BENCH_KUBECONFIG):
         os.environ["KUBECONFIG"] = _BENCH_KUBECONFIG
+        _KUBECONFIG_AUTO_BENCH = True
 
 
 def main(argv: list[str] | None = None) -> int:

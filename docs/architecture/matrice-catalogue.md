@@ -189,8 +189,8 @@ sur quelle combinaison, quand) est dans le **bloc « Scénarios exécutés »** 
 après la table. Source : [`bench/scenarios/`](../../bench/scenarios/).
 
 > **Miroir machine (ADR 0056 P4).** Cette table a un pendant exécutable :
-> `cluster_topology/epreuves.py` (constante `EPREUVES`) la reprend champ par
-> champ pour **filtrer** les épreuves jouables selon une `topology.yaml`
+> `nestor/epreuves.py` (constante `EPREUVES`) la reprend champ par champ pour
+> **filtrer** les épreuves jouables selon une `topology.yaml`
 > (`topology.py epreuves`). Un test de parité (`tests/test_epreuves.py`) casse
 > si le code et le glob `bench/scenarios/NN-*.sh` divergent — la table reste la
 > source humaine, le code son miroir testé.

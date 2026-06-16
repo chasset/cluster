@@ -119,7 +119,7 @@ class Topology:
         `layers.layers_from_profile` (import LOCAL pour éviter un cycle model↔layers)."""
         if self.layers:
             return list(self.layers)
-        from cluster_topology.layers import layers_from_profile
+        from nestor.layers import layers_from_profile
 
         return layers_from_profile(self.catalog.get("profile", "base"))
 
