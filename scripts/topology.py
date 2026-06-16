@@ -600,55 +600,87 @@ def _ready_nodes() -> list[str]:
     return ready
 
 
-# Signal d'infra CANONIQUE par couche applicative : la ressource k8s la plus
-# caractéristique dont la PRÉSENCE prouve que la couche est déployée. Constaté sur
-# le cluster (comme « nœud Ready ») pour que `preview` PLAN reflète le RÉEL des
-# couches, pas seulement l'historique (un run sur cache n'est pas consigné → faux
-# « à installer » alors que la couche TOURNE). Dérivé des `phase_targeted_resources`
-# (rollback-lib.sh, ADR 0066) — la même ressource que le rollback ciblerait.
-# Format : phase → (kind, name, namespace|None). Les phases sans signal stable
-# (storage-simple = StorageClass globale ; couches Ceph hors périmètre local-path)
-# restent jugées par l'historique.
-_LAYER_SIGNAL: dict[str, tuple[str, str, str | None]] = {
-    "metrics-server": ("deployment", "metrics-server", "kube-system"),
-    "storage-simple": ("deployment", "local-path-provisioner", "local-path-storage"),
-    "monitoring": ("namespace", "monitoring", None),
-    "gitops": ("namespace", "argocd", None),
-    "dataops": ("namespace", "dagster", None),
-    "gitops-seed": ("application", "atlas", "argocd"),
+# Signal de SANTÉ canonique par couche applicative : la ressource k8s du DERNIER
+# maillon dont la PRÉSENCE + l'état READY prouvent que la couche est posée ET saine.
+# Pas le namespace (créé tôt, présent même si la couche a échoué à mi-chemin : un ns
+# `monitoring` qui existe mais sans Loki Ready a fait afficher la couche « ✓ » à tort)
+# — on vise la ressource DISCRIMINANTE que le rôle lui-même éprouve (sa gate Ready) :
+#   monitoring → StatefulSet loki Ready (platform-loki) — absent si SeaweedFS manque ;
+#   gitops     → Deployment argocd-server Ready (platform-argocd) ;
+#   dataops    → Deployment dagster Ready (platform-dagster) ;
+#   metrics-server / storage-simple → leur Deployment Ready.
+# Format : phase → (kind, name, namespace|None, ready). `ready=True` (workloads) exige
+# readyReplicas≥1 ; `ready=False` (Application Argo : CRD sans replicas) = présence.
+# Constaté sur le cluster (comme « nœud Ready ») pour que `preview`/`next` reflètent le
+# RÉEL — une couche à moitié posée n'est PAS « à-jour ». Miroir des gates de rôles et de
+# `gate_pred` (run-phases.sh) — même ressource, même critère Ready.
+_LAYER_SIGNAL: dict[str, tuple[str, str, str | None, bool]] = {
+    "metrics-server": ("deployment", "metrics-server", "kube-system", True),
+    "storage-simple": ("deployment", "local-path-provisioner", "local-path-storage", True),
+    "monitoring": ("statefulset", "loki", "monitoring", True),
+    "gitops": ("deployment", "argocd-server", "argocd", True),
+    "dataops": ("deployment", "dagster", "dagster", True),
+    "gitops-seed": ("application", "atlas", "argocd", False),
 }
 
+# Kinds dont la SANTÉ se lit via `status.readyReplicas` (workloads répliqués).
+_READY_REPLICAS_KINDS = frozenset({"deployment", "statefulset", "daemonset", "replicaset"})
 
-def _resource_exists(kind: str, name: str, namespace: str | None) -> bool:
-    """`True` si la ressource k8s existe sur le banc (kubectl get, borné). Toute
-    erreur (absente, cluster injoignable, kind inconnu) → False (prudent : on ne
-    marque « à-jour » que sur une présence CONSTATÉE)."""
+
+def _kubectl_resource(kind, name, namespace, jsonpath=None):
+    """`kubectl get <kind> <name>` borné, env banc (jamais la prod, ADR 0053).
+    Renvoie le CompletedProcess, ou None sur erreur d'exécution (cluster injoignable…)."""
     argv = ["kubectl", "get", kind, name, "--request-timeout=5s"]
     if namespace:
         argv += ["-n", namespace]
+    if jsonpath:
+        argv += ["-o", f"jsonpath={jsonpath}"]
     try:
-        out = subprocess.run(  # noqa: S603 — argv fixe (table _LAYER_SIGNAL), pas d'entrée shell
+        return subprocess.run(  # noqa: S603 — argv fixe (table _LAYER_SIGNAL), pas d'entrée shell
             argv,
             check=False,
             capture_output=True,
             text=True,
-            env=_kubectl_env(),  # banc, sinon vide — jamais la prod (ADR 0053)
+            env=_kubectl_env(),
             timeout=_REFRESH_TIMEOUT_S,
         )
     except (OSError, ValueError, subprocess.TimeoutExpired):
+        return None
+
+
+def _resource_exists(kind: str, name: str, namespace: str | None) -> bool:
+    """`True` si la ressource k8s EXISTE sur le banc (présence seule, sans santé).
+    Toute erreur (absente, cluster injoignable, kind inconnu) → False (prudent)."""
+    out = _kubectl_resource(kind, name, namespace)
+    return out is not None and out.returncode == 0
+
+
+def _resource_healthy(kind: str, name: str, namespace: str | None, ready: bool) -> bool:
+    """La ressource est-elle posée ET saine ? `ready=False` → présence seule (CRD type
+    Application sans replicas). `ready=True` → pour un workload répliqué, readyReplicas≥1
+    (le DERNIER maillon : un Loki à 0/1 réplica n'est PAS sain → la couche n'est pas
+    « à-jour »). Lecture bornée, fail-closed (toute incertitude → False)."""
+    if not ready or kind not in _READY_REPLICAS_KINDS:
+        return _resource_exists(kind, name, namespace)
+    out = _kubectl_resource(kind, name, namespace, jsonpath="{.status.readyReplicas}")
+    if out is None or out.returncode != 0:
         return False
-    return out.returncode == 0
+    try:
+        return int((out.stdout or "").strip() or "0") >= 1
+    except (ValueError, AttributeError):
+        return False
 
 
 def _observed_layers(phases: list[str]) -> set[str]:
-    """Couches applicatives PROUVÉES déployées par l'état RÉEL du cluster (signal
-    d'infra présent). Ne teste QUE les phases de `phases` qui ont un signal connu
-    (_LAYER_SIGNAL) — un seul `kubectl get` par couche, borné. Le RÉEL prime sur
-    l'absence de trace d'historique (ADR 0052/0056 §7), comme pour up/bootstrap."""
+    """Couches applicatives PROUVÉES posées ET SAINES par l'état RÉEL du cluster.
+    Ne teste QUE les phases de `phases` qui ont un signal connu (_LAYER_SIGNAL) — un
+    `kubectl get` borné par couche. Une couche dont le dernier maillon n'est pas Ready
+    (ex. monitoring sans Loki) n'est PAS retenue : le RÉEL prime sur l'historique (ADR
+    0052/0056 §7), mais « réel » = SAIN, pas « namespace présent »."""
     done: set[str] = set()
     for ph in phases:
         sig = _LAYER_SIGNAL.get(ph)
-        if sig and _resource_exists(*sig):
+        if sig and _resource_healthy(*sig):
             done.add(ph)
     return done
 
@@ -1401,9 +1433,10 @@ def cmd_preview(args: argparse.Namespace) -> int:
     # Le RÉEL PRIME sur l'absence de trace (ADR 0052/0056 §7) : un cluster qui TOURNE
     # ne « s'installe » pas, même si l'historique ne le matche pas (run non consigné /
     # ancien label de topologie). On retire les phases socle (up/bootstrap) observées
-    # faites du RÉEL, ET les couches applicatives dont le signal d'infra est présent
-    # sur le banc (metrics-server déployé, ns monitoring/argocd…) — sinon une couche
-    # montée sur cache socle (non consignée) s'afficherait « à installer » à tort.
+    # faites du RÉEL, ET les couches applicatives PROUVÉES SAINES sur le banc (dernier
+    # maillon Ready : Loki pour monitoring, argocd-server pour gitops…). « Sain », pas
+    # « namespace présent » : une couche posée à MOITIÉ (ns créé mais Loki absent)
+    # RESTE « à installer » — sinon un montage échoué à mi-chemin s'afficherait « ✓ ».
     a_appliquer -= observed_done_phases(declared, real.vms_present, real.nodes_ready)
     a_appliquer -= _observed_layers([p for p in seq if p in a_appliquer])
     # jamais monté ≠ rejeu : `jamais` (aucun run de la stack) → « à installer » (inédit) ;
@@ -1690,8 +1723,26 @@ def cmd_next(args: argparse.Namespace) -> int:
     backend = topo.storage.get("backend", "local-path")
     try:
         cible_eff = target or default_target(topo)
+        seq = expected_phase_sequence(topo, target)
+    except (PlanError, TopologyError) as exc:
+        raise _UsageError(str(exc)) from exc
+    # Le RÉEL prime AUSSI pour les couches APPLICATIVES (même calcul que `preview`,
+    # ADR 0052/0056 §7) : une couche dont le signal d'infra est présent sur le banc
+    # (metrics-server déployé, ns monitoring/argocd…) est FAITE, même sans trace
+    # d'historique (run non consigné / cache socle) ET même si le run n'est pas frais.
+    # Sans ça, `next` re-propose une couche déjà installée. `observed` = socle observé
+    # + couches applicatives observées : `installable_now` les retire TOUJOURS (prime
+    # sur la fraîcheur — sinon un run `jamais`/`perime` rejouerait toute la séquence).
+    observed_layers = _observed_layers([p for p in seq if p not in ("up", "bootstrap")])
+    observed = observed_socle | observed_layers
+    try:
         montables = installable_now(
-            topo, target, done, etat_frais, deps_fn=lambda: phase_deps(backend)
+            topo,
+            target,
+            done,
+            etat_frais,
+            deps_fn=lambda: phase_deps(backend),
+            observed_done=observed,
         )
     except (PlanError, TopologyError) as exc:
         raise _UsageError(str(exc)) from exc
@@ -1702,10 +1753,18 @@ def cmd_next(args: argparse.Namespace) -> int:
         print(sugg.message)
         return 0
 
-    no_input = args.yes or not sys.stdin.isatty()
-    # Menu si PLUSIEURS couches montables ; sinon la seule (ou le défaut sous no_input).
-    # Choisir un numéro dans le menu EST déjà la décision explicite → on NE redemande
-    # PAS de confirmation ensuite (un seul geste, pas de double [o/N] redondant).
+    # Hors TTY SANS --yes : on ne monte JAMAIS en silence (ni menu auto, ni montage
+    # mono-couche à l'aveugle). Refus net — l'opérateur doit voir/choisir, ou passer
+    # --yes (CI). Ce garde-fou vaut pour les DEUX chemins (sinon le menu, qui prend le
+    # défaut sous no_input, monterait sans confirmation explicite).
+    off_tty = not sys.stdin.isatty()
+    if off_tty and not args.yes:
+        print("montage refusé hors TTY sans --yes (pas de montage silencieux).", file=sys.stderr)
+        return 2
+    no_input = args.yes  # à ce stade : soit TTY (on prompte), soit --yes (on saute)
+    # Menu si PLUSIEURS couches montables ; sinon la seule. Choisir un numéro dans le
+    # menu EST déjà la décision explicite → on NE redemande PAS de confirmation ensuite
+    # (un seul geste, pas de double [o/N] redondant).
     a_choisi_au_menu = len(montables) > 1
     if a_choisi_au_menu:
         phase = _choisir_couche(montables, _quoi_couche_label, no_input=no_input)
@@ -1720,7 +1779,7 @@ def cmd_next(args: argparse.Namespace) -> int:
     # Confirmation AVANT de monter (l'étape MUTE le banc) — SEULEMENT s'il n'y a pas eu
     # de menu (chemin mono-couche : la confirmation est l'unique garde-fou). Après un
     # menu, le choix du numéro a déjà valu décision (pas de friction en double). --yes
-    # saute ; hors TTY sans --yes, _confirm renvoie False → refus plutôt qu'à l'aveugle.
+    # saute la confirmation (CI).
     if not a_choisi_au_menu and not _confirm(
         f"{quoi[0].upper()}{quoi[1:]} ?", default=args.yes, no_input=no_input
     ):

@@ -626,6 +626,11 @@ runs:
         import subprocess as sp
 
         self._set_real(vms=[], ready=[])  # banc inexistant → up est la 1re phase
+        # Banc inexistant → aucune couche applicative saine ; neutralise la sonde
+        # kubectl pour ne capturer que l'appel `run-phases.sh up`.
+        orig_obs = cli._observed_layers
+        cli._observed_layers = lambda _phases: set()
+        self.addCleanup(setattr, cli, "_observed_layers", orig_obs)
         calls = []
 
         def fake_run(argv, **kw):
@@ -650,6 +655,15 @@ runs:
 
     def test_refuses_without_yes_off_tty(self):
         # Hors TTY sans --yes : la confirmation refuse → code 2, RIEN n'est monté.
+        # On neutralise la sonde réelle `_observed_layers` (kubectl) pour ne capturer
+        # QUE les appels de montage (sinon les probes kubectl pollueraient `calls`), et
+        # `phase_deps` (sinon le pont bash heurterait le stub subprocess ci-dessous).
+        orig_obs = cli._observed_layers
+        cli._observed_layers = lambda _phases: set()
+        self.addCleanup(setattr, cli, "_observed_layers", orig_obs)
+        orig_deps = cli.phase_deps
+        cli.phase_deps = lambda _backend: {"datalake": set(), "monitoring": set(), "dataops": set()}
+        self.addCleanup(setattr, cli, "phase_deps", orig_deps)
         calls = []
         orig = cli.subprocess.run
         cli.subprocess.run = lambda *a, **k: calls.append(a) or subprocess.CompletedProcess(a, 0)
@@ -660,7 +674,7 @@ runs:
             ["next", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist]
         )
         self.assertEqual(code, 2)
-        self.assertIn("annulé", err)
+        self.assertIn("refusé hors TTY", err)  # pas de montage silencieux
         self.assertEqual(calls, [])  # aucun montage lancé
 
 
@@ -711,6 +725,11 @@ runs:
             "gitops-seed": {"gitops"},
         }
         self.addCleanup(setattr, cli, "phase_deps", orig_deps)
+        # Aucune couche applicative observée par défaut (le banc n'a que le socle) :
+        # neutralise la sonde kubectl `_observed_layers` (sinon elle interroge le réel
+        # et fausse le menu / capture des appels). Les tests « déjà installé » la
+        # re-stubent pour renvoyer la couche présente.
+        self._stub_observed(set())
         # Inventaire présent (sinon garde-fou) — créé puis retiré.
         inv = os.path.join(_ROOT, "bootstrap", "hosts.yaml")
         if not os.path.exists(inv):
@@ -763,6 +782,13 @@ runs:
         self.addCleanup(setattr, builtins, "input", orig_input)
         self.addCleanup(setattr, sys.stdin, "isatty", orig_isatty)
 
+    def _stub_observed(self, layers):
+        """Stube la sonde réelle `_observed_layers` (kubectl) → renvoie `layers`.
+        Évite d'interroger le banc et fige les couches « déjà installées »."""
+        orig = cli._observed_layers
+        cli._observed_layers = lambda _phases: set(layers)
+        self.addCleanup(setattr, cli, "_observed_layers", orig)
+
     def test_interactive_choice_picks_metrics_over_storage(self):
         # TTY + saisie « 2 » : l'opérateur choisit metrics-server AVANT storage-simple.
         # Le choix au menu VAUT décision → AUCUNE confirmation [o/N] redondante après.
@@ -801,6 +827,96 @@ runs:
         self.assertEqual(code, 0)
         self.assertTrue(mounted[0].endswith("metrics-server.yaml"))
         self.assertNotIn("installables", err)  # pas de menu pour une seule couche
+
+    def test_observed_layer_not_reproposed(self):
+        # BUG du banc : metrics-server DÉJÀ installé (signal d'infra présent), mais
+        # absent de l'historique → `next` le re-proposait. Désormais la sonde réelle
+        # (_observed_layers) le retire : le menu ne montre que storage-simple (seule
+        # couche restante → PAS de menu), monté direct.
+        mounted = self._spy_launch()
+        topo, hist = self._fixtures()
+        self._stub_observed({"metrics-server"})  # réel : metrics déjà là
+        code, out, err = _capture(
+            ["next", "-f", topo, "--target", "atlas", "--history", hist, "--yes"]
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(len(mounted), 1)
+        self.assertTrue(mounted[0].endswith("local-path.yaml"))  # storage-simple, PAS metrics
+        self.assertNotIn("installables", err)  # une seule couche restante → pas de menu
+
+    def test_observed_layer_primes_over_stale_history(self):
+        # RÉEL prime sur la fraîcheur (ADR 0052) : même sans run frais, metrics observé
+        # n'est jamais re-proposé. Historique VIDE (freshness=jamais) + metrics observé.
+        mounted = self._spy_launch()
+        topo = _tmp(self._ATLAS_LOCAL)
+        hist = _tmp("runs: []\n")  # historique vide → freshness=jamais
+        self.addCleanup(os.unlink, topo)
+        self.addCleanup(os.unlink, hist)
+        self._stub_observed({"metrics-server"})
+        code, _, err = _capture(
+            ["next", "-f", topo, "--target", "atlas", "--history", hist, "--yes"]
+        )
+        self.assertEqual(code, 0)
+        self.assertFalse(
+            any("metrics-server" in m for m in mounted), "metrics observé : jamais re-monté"
+        )
+
+
+class LayerHealthSignal(unittest.TestCase):
+    """`_resource_healthy` / `_observed_layers` : une couche n'est SAINE que si son
+    dernier maillon est READY — pas seulement présent. C'est ce qui empêche `preview`
+    d'afficher « ✓ » une couche posée à moitié (ns monitoring créé, Loki absent)."""
+
+    def _stub_kubectl(self, table):
+        """Stube `_kubectl_resource` : `table[(kind,name)]` = (returncode, stdout).
+        Absent de la table → ressource introuvable (returncode 1)."""
+        import subprocess as sp
+
+        def fake(kind, name, namespace, jsonpath=None):
+            rc, out = table.get((kind, name), (1, ""))
+            return sp.CompletedProcess(args=[], returncode=rc, stdout=out, stderr="")
+
+        orig = cli._kubectl_resource
+        cli._kubectl_resource = fake
+        self.addCleanup(setattr, cli, "_kubectl_resource", orig)
+
+    def test_workload_ready_is_healthy(self):
+        # Deployment présent avec readyReplicas=1 → sain.
+        self._stub_kubectl({("deployment", "argocd-server"): (0, "1")})
+        self.assertTrue(cli._resource_healthy("deployment", "argocd-server", "argocd", ready=True))
+
+    def test_workload_present_but_zero_replicas_is_not_healthy(self):
+        # BUG du banc : ressource PRÉSENTE (returncode 0) mais 0 réplica prêt → PAS saine.
+        # Sans le critère Ready, une couche cassée passerait pour « à-jour ».
+        self._stub_kubectl({("statefulset", "loki"): (0, "0")})
+        self.assertFalse(cli._resource_healthy("statefulset", "loki", "monitoring", ready=True))
+
+    def test_workload_absent_is_not_healthy(self):
+        # Loki carrément absent (cas réel : SeaweedFS manquant → Loki jamais créé).
+        self._stub_kubectl({})  # rien
+        self.assertFalse(cli._resource_healthy("statefulset", "loki", "monitoring", ready=True))
+
+    def test_empty_replicas_field_is_not_healthy(self):
+        # readyReplicas absent (champ vide) → 0 → pas sain (fail-closed).
+        self._stub_kubectl({("statefulset", "loki"): (0, "")})
+        self.assertFalse(cli._resource_healthy("statefulset", "loki", "monitoring", ready=True))
+
+    def test_presence_only_signal_ignores_readiness(self):
+        # ready=False (Application Argo : CRD sans replicas) → présence seule suffit.
+        self._stub_kubectl({("application", "atlas"): (0, "")})
+        self.assertTrue(cli._resource_healthy("application", "atlas", "argocd", ready=False))
+
+    def test_observed_layers_drops_unhealthy_monitoring(self):
+        # Le cas de bout en bout : metrics sain, monitoring posé à moitié (Loki 0/1).
+        # _observed_layers retient metrics, PAS monitoring → preview ne ment plus.
+        self._stub_kubectl(
+            {
+                ("deployment", "metrics-server"): (0, "1"),
+                ("statefulset", "loki"): (0, "0"),  # Loki présent mais pas prêt
+            }
+        )
+        got = cli._observed_layers(["metrics-server", "monitoring"])
+        self.assertEqual(got, {"metrics-server"})
 
 
 class Metrics(unittest.TestCase):

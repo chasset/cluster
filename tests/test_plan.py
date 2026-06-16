@@ -406,6 +406,38 @@ class InstallableNow(unittest.TestCase):
         got = installable_now(topo, "atlas", seq, "frais", deps_fn=self._deps_fn())
         self.assertEqual(got, [])
 
+    def test_observed_layer_not_reproposed_even_if_stale(self):
+        # RÉEL prime sur la fraîcheur : metrics-server OBSERVÉ présent n'est PAS
+        # re-proposé, même quand la fraîcheur est `jamais` (diff_phases rejouerait
+        # tout). Cas du banc : couche installée hors run consigné → ne pas re-proposer.
+        topo = _topo(backend="local-path")
+        got = installable_now(
+            topo,
+            "atlas",
+            set(),  # historique vide
+            "jamais",  # aucun run frais → diff_phases rejoue toute la séquence
+            deps_fn=self._deps_fn(),
+            observed_done={"up", "bootstrap", "metrics-server"},  # réel : socle + metrics
+        )
+        self.assertNotIn("metrics-server", got)  # déjà là → pas re-proposé
+        self.assertIn("storage-simple", got)  # toujours à monter
+
+    def test_observed_done_satisfies_downstream_deps(self):
+        # Une couche observée présente satisfait les dépendances de ses consommateurs :
+        # storage-simple OBSERVÉ → monitoring/gitops deviennent montables.
+        topo = _topo(backend="local-path")
+        got = installable_now(
+            topo,
+            "atlas",
+            {"up", "bootstrap"},
+            "frais",
+            deps_fn=self._deps_fn(),
+            observed_done={"storage-simple"},
+        )
+        self.assertNotIn("storage-simple", got)  # observé → pas re-proposé
+        self.assertIn("monitoring", got)  # débloqué par le storage observé
+        self.assertIn("gitops", got)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -348,6 +348,7 @@ def installable_now(
     done: set[str],
     freshness: str,
     deps_fn: Callable[[], dict[str, set[str]]] | None = None,
+    observed_done: set[str] | None = None,
 ) -> list[str]:
     """Phases du chemin `target` MONTABLES MAINTENANT, dans l'ordre du chemin.
 
@@ -362,6 +363,13 @@ def installable_now(
     DUR (pas de cluster sans VMs ni socle) → on renvoie CETTE seule phase, jamais un
     menu (on ne « choisit » pas de créer les VMs vs monter une couche applicative).
 
+    `observed_done` : phases PROUVÉES présentes par l'ÉTAT RÉEL (signal d'infra observé
+    — la façade le calcule via `_observed_layers`/`observed_done_phases`). Elles sont
+    TOUJOURS retirées des montables, même quand la fraîcheur est `perime`/`jamais` (où
+    `diff_phases` rejouerait toute la séquence) : le RÉEL prime sur la fraîcheur (ADR
+    0052/0056 §7) — une couche déjà déployée n'est pas « à monter », sinon `next` la
+    re-propose. Même calcul que `preview` (qui soustrait l'observé APRÈS diff_phases).
+
     `deps_fn` est un FOURNISSEUR PARESSEUX de la carte de dépendances (la façade y
     branche `layers.phase_deps`, qui SHELLE le graphe). Module PUR : `plan` n'appelle
     pas bash lui-même — il invoque `deps_fn` SEULEMENT au-delà du garde-fou amont
@@ -371,7 +379,13 @@ def installable_now(
     """
     target = target or default_target(topo)
     seq = expected_phase_sequence(topo, target)
-    manquantes = diff_phases(seq, done, freshness)
+    observed_done = observed_done or set()
+    # Le RÉEL prime sur la fraîcheur : une phase observée présente n'est jamais « à
+    # monter » (même en rejeu). On la traite comme faite (∈ done) ET on la retire des
+    # manquantes — pour les DEUX décisions (ce qui reste à monter, et la satisfaction
+    # des dépendances d'une couche aval).
+    done = done | observed_done
+    manquantes = [p for p in diff_phases(seq, done, freshness) if p not in observed_done]
     if not manquantes:
         return []
     # Prérequis dur : la première phase amont manquante est la seule offre possible.
