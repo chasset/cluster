@@ -469,7 +469,7 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
         )
 
     # KUBECONFIG cible : le banc de la stack s'il est monté, sinon /dev/null (jamais
-    # la prod). Imprimé en ligne eval-able (STDOUT) ; message humain SIMPLE sur STDERR.
+    # la prod). Message humain SIMPLE sur STDERR.
     if os.path.exists(_BENCH_KUBECONFIG):
         cible = os.path.abspath(_BENCH_KUBECONFIG)
     else:
@@ -479,7 +479,16 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
             "(le monter : `cluster up`).",
             file=sys.stderr,
         )
-    print(f"export KUBECONFIG={shlex.quote(cible)}")
+    # La ligne `export …` n'est utile QU'à `eval`. En appel direct (stdout = TTY), on
+    # ne la déverse pas brute dans le terminal — on suggère plutôt `eval`. Si stdout
+    # est capturé (`eval "$(…)"`/pipe), on l'imprime pour que le shell la pose.
+    if sys.stdout.isatty():
+        print(
+            f'  pointer le shell : `eval "$(cluster stack select {args.name})"`',
+            file=sys.stderr,
+        )
+    else:
+        print(f"export KUBECONFIG={shlex.quote(cible)}")
     return 0
 
 
