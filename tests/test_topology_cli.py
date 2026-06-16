@@ -2063,7 +2063,11 @@ class Remove(unittest.TestCase):
         orig = cli._roundtrip.run_remove
         cli._roundtrip.run_remove = fake
         self.addCleanup(setattr, cli._roundtrip, "run_remove", orig)
-        code, out, _ = _capture(["remove", "-f", _EXAMPLE, "--phase", "monitoring", "--yes"])
+        # --table : on teste le chemin TABLE explicitement (le défaut routerait monitoring
+        # vers la découverte, ADR 0079 étape A).
+        code, out, _ = _capture(
+            ["remove", "-f", _EXAMPLE, "--phase", "monitoring", "--table", "--yes"]
+        )
         self.assertEqual(code, 0)
         # le backend de la stack est threadé (socle.example = ceph) ; flags relayés.
         self.assertEqual(captured["phase"], "monitoring")
@@ -2083,7 +2087,9 @@ class Remove(unittest.TestCase):
         orig = cli._roundtrip.run_remove
         cli._roundtrip.run_remove = fake
         self.addCleanup(setattr, cli._roundtrip, "run_remove", orig)
-        code, out, _ = _capture(["remove", "-f", _EXAMPLE, "--phase", "monitoring", "--yes"])
+        code, out, _ = _capture(
+            ["remove", "-f", _EXAMPLE, "--phase", "monitoring", "--table", "--yes"]
+        )
         self.assertEqual(code, 1)
         self.assertIn("INCOMPLÈTE", out)
 
@@ -2143,13 +2149,15 @@ class Remove(unittest.TestCase):
         self.assertIn("Deployment/loki", out)
         self.assertNotIn("Pod/loki-0", out)
 
-    def _stub_discovery(self, namespaces, owned):
+    def _stub_discovery(self, namespaces, owned, *, nodeside=False):
         # neutralise les ponts bash de roundtrip + la sonde owned (façade I/O) pour un
-        # `--discover` testable sans cluster. closure = la phase seule ; pas de stockage.
+        # chemin découverte testable sans cluster. closure = la phase seule ; pas de stockage ;
+        # node-side paramétrable (route le défaut). _delete_namespace stubé (pas de kubectl).
         for name, val in (
             ("closure", lambda phase: [phase]),
             ("phase_namespaces", lambda phase: namespaces),
             ("involves_storage", lambda phase: False),
+            ("closure_has_nodeside", lambda phase: nodeside),
         ):
             orig = getattr(cli._roundtrip, name)
             setattr(cli._roundtrip, name, val)
@@ -2157,6 +2165,8 @@ class Remove(unittest.TestCase):
         orig_owned = cli._discover_owned
         cli._discover_owned = lambda ns: owned
         self.addCleanup(setattr, cli, "_discover_owned", orig_owned)
+        self.addCleanup(setattr, cli, "_delete_namespace", cli._delete_namespace)
+        cli._delete_namespace = lambda ns: (True, "finalisé")
 
     def test_discover_deletes_roots_only_never_run_remove(self):
         # --discover supprime les RACINES (le GC cascade les possédés) et n'appelle JAMAIS
@@ -2248,6 +2258,83 @@ class Remove(unittest.TestCase):
         code, _, err = _capture(["remove", "--phase", "sc", "--discover", "--yes"])
         self.assertEqual(code, 2)
         self.assertIn("--full", err)
+
+    def test_default_routes_to_discovery_when_no_nodeside(self):
+        # ADR 0079 étape A : sans node-side, `remove` (SANS flag) route vers la DÉCOUVERTE,
+        # PAS la table (run_remove jamais appelé). Finalise les ns possédés.
+        called_table = []
+        orig_rm = cli._roundtrip.run_remove
+        cli._roundtrip.run_remove = lambda *a, **k: called_table.append(a)
+        self.addCleanup(setattr, cli._roundtrip, "run_remove", orig_rm)
+        self._stub_discovery(
+            ["dagster"],
+            [
+                {
+                    "kind": "Deployment",
+                    "name": "d",
+                    "uid": "u-d",
+                    "namespace": "dagster",
+                    "ownerReferences": [],
+                }
+            ],
+            nodeside=False,
+        )
+        self.addCleanup(setattr, cli, "_kubectl_delete", cli._kubectl_delete)
+        self.addCleanup(setattr, cli, "_probe_resource_stuck", cli._probe_resource_stuck)
+        cli._kubectl_delete = lambda k, n, ns, **kw: (True, "supprimé")
+        cli._probe_resource_stuck = lambda k, n, ns: None
+        code, out, _ = _capture(["remove", "--phase", "dataops", "--yes"])
+        self.assertEqual(code, 0)
+        self.assertEqual(called_table, [])  # PAS la table
+        self.assertIn("supprimée par découverte", out)
+
+    def test_default_routes_to_table_when_nodeside(self):
+        # une clôture AVEC node-side (ceph : disques) route vers la TABLE par défaut — la
+        # découverte ne couvre pas encore le node-side (étape ultérieure).
+        called_table = []
+
+        def fake(phase, *, backend, allow_full, assume_yes):
+            called_table.append(phase)
+            from nestor.roundtrip import RemoveResult, RoundtripStep
+
+            return RemoveResult(
+                phase=phase, layers=[phase], steps=[RoundtripStep("supprimer", True)]
+            )
+
+        orig_rm = cli._roundtrip.run_remove
+        cli._roundtrip.run_remove = fake
+        self.addCleanup(setattr, cli._roundtrip, "run_remove", orig_rm)
+        orig_ns = cli._roundtrip.closure_has_nodeside
+        cli._roundtrip.closure_has_nodeside = lambda phase: True
+        self.addCleanup(setattr, cli._roundtrip, "closure_has_nodeside", orig_ns)
+        code, _, _ = _capture(["remove", "-f", _EXAMPLE, "--phase", "ceph", "--full", "--yes"])
+        self.assertEqual(code, 0)
+        self.assertEqual(called_table, ["ceph"])  # chemin TABLE pris
+
+    def test_discover_finalizes_owned_namespaces(self):
+        # la découverte finalise les ns possédés (ce qui manquait au chemin table : ns wedgé).
+        finalized = []
+        self._stub_discovery(
+            ["dagster", "postgres"],
+            [
+                {
+                    "kind": "Deployment",
+                    "name": "d",
+                    "uid": "u-d",
+                    "namespace": "dagster",
+                    "ownerReferences": [],
+                }
+            ],
+        )
+        # remplace le stub _delete_namespace du helper pour CAPTER les ns finalisés.
+        cli._delete_namespace = lambda ns: (finalized.append(ns), (True, "finalisé"))[1]
+        self.addCleanup(setattr, cli, "_kubectl_delete", cli._kubectl_delete)
+        self.addCleanup(setattr, cli, "_probe_resource_stuck", cli._probe_resource_stuck)
+        cli._kubectl_delete = lambda k, n, ns, **kw: (True, "supprimé")
+        cli._probe_resource_stuck = lambda k, n, ns: None
+        code, _, _ = _capture(["remove", "--phase", "dataops", "--discover", "--yes"])
+        self.assertEqual(code, 0)
+        self.assertEqual(sorted(finalized), ["dagster", "postgres"])
 
 
 class Dispatch(unittest.TestCase):

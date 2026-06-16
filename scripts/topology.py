@@ -63,6 +63,7 @@ La logique de mapping exception→code est testée par tests/test_topology_cli.p
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import difflib
 import glob
@@ -2432,7 +2433,15 @@ def _kubectl_strip_finalizers(kind, name, namespace) -> tuple[bool, str]:
 def _probe_resource_stuck(kind, name, namespace) -> dict | None:
     """Sonde l'état d'une cible qui traîne après delete → entrées pour `classify_stuck`
     (PUR). Renvoie {terminating, has_finalizers, container_alive}, ou None si la ressource
-    est PARTIE (delete réussi). `container_alive` : un Pod avec ≥1 conteneur `running`."""
+    est PARTIE / en cours de GC. `container_alive` : un Pod avec ≥1 conteneur `running`."""
+    # Si le NAMESPACE de la cible n'existe plus, la ressource est forcément en cours de GC
+    # (un PVC `Terminating` dont le ns est NotFound part avec lui, via la libération node-side
+    # du PV local-path — kubectl ne peut pas l'accélérer, et patcher ses finalizers dans un ns
+    # absent ÉCHOUE). On la traite comme PARTIE : pas un résidu bloquant (preuve banc #372).
+    if namespace:
+        ns_chk = _kubectl("get", "ns", namespace)
+        if ns_chk is not None and ns_chk.returncode != 0:
+            return None
     out = _kubectl("get", kind, name, "-n", namespace or "default", "-o", "json")
     if out is None or out.returncode != 0 or not (out.stdout or "").strip():
         return None  # absente → partie
@@ -2449,6 +2458,50 @@ def _probe_resource_stuck(kind, name, namespace) -> dict | None:
     }
 
 
+def _delete_namespace(ns: str) -> tuple[bool, str]:
+    """Supprime un namespace possédé par la couche, en finalisant s'il reste WEDGÉ
+    (ADR 0079 §3). `delete --wait=false` ; si le ns traîne en Terminating, retire
+    `spec.finalizers` via le sous-ressource `/finalize` (la seule voie pour débloquer un ns
+    déjà Terminating — un patch simple est ignoré ; miroir de `_ns_force_finalize`,
+    rollback-lib). Renvoie (parti, detail). Idempotent : ns absent → (True, déjà absent)."""
+    if _kubectl("get", "ns", ns) is None:
+        return False, "cluster injoignable"
+    out = _kubectl("get", "ns", ns)
+    if out.returncode != 0:
+        return True, "déjà absent"
+    _kubectl("delete", "ns", ns, "--wait=false", "--ignore-not-found")
+    # encore là ? → finalize (retire spec.finalizers via /finalize).
+    chk = _kubectl("get", "ns", ns, "-o", "json")
+    if chk is None or chk.returncode != 0 or not (chk.stdout or "").strip():
+        return True, "supprimé"
+    try:
+        obj = json.loads(chk.stdout)
+    except (ValueError, KeyError):
+        return False, "ns illisible"
+    obj.get("spec", {}).pop("finalizers", None)
+    _kubectl_replace_finalize(ns, json.dumps(obj))
+    gone = _kubectl("get", "ns", ns)
+    return (gone is not None and gone.returncode != 0), (
+        "finalisé" if (gone is not None and gone.returncode != 0) else "encore Terminating"
+    )
+
+
+def _kubectl_replace_finalize(ns: str, body_json: str) -> None:
+    """`kubectl replace --raw /api/v1/namespaces/<ns>/finalize -f -` (débloque un ns
+    Terminating). Best-effort : on alimente stdin avec le ns SANS spec.finalizers — la seule
+    voie pour finaliser un ns déjà Terminating (ADR 0079 §3 ; miroir de _ns_force_finalize)."""
+    with contextlib.suppress(OSError, ValueError, subprocess.TimeoutExpired):
+        subprocess.run(  # noqa: S603 — argv fixe, ns contrôlé (clôture de la couche)
+            ["kubectl", "replace", "--raw", f"/api/v1/namespaces/{ns}/finalize", "-f", "-"],
+            check=False,
+            capture_output=True,
+            text=True,
+            input=body_json,
+            env=_kubectl_env(),
+            timeout=_REFRESH_TIMEOUT_S,
+        )
+
+
 def _remove_by_discovery(phase: str, *, full: bool, assume_yes: bool) -> int:
     """`remove --discover` (ADR 0079) : défait la clôture de `phase` PAR DÉCOUVERTE.
 
@@ -2456,9 +2509,12 @@ def _remove_by_discovery(phase: str, *, full: bool, assume_yes: bool) -> int:
     (racines filtrées du bruit, module PUR `ownership`), confirme l'arbre AVANT, puis
     supprime chaque racine — le GC k8s cascade les possédés. NE s'arrête PAS au 1er échec
     (ADR 0079 §4) : agrège les verdicts. Les cibles qui traînent sont ré-sondées et
-    débloquées selon `classify_stuck` (force-delete / retrait finalizer). Gardes identiques
-    au chemin table : cible banc (appelant), `--full` pour une clôture de stockage,
-    confirmation. Code 0 si tout parti, 1 si résidu / refus."""
+    débloquées selon `classify_stuck` (force-delete / retrait finalizer). Puis (étape B)
+    supprime les CRD cluster-scoped DÉCOUVERTES comme appartenant à la clôture
+    (`ownership.deletable_crds` : tous leurs CR dans les ns de la clôture — jamais une CRD
+    partagée). Enfin finalise les namespaces possédés (ns wedgé → /finalize). Gardes
+    identiques au chemin table : cible banc (appelant), `--full` pour une clôture de
+    stockage, confirmation. Code 0 si tout parti, 1 si résidu / refus."""
     from nestor import ownership
 
     try:
@@ -2511,6 +2567,23 @@ def _remove_by_discovery(phase: str, *, full: bool, assume_yes: bool) -> int:
         if not ok or _probe_resource_stuck(r.kind, r.name, r.namespace) is not None:
             residus.append(r.ref)
 
+    # NOTE (ADR 0079) : on ne supprime PAS les CRD cluster-scoped par découverte ici. Le banc
+    # a montré que le lien CRD→opérateur n'est pas découvrable de façon fiable (managedFields
+    # = OpenAPI-Generator/kube-apiserver, pas le nom de l'opérateur) → impossible de savoir si
+    # une CRD a un opérateur HORS clôture qu'on orphelinerait. Les CR sont défaits (ci-dessus) ;
+    # les CRD restent (opérateur réutilisable par un re-`next`). Le nettoyage des CRD viendra
+    # avec un signal d'appartenance opérateur fiable (étape ultérieure). La logique pure
+    # `ownership.deletable_crds` est prête mais NON branchée tant que ce signal manque.
+
+    # Dernière passe : supprimer les NAMESPACES possédés (finalize si wedgé). C'est ce qui
+    # manquait au chemin table (ns argocd/gitea coincés en Terminating, cas vécu) — ici, dérivé.
+    for ns in namespaces:
+        ok, detail = _delete_namespace(ns)
+        marque = "✓" if ok else "✗"
+        print(f"  {marque} namespace {ns} — {detail}")
+        if not ok:
+            residus.append(f"ns/{ns}")
+
     if residus:
         print(f"→ suppression INCOMPLÈTE — résidus : {residus} (relancer, ou chemin table).")
         return 1
@@ -2533,22 +2606,31 @@ def cmd_remove(args: argparse.Namespace) -> int:
     (STORAGE_BACKEND) pour cibler les bonnes ressources : sans lui, le rollback
     retomberait sur `ceph` et tenterait de supprimer une OBC absente en local-path.
 
-    `--dry-run` (ADR 0079) : ne DÉTRUIT rien — DÉCOUVRE par introspection les ressources
-    réelles de la clôture (api-resources + ownerReferences) et affiche l'ordre de teardown
-    (possédés→possesseurs). Aperçu read-only du futur rollback par découverte ; le rollback
-    effectif passe encore par la table (rewire ultérieur, prouvé au banc).
+    DÉCOUVERTE PAR DÉFAUT (ADR 0079, étape A) : pour une clôture SANS node-side (tout sauf
+    `ceph` : disques), `remove` défait PAR DÉCOUVERTE d'appartenance (api-resources +
+    ownerReferences) — supprime les RACINES namespacées (le GC k8s cascade), force les CR à
+    finalizer, finalise les ns wedgés. Plus de table « nom/kind oublié » à maintenir pour le
+    k8s namespacé (la classe de bugs vécue ce soir). On ne supprime PAS les CRD cluster-scoped
+    (le lien CRD→opérateur n'est pas découvrable de façon fiable — elles restent, l'opérateur
+    est réutilisable). Les clôtures à node-side (`ceph`) restent au chemin TABLE jusqu'à ce
+    qu'une étape ultérieure couvre le node-side par SSH — `closure_has_nodeside` DÉRIVE le
+    routage de la table (transitoire), pas d'une liste codée. `--table` force le chemin table
+    (échappatoire) ; `--discover` force la découverte (diagnostic).
 
-    `--discover` (ADR 0079, slice 2) : défait la clôture PAR DÉCOUVERTE d'appartenance
-    (api-resources + ownerReferences) au lieu de la table — supprime les RACINES, le GC
-    k8s cascade. k8s namespacé UNIQUEMENT (CRD cluster-scoped / node-side Ceph /
-    force-delete ns restent au chemin table). Mêmes gardes (cible banc, `--full`,
-    confirmation). Coexiste avec la table, qui reste le DÉFAUT.
+    `--dry-run` montre l'arbre découvert sans rien détruire. Garde-fou destructif : sur la
+    découverte, sans `--yes`, on EXIGE une confirmation (l'opérateur voit l'arbre AVANT).
 
     Code 0 si supprimé/dry-run, 1 si une étape échoue / confirmation refusée, 2 si usage."""
     if args.dry_run:
         return _remove_dry_run(args.phase)
-    if args.discover:
-        _assert_bench_target(f"nestor remove --discover ({args.phase})")
+    try:
+        par_decouverte = args.discover or (
+            not args.table and not _roundtrip.closure_has_nodeside(args.phase)
+        )
+    except _roundtrip.RoundtripError as exc:
+        raise _UsageError(str(exc)) from exc
+    if par_decouverte:
+        _assert_bench_target(f"nestor remove ({args.phase}, découverte)")
         return _remove_by_discovery(args.phase, full=args.full, assume_yes=args.yes)
     _assert_bench_target(f"nestor remove ({args.phase})")
     topo = load_topology(_resolve(args.file))
@@ -2944,11 +3026,19 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="ne rien détruire : DÉCOUVRIR et afficher l'ordre de teardown (ADR 0079)",
     )
-    p_remove.add_argument(
+    # Routage découverte/table (ADR 0079 étape A). Par défaut : DÉCOUVERTE si la clôture est
+    # namespacée seule (ni CRD ni node-side) ; TABLE sinon (ceph/sc/datalake). Les deux flags
+    # FORCENT un chemin (diagnostic / échappatoire), mutuellement exclusifs.
+    grp = p_remove.add_mutually_exclusive_group()
+    grp.add_argument(
         "--discover",
         action="store_true",
-        help="défaire par DÉCOUVERTE d'appartenance (api-resources + ownerReferences, "
-        "ADR 0079) au lieu de la table — k8s namespacé uniquement",
+        help="forcer la DÉCOUVERTE d'appartenance (api-resources + ownerReferences, ADR 0079)",
+    )
+    grp.add_argument(
+        "--table",
+        action="store_true",
+        help="forcer le chemin TABLE (rollback-lib.sh) — échappatoire au routage par défaut",
     )
     p_remove.add_argument(
         "--yes",
