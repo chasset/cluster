@@ -112,6 +112,7 @@ from cluster_topology import (  # noqa: E402
 from cluster_topology import bootstrap as _bootstrap  # noqa: E402
 from cluster_topology import discover as _discover  # noqa: E402
 from cluster_topology import ha as _ha  # noqa: E402
+from cluster_topology import isolation as _isolation  # noqa: E402
 from cluster_topology import refresh_fuse as _refresh_fuse  # noqa: E402
 from cluster_topology import refresh_plan as _refresh_plan  # noqa: E402
 from cluster_topology import roundtrip as _roundtrip  # noqa: E402
@@ -1200,6 +1201,38 @@ def _assert_bench_target(action: str) -> None:
     )
 
 
+def _assert_inventory_safe(action: str, inventory_path: str, topo: Topology) -> None:
+    """Garde de CIBLE ANSIBLE (ADR 0053) : un montage qui vise le banc (target_kind=lima)
+    ne s'exécute PAS sur un inventaire de PROD.
+
+    Complément INDISPENSABLE de `_assert_bench_target` : celle-ci ne valide que le
+    KUBECONFIG (chemin kubectl), mais un play `hosts: cloud` SSHe sur les nœuds de
+    L'INVENTAIRE — chemin disjoint du KUBECONFIG. Un banc KUBECONFIG + un inventaire
+    prod a déjà reconfiguré des nœuds de PROD (`next dataops`). On valide ICI, en
+    Python et AVANT ansible-runner, que l'inventaire vise la même topologie que
+    l'intention (`topo.target_kind`) — indépendant de la discipline par-play
+    (l'audit-log côté playbook a un trou par play oublié).
+
+    Lève `_UsageError` (REFUS) si l'inventaire peut SSHer sur une cible non prouvée
+    conforme. Un inventaire purement local (que `localhost`) passe toujours."""
+    try:
+        with open(inventory_path, encoding="utf-8") as f:
+            inv = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError) as exc:
+        raise _UsageError(f"inventaire illisible ({inventory_path}) : {exc}") from exc
+    ok, raison = _isolation.classify_inventory_target(inv, topo.target_kind)
+    if not ok:
+        raise _UsageError(
+            f"REFUS : `{action}` vise la topologie `{topo.target_kind}` mais "
+            f"l'inventaire `{os.path.relpath(inventory_path, _ROOT)}` n'est pas une cible "
+            f"sûre — {raison} (ADR 0053). Risque de MUTER la mauvaise cible (la PROD).\n"
+            "  • Banc : utiliser l'inventaire Lima (target_kind: lima) — il est généré "
+            "par le montage du banc (`bench/lima/run-phases.sh up`).\n"
+            "  • Régénérer l'inventaire de la stack active : "
+            "`cluster artifact generate -o bootstrap/hosts.yaml`."
+        )
+
+
 def cmd_scale(args: argparse.Namespace) -> int:
     """`scale` : ajuste les replicas des workloads stateless au nombre de nœuds (ADR 0072).
 
@@ -1781,6 +1814,11 @@ def _monter_phase(topo: Topology, phase: str, run_params: dict) -> int:
             "ou le copier depuis bootstrap/hosts.example.yaml"
         )
     _assert_bench_target(f"cluster next ({phase})")
+    # Garde de CIBLE ANSIBLE (ADR 0053) : valide que l'INVENTAIRE vise la topologie
+    # voulue AVANT de lancer ansible-runner. _assert_bench_target ne couvre que le
+    # KUBECONFIG ; un play `hosts: cloud` SSHe sur les nœuds de l'inventaire (chemin
+    # disjoint). Sans ça, un banc KUBECONFIG + un inventaire prod mute la PROD.
+    _assert_inventory_safe(f"cluster next ({phase})", inventory, topo)
     playbook = os.path.relpath(os.path.join(_ROOT, playbook_rel), private_data_dir)
     print(f"→ lancement de {phase} ({playbook_rel}) via ansible-runner…")
     try:

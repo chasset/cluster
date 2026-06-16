@@ -678,6 +678,87 @@ runs:
         self.assertEqual(calls, [])  # aucun montage lancé
 
 
+class NextInventoryGuard(unittest.TestCase):
+    """Garde de CIBLE ANSIBLE (ADR 0053) : `next` visant le banc REFUSE un inventaire
+    prod AVANT de lancer ansible-runner. Régression de la faille `next dataops` → prod."""
+
+    # Topo banc (target_kind=lima) visant une couche applicative (dataops local-path).
+    _TOPO_LIMA = """\
+catalog:
+  topology: banc
+  profile: dataops
+nodes:
+  - {name: node1, roles: [control, worker]}
+  - {name: node2, roles: [worker]}
+storage:
+  backend: local-path
+target_kind: lima
+"""
+    # Inventaire PROD résiduel (le cas exact de la faille) : target_kind prod, dirqual.
+    _INV_PROD = """\
+cloud:
+  children:
+    control:
+    workers:
+  vars:
+    target_kind: prod
+control:
+  hosts:
+    dirqual1: {ansible_host: 10.67.2.11}
+workers:
+  hosts:
+    dirqual2: {ansible_host: 10.67.2.12}
+"""
+
+    def setUp(self):
+        # Socle présent (up/bootstrap faits) → next vise une couche applicative montée
+        # via ansible-runner (le chemin gardé).
+        for name, val in (("_real_vms", ["node1", "node2"]), ("_ready_nodes", ["node1"])):
+            orig = getattr(cli, name)
+            setattr(cli, name, lambda _v=val: _v)
+            self.addCleanup(setattr, cli, name, orig)
+        self._stub("_observed_layers", lambda _p: set())
+        self._stub("phase_deps", lambda _b: {"storage-simple": set(), "metrics-server": set()})
+        # Stub launch_phase : si la garde laissait passer, on le SAURAIT (ne doit JAMAIS
+        # être appelé sur un inventaire prod).
+        from cluster_topology.runner import RunResult
+
+        self.launched = []
+        orig_lp = cli._runner.launch_phase
+        cli._runner.launch_phase = lambda *a, **k: self.launched.append(a) or RunResult(
+            rc=0, status="successful"
+        )
+        self.addCleanup(setattr, cli._runner, "launch_phase", orig_lp)
+        # Écrit l'inventaire PROD à l'emplacement réel (sauvegarde/restaure l'existant).
+        self._inv = os.path.join(_ROOT, "bootstrap", "hosts.yaml")
+        self._backup = self._inv + ".test-backup"
+        if os.path.exists(self._inv):
+            os.rename(self._inv, self._backup)
+            self.addCleanup(lambda: os.rename(self._backup, self._inv))
+        with open(self._inv, "w", encoding="utf-8") as f:
+            f.write(self._INV_PROD)
+        if not os.path.exists(self._backup):
+            self.addCleanup(lambda: os.path.exists(self._inv) and os.unlink(self._inv))
+
+    def _stub(self, name, fn):
+        orig = getattr(cli, name)
+        setattr(cli, name, fn)
+        self.addCleanup(setattr, cli, name, orig)
+
+    def test_lima_topo_refuses_prod_inventory(self):
+        topo = _tmp(self._TOPO_LIMA)
+        hist = _tmp("runs: []\n")
+        self.addCleanup(os.unlink, topo)
+        self.addCleanup(os.unlink, hist)
+        code, _, err = _capture(
+            ["next", "-f", topo, "--target", "atlas", "--history", hist, "--yes"]
+        )
+        self.assertEqual(code, 2)  # REFUS (usage)
+        self.assertIn("dirqual1", err)  # nomme les hôtes prod menacés
+        self.assertIn("0053", err)  # cite la doctrine d'isolation
+        self.assertEqual(self.launched, [])  # ansible-runner JAMAIS lancé sur la prod
+
+
 class NextMenu(unittest.TestCase):
     """`next` propose un MENU quand PLUSIEURS couches sont montables (choix d'ordre)."""
 
@@ -730,6 +811,13 @@ runs:
         # et fausse le menu / capture des appels). Les tests « déjà installé » la
         # re-stubent pour renvoyer la couche présente.
         self._stub_observed(set())
+        # Garde de cible Ansible (ADR 0053) : ces tests visent une topo `lima` mais le
+        # poste dev peut porter un vrai inventaire PROD (bootstrap/hosts.yaml) que la
+        # garde refuse à raison. On la neutralise ici (on teste la logique du menu, pas
+        # la garde — celle-ci a ses propres tests, test_isolation + Next).
+        orig_safe = cli._assert_inventory_safe
+        cli._assert_inventory_safe = lambda *a, **k: None
+        self.addCleanup(setattr, cli, "_assert_inventory_safe", orig_safe)
         # Inventaire présent (sinon garde-fou) — créé puis retiré.
         inv = os.path.join(_ROOT, "bootstrap", "hosts.yaml")
         if not os.path.exists(inv):
