@@ -361,6 +361,9 @@ class StorageDerivationParity(unittest.TestCase):
         self.assertEqual(rp["gitea_storage_class"], "rook-ceph-block-replicated")
         self.assertEqual(rp["cnpg_s3_backing"], "rgw")
         self.assertEqual(rp["cnpg_s3_endpoint"], "http://rook-ceph-rgw-datalake.rook-ceph:80")
+        # Loki partage le MÊME backing/endpoint S3 que CNPG (parité run-phases.sh:1153).
+        self.assertEqual(rp["loki_s3_backing"], "rgw")
+        self.assertEqual(rp["loki_s3_endpoint"], "http://rook-ceph-rgw-datalake.rook-ceph:80")
         self.assertTrue(rp["argocd_apply_gateway"])
 
     def test_run_params_light_local_path(self):
@@ -371,6 +374,10 @@ class StorageDerivationParity(unittest.TestCase):
         self.assertEqual(rp["profiles"], ["base", "metrics", "store", "obs"])
         self.assertEqual(rp["cnpg_storage_class"], "local-path")
         self.assertEqual(rp["cnpg_s3_backing"], "seaweedfs")
+        # SANS loki_s3_backing=seaweedfs, le play monitoring SKIPPE SeaweedFS (défaut
+        # rgw) → Loki casse en local-path. Régression réelle constatée au banc.
+        self.assertEqual(rp["loki_s3_backing"], "seaweedfs")
+        self.assertEqual(rp["loki_s3_endpoint"], "http://seaweedfs.s3.svc.cluster.local:8333")
         self.assertFalse(rp["argocd_apply_gateway"])
 
 
