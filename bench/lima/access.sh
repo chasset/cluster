@@ -264,7 +264,10 @@ port_of() {
 
 # Affiche les URLs cliquables (port mappé par UI) + l'auth attendue.
 print_urls() {
-    log "UI accessibles (TLS CA interne — accepter le certificat la 1re fois)"
+    log "UI accessibles via le Gateway (TLS terminé par la CA interne, ADR 0021)."
+    log "  Le certificat est signé par une CA INTERNE (réseau privé, pas d'autorité"
+    log "  publique) → le navigateur affiche un avertissement « non sécurisé » : c'est"
+    log "  ATTENDU et sans danger ici (ADR 0003/0021). Accepter le certificat une fois."
     local hostname ns svc layer auth port
     while IFS=$'\t' read -r hostname ns svc layer auth; do
         port=$(port_of "${hostname}")
