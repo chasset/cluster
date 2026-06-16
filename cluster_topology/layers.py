@@ -174,3 +174,46 @@ def layers_from_profile(profile: str) -> list[str]:
     from cluster_topology.profile import required_profiles
 
     return list(required_profiles(profile))
+
+
+def _phase_of(comp: str, backend: str) -> str:
+    """Phase de QUEUE qui contient le composant `comp`, ou '' s'il relève du socle.
+
+    `phase_of_component` (graphe atomique) couvre les phases du roundtrip ; les
+    phases de queue qui n'y figurent pas (`storage-simple`/`metrics-server`) SONT
+    elles-mêmes leur phase → même repli que `resolve_layers` (ligne 155). Sans ce
+    repli, l'arête `gitea → storage-simple` serait perdue (storage-simple hors
+    _ROUNDTRIP_PHASES) et `gitops` paraîtrait à tort sans dépendance de stockage."""
+    ph = _rb(f"phase_of_component {comp!r}", backend).strip()
+    if not ph and comp in _QUEUE_PHASES:
+        ph = comp
+    return ph
+
+
+def phase_deps(backend: str = "local-path") -> dict[str, set[str]]:
+    """Dépendances PHASE→PHASE des couches de queue, DÉRIVÉES du graphe atomique.
+
+    Pour chaque phase de queue, l'ensemble des AUTRES phases de queue dont un de ses
+    composants dépend (directement) — projeté au grain phase via `_phase_of`. C'est
+    la VRAIE dépendance (ADR 0066, source unique), pas l'ordre conventionnel de
+    montage (`resolve_layers` met le stockage en tête même quand metrics n'en
+    dépend pas). Backend-conditionnel : en local-path le stockage est `storage-simple`,
+    en ceph `ceph`/`sc`/`datalake` (le graphe émet déjà la bonne variante).
+
+    Sert à `plan.installable_now` : une couche est montable dès que TOUTES ses
+    dépendances ici sont satisfaites — ce qui rend `metrics-server` montable AVANT
+    `storage-simple` (aucune arête entre eux), au choix de l'opérateur."""
+    deps: dict[str, set[str]] = {}
+    for phase in _QUEUE_PHASES:
+        # Une phase ceph-only n'existe pas en local-path : pas d'entrée (le graphe
+        # ne la monterait pas). On la saute proprement plutôt que d'inventer une arête.
+        if backend != "ceph" and phase in _CEPH_ONLY:
+            continue
+        direct: set[str] = set()
+        for comp in _expand_alias(phase, backend):
+            for dep in _rb(f"component_deps {comp!r}", backend).split():
+                pd = _phase_of(dep, backend)
+                if pd and pd != phase and pd in _QUEUE_PHASES:
+                    direct.add(pd)
+        deps[phase] = direct
+    return deps

@@ -71,6 +71,7 @@ import os
 import shlex
 import subprocess
 import sys
+from collections.abc import Callable
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -81,6 +82,7 @@ from cluster_topology import (  # noqa: E402
     QUESTIONS,
     PlanError,
     ScaffoldError,
+    Topology,
     TopologyError,
     build_topology_dict,
     catalog_entry,
@@ -92,11 +94,14 @@ from cluster_topology import (  # noqa: E402
     expected_phase_sequence,
     filter_epreuves,
     format_metrics,
+    installable_now,
     load_runs,
     load_topology,
     metrics_of,
     observed_done_phases,
+    phase_deps,
     phase_label,
+    phase_playbook,
     plan_init,
     render_lima_inventory,
     render_prod_inventory,
@@ -324,6 +329,31 @@ def _confirm(prompt: str, *, default: bool, no_input: bool) -> bool:
         if answer in ("n", "non", "no"):
             return False
         print("    réponds o(ui) ou n(on)", file=sys.stderr)
+
+
+def _choisir_couche(
+    choix: list[str], libelle: Callable[[str], str], *, no_input: bool
+) -> str | None:
+    """Menu numéroté quand PLUSIEURS couches sont montables (choix d'ordre, ADR 0066).
+
+    `choix` est ordonné selon le chemin (le 1er = ordre conventionnel = DÉFAUT).
+    `libelle(phase)` rend le texte humain affiché. Renvoie la phase choisie, ou None
+    si l'opérateur annule (saisie vide hors défaut interdite : Entrée = défaut). Sous
+    `no_input` (CI/non-TTY/--yes) : renvoie le défaut sans prompter — pas de menu
+    interactif à l'aveugle."""
+    if no_input:
+        return choix[0]
+    print("Plusieurs couches sont installables maintenant — laquelle monter ?", file=sys.stderr)
+    for i, phase in enumerate(choix, 1):
+        marque = "  (défaut)" if i == 1 else ""
+        print(f"  {i}) {libelle(phase)}{marque}", file=sys.stderr)
+    while True:
+        rep = input(f"Numéro [1-{len(choix)}, défaut 1] : ").strip()
+        if not rep:
+            return choix[0]
+        if rep.isdigit() and 1 <= int(rep) <= len(choix):
+            return choix[int(rep) - 1]
+        print(f"    réponds un numéro entre 1 et {len(choix)} (ou Entrée pour 1)", file=sys.stderr)
 
 
 def _activate_symlink(target_rel: str) -> None:
@@ -1532,17 +1562,107 @@ def cmd_up(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_next(args: argparse.Namespace) -> int:
-    """`next` : applique la PROCHAINE couche manquante du plan (1er drift).
+# Libellés HUMAINS des phases AMONT — `next` les distingue comme `preview` : `up` =
+# créer les VMs SEULES, `bootstrap` = Kubernetes + CRI + CNI (pas tout le socle d'un
+# coup). Sert au message ET à la confirmation (un seul vocabulaire, pas de jargon).
+_LIBELLES_AMONT = {
+    "up": "créer les VMs",
+    "bootstrap": "monter Kubernetes (CRI + kubeadm + CNI Cilium)",
+}
 
-    PAS le calque `pulumi up` complet (qui provisionnerait les VMs et monterait TOUTE
-    la séquence) — `next` ne monte qu'UNE couche unitaire via ansible-runner (parité
-    state.sh : le 1er drift). Lancer `next` EST la décision humaine (G2, ADR 0063) ;
-    ré-invoquer `next` monte la suivante (jamais d'auto-enchaînement silencieux). Le
-    vrai `up` (entrée complète : provisioning + orchestration) reste à coder.
+
+def _quoi_couche(phase: str) -> str:
+    """Texte humain de l'action de montage d'une `phase` (amont OU couche applicative)."""
+    return _LIBELLES_AMONT.get(phase, f"monter la couche `{phase}`")
+
+
+def _quoi_couche_label(phase: str) -> str:
+    """Libellé d'une phase pour le MENU : nom technique + label métier lisible.
+
+    Ex. `storage-simple — stockage local-path`. Réutilise plan.phase_label (source
+    unique des libellés métier) ; tombe sur le seul nom si pas de label distinct."""
+    label = phase_label(phase)
+    return f"{phase} — {label}" if label != phase else phase
+
+
+def _monter_phase(topo: Topology, phase: str, run_params: dict) -> int:
+    """Monte UNE phase choisie : amont (run-phases.sh up/bootstrap) ou play unitaire
+    (ansible-runner). Renvoie 0 (ok) / 1 (échec run) ou lève _UsageError (usage).
+
+    Extrait de cmd_next pour être partagé par le chemin « 1re couche » et le menu
+    multi-couches : une fois la phase CHOISIE, son montage est identique."""
+    playbook_rel = phase_playbook(phase)
+    # Phases AMONT (`up`/`bootstrap`) : pas de playbook unitaire — provisioning bash
+    # (limactl, cni.sh, ADR 0049). On délègue à l'arm run-phases.sh du MÊME nom.
+    if phase in ("up", "bootstrap"):
+        _assert_bench_target(f"cluster next ({phase})")
+        stack_name = topo.catalog.get("topology", "—")
+        runphases = os.path.join(_ROOT, "bench", "lima", "run-phases.sh")
+        print(f"→ {phase} : {_quoi_couche(phase)} via run-phases.sh…")
+        rc = subprocess.run(  # noqa: S603 — chemin codé, env dérivé d'une topo validée
+            ["bash", runphases, phase],
+            check=False,
+            env=_runphases_env(topo, stack_name),
+        ).returncode
+        if rc != 0:
+            print(f"échec de la phase `{phase}` (rc={rc}).", file=sys.stderr)
+            return 1
+        print(f"✓ `{phase}` terminée — relancer `next` pour l'étape suivante ({stack_name}).")
+        return 0
+    # Toute autre phase sans playbook unitaire (cas théorique) = erreur d'usage.
+    if playbook_rel is None:
+        raise _UsageError(
+            f"la phase `{phase}` n'est pas un play unitaire lançable "
+            "(déléguée au chemin nommé run-phases.sh) — la lancer via run-phases.sh"
+        )
+    private_data_dir = os.path.join(_ROOT, "bootstrap")
+    inventory = os.path.join(private_data_dir, "hosts.yaml")
+    ansible_cfg = os.path.join(private_data_dir, "ansible.cfg")
+    # L'inventaire réel est gitignoré (ADR 0023) — sans lui, ansible-runner
+    # prendrait le chemin pour un nom d'hôte (erreur cryptique). On l'arrête net.
+    if not os.path.exists(inventory):
+        raise _UsageError(
+            f"inventaire absent : {os.path.relpath(inventory, _ROOT)} "
+            "— le générer (`topology.py generate -o bootstrap/hosts.yaml`) "
+            "ou le copier depuis bootstrap/hosts.example.yaml"
+        )
+    _assert_bench_target(f"cluster next ({phase})")
+    playbook = os.path.relpath(os.path.join(_ROOT, playbook_rel), private_data_dir)
+    print(f"→ lancement de {phase} ({playbook_rel}) via ansible-runner…")
+    try:
+        result = _runner.launch_phase(
+            playbook,
+            run_params,
+            private_data_dir,
+            inventory,
+            ansible_config=ansible_cfg,
+            # KUBECONFIG vient de l'environnement du poste (config locale de
+            # l'opérateur, comme run-phases.sh/lib.sh) ; transmis explicitement
+            # plutôt que laissé ambiant dans le sous-processus runner.
+            kubeconfig=os.environ.get("KUBECONFIG"),
+            target_kind=topo.target_kind,
+        )
+    except _runner.RunnerUnavailable as exc:
+        raise _UsageError(str(exc)) from exc
+    print(f"  rc={result.rc} status={result.status}")
+    return 0 if result.rc == 0 else 1
+
+
+def cmd_next(args: argparse.Namespace) -> int:
+    """`next` : monte une couche montable du plan — au CHOIX si plusieurs le sont.
+
+    PAS le calque `pulumi up` complet (qui monterait TOUTE la séquence) — `next` ne
+    monte qu'UNE couche par invocation (parité state.sh). Quand PLUSIEURS couches
+    sont montables maintenant (deps réelles satisfaites — p. ex. `metrics-server` et
+    `storage-simple`, indépendants, ADR 0066), `next` les PROPOSE en menu et
+    l'opérateur choisit l'ordre ; le défaut reste l'ordre conventionnel du chemin.
+    Les phases AMONT (créer les VMs, socle k8s) sont des prérequis DURS : jamais un
+    menu. Lancer `next` EST la décision humaine (G2, ADR 0063) ; ré-invoquer monte la
+    suivante (jamais d'auto-enchaînement silencieux).
 
     Code 0 si la couche est montée (ou rien à monter) ; 1 si le run échoue ; 2 (usage)
-    si la couche n'est pas un play unitaire / inventaire absent / chemin incohérent.
+    si la couche n'est pas un play unitaire / inventaire absent / chemin incohérent /
+    montage annulé.
     """
     path = _resolve(args.file)
     topo = load_topology(path)
@@ -1562,93 +1682,51 @@ def cmd_next(args: argparse.Namespace) -> int:
     observed_socle = observed_done_phases(declared, _real_vms(), _ready_nodes())
     done -= {"up", "bootstrap"} - observed_socle  # retire le socle que le réel CONTREDIT
     run_params = derive_run_params(topo)
+    # Les couches MONTABLES maintenant (deps réelles satisfaites). La carte de
+    # dépendances vient du graphe atomique (bash, `phase_deps`) — fournie en PARESSEUX :
+    # `installable_now` ne l'invoque QU'au-delà du garde-fou amont (inutile de sheller
+    # le graphe pour décider de créer les VMs). En cas d'indisponibilité du graphe, le
+    # fournisseur lève → on retombe proprement en erreur d'usage.
+    backend = topo.storage.get("backend", "local-path")
     try:
-        sugg = suggest_next(topo, target, done, etat_frais, run_params=run_params)
-    except PlanError as exc:
+        cible_eff = target or default_target(topo)
+        montables = installable_now(
+            topo, target, done, etat_frais, deps_fn=lambda: phase_deps(backend)
+        )
+    except (PlanError, TopologyError) as exc:
         raise _UsageError(str(exc)) from exc
 
-    if sugg.phase is None:
+    if not montables:
+        # Rien à monter : suggest_next porte le message « à jour » détaillé.
+        sugg = suggest_next(topo, target, done, etat_frais, run_params=run_params)
         print(sugg.message)
-        return 0  # rien à monter (stack à jour)
+        return 0
 
-    # Libellé HUMAIN de l'action — `next` distingue les phases comme `preview` :
-    # `up` = créer les VMs SEULES, `bootstrap` = Kubernetes + CRI + CNI (pas tout le
-    # socle d'un coup). Une couche applicative sinon. On l'utilise pour le message ET
-    # la confirmation (cohérence : un seul vocabulaire, pas de jargon « 1er drift »).
-    _libelles_amont = {
-        "up": "créer les VMs",
-        "bootstrap": "monter Kubernetes (CRI + kubeadm + CNI Cilium)",
-    }
-    quoi = _libelles_amont.get(sugg.phase, f"monter la couche `{sugg.phase}`")
-    print(f"Prochaine étape sur `{target or default_target(topo)}` : {quoi}.")
-
-    # Confirmation AVANT de monter (l'étape MUTE le banc). --yes saute (CI/non-TTY) ;
-    # hors TTY sans --yes, _confirm renvoie le défaut (False) → on refuse plutôt que
-    # d'agir à l'aveugle.
     no_input = args.yes or not sys.stdin.isatty()
-    if not _confirm(f"{quoi[0].upper()}{quoi[1:]} ?", default=args.yes, no_input=no_input):
+    # Menu si PLUSIEURS couches montables ; sinon la seule (ou le défaut sous no_input).
+    # Choisir un numéro dans le menu EST déjà la décision explicite → on NE redemande
+    # PAS de confirmation ensuite (un seul geste, pas de double [o/N] redondant).
+    a_choisi_au_menu = len(montables) > 1
+    if a_choisi_au_menu:
+        phase = _choisir_couche(montables, _quoi_couche_label, no_input=no_input)
+        if phase is None:
+            print("montage annulé.", file=sys.stderr)
+            return 2
+    else:
+        phase = montables[0]
+
+    quoi = _quoi_couche(phase)
+    print(f"Prochaine étape sur `{cible_eff}` : {quoi}.")
+    # Confirmation AVANT de monter (l'étape MUTE le banc) — SEULEMENT s'il n'y a pas eu
+    # de menu (chemin mono-couche : la confirmation est l'unique garde-fou). Après un
+    # menu, le choix du numéro a déjà valu décision (pas de friction en double). --yes
+    # saute ; hors TTY sans --yes, _confirm renvoie False → refus plutôt qu'à l'aveugle.
+    if not a_choisi_au_menu and not _confirm(
+        f"{quoi[0].upper()}{quoi[1:]} ?", default=args.yes, no_input=no_input
+    ):
         print("montage annulé.", file=sys.stderr)
         return 2
-
-    # Phases AMONT (`up` = créer les VMs, `bootstrap` = k8s + CRI + CNI) : pas de
-    # playbook unitaire — elles relèvent du provisioning bash (limactl, cni.sh, ADR
-    # 0049). `next` les RÉALISE UNE PAR UNE en déléguant à l'arm run-phases.sh du MÊME
-    # nom (`up`/`bootstrap` sont deux arms distincts) — cohérence stricte avec le PLAN
-    # de `preview` : un `next` = exactement une phase de la séquence. Au `next` suivant,
-    # la phase d'après (bootstrap, puis la 1re couche applicative) se monte.
-    if sugg.phase in ("up", "bootstrap"):
-        _assert_bench_target(f"cluster next ({sugg.phase})")
-        stack_name = topo.catalog.get("topology", "—")
-        runphases = os.path.join(_ROOT, "bench", "lima", "run-phases.sh")
-        print(f"→ {sugg.phase} : {quoi} via run-phases.sh…")
-        rc = subprocess.run(  # noqa: S603 — chemin codé, env dérivé d'une topo validée
-            ["bash", runphases, sugg.phase],
-            check=False,
-            env=_runphases_env(topo, stack_name),
-        ).returncode
-        if rc != 0:
-            print(f"échec de la phase `{sugg.phase}` (rc={rc}).", file=sys.stderr)
-            return 1
-        print(f"✓ `{sugg.phase}` terminée — relancer `next` pour l'étape suivante ({stack_name}).")
-        return 0
-    # Toute autre phase sans playbook unitaire (cas théorique) reste une erreur d'usage.
-    if sugg.playbook is None:
-        raise _UsageError(
-            f"la phase `{sugg.phase}` n'est pas un play unitaire lançable "
-            "(déléguée au chemin nommé run-phases.sh) — la lancer via run-phases.sh"
-        )
-    private_data_dir = os.path.join(_ROOT, "bootstrap")
-    inventory = os.path.join(private_data_dir, "hosts.yaml")
-    ansible_cfg = os.path.join(private_data_dir, "ansible.cfg")
-    # L'inventaire réel est gitignoré (ADR 0023) — sans lui, ansible-runner
-    # prendrait le chemin pour un nom d'hôte (erreur cryptique). On l'arrête net
-    # avec un message qui pointe vers l'exemple versionné.
-    if not os.path.exists(inventory):
-        raise _UsageError(
-            f"inventaire absent : {os.path.relpath(inventory, _ROOT)} "
-            "— le générer (`topology.py generate -o bootstrap/hosts.yaml`) "
-            "ou le copier depuis bootstrap/hosts.example.yaml"
-        )
-    _assert_bench_target(f"cluster next ({sugg.phase})")
-    playbook = os.path.relpath(os.path.join(_ROOT, sugg.playbook), private_data_dir)
-    print(f"→ lancement de {sugg.phase} ({sugg.playbook}) via ansible-runner…")
-    try:
-        result = _runner.launch_phase(
-            playbook,
-            sugg.run_params,
-            private_data_dir,
-            inventory,
-            ansible_config=ansible_cfg,
-            # KUBECONFIG vient de l'environnement du poste (config locale de
-            # l'opérateur, comme run-phases.sh/lib.sh) ; transmis explicitement
-            # plutôt que laissé ambiant dans le sous-processus runner.
-            kubeconfig=os.environ.get("KUBECONFIG"),
-            target_kind=topo.target_kind,
-        )
-    except _runner.RunnerUnavailable as exc:
-        raise _UsageError(str(exc)) from exc
-    print(f"  rc={result.rc} status={result.status}")
-    return 0 if result.rc == 0 else 1
+    return _monter_phase(topo, phase, run_params)
 
 
 def cmd_ha_3cp(args: argparse.Namespace) -> int:

@@ -664,6 +664,145 @@ runs:
         self.assertEqual(calls, [])  # aucun montage lancé
 
 
+class NextMenu(unittest.TestCase):
+    """`next` propose un MENU quand PLUSIEURS couches sont montables (choix d'ordre)."""
+
+    # Topo local-path visant `atlas` : après socle, storage-simple ET metrics-server
+    # sont montables (indépendants). Fixture minimale gitignorable.
+    _ATLAS_LOCAL = """\
+catalog:
+  topology: atlas-local
+  profile: dataops
+nodes:
+  - {name: cp1, roles: [control]}
+  - {name: node1, roles: [worker]}
+  - {name: node2, roles: [worker]}
+storage:
+  backend: local-path
+target_kind: lima
+"""
+    # Socle local-path fait (up+bootstrap), rien d'autre → le menu doit proposer
+    # storage-simple (défaut) ET metrics-server.
+    _SOCLE_LIGHT_DONE = f"""\
+runs:
+  - id: r1
+    date: {dt_today()}
+    profil: dataops
+    topologie: atlas-local
+    phases: {{up: 1, bootstrap: 1}}
+"""
+
+    def setUp(self):
+        # Socle réellement présent (toutes VMs + un nœud Ready) → up/bootstrap faits.
+        orig_vms, orig_ready = cli._real_vms, cli._ready_nodes
+        cli._real_vms = lambda: ["cp1", "node1", "node2"]
+        cli._ready_nodes = lambda: ["cp1"]
+        self.addCleanup(setattr, cli, "_real_vms", orig_vms)
+        self.addCleanup(setattr, cli, "_ready_nodes", orig_ready)
+        # Carte de deps DÉTERMINISTE (== ce que phase_deps dérive du graphe ; prouvé
+        # dans test_layers.PhaseDeps) — évite de sheller bash et fige le menu.
+        orig_deps = cli.phase_deps
+        cli.phase_deps = lambda _backend: {
+            "storage-simple": set(),
+            "metrics-server": set(),
+            "monitoring": {"storage-simple"},
+            "gitops": {"storage-simple"},
+            "dataops": {"monitoring", "storage-simple"},
+            "gitops-seed": {"gitops"},
+        }
+        self.addCleanup(setattr, cli, "phase_deps", orig_deps)
+        # Inventaire présent (sinon garde-fou) — créé puis retiré.
+        inv = os.path.join(_ROOT, "bootstrap", "hosts.yaml")
+        if not os.path.exists(inv):
+            with open(inv, "w", encoding="utf-8") as f:
+                f.write("# inventaire de test (créé puis retiré)\n")
+            self.addCleanup(os.unlink, inv)
+
+    def _spy_launch(self):
+        """Stub launch_phase qui capture la phase (via le playbook) montée."""
+        from cluster_topology.runner import RunResult
+
+        mounted = []
+
+        def fake(playbook, extravars, pdd, inv, **kw):
+            mounted.append(playbook)
+            return RunResult(rc=0, status="successful")
+
+        orig = cli._runner.launch_phase
+        cli._runner.launch_phase = fake
+        self.addCleanup(setattr, cli._runner, "launch_phase", orig)
+        return mounted
+
+    def _fixtures(self):
+        topo = _tmp(self._ATLAS_LOCAL)
+        hist = _tmp(self._SOCLE_LIGHT_DONE)
+        self.addCleanup(os.unlink, topo)
+        self.addCleanup(os.unlink, hist)
+        return topo, hist
+
+    def test_yes_picks_default_first_of_path(self):
+        # --yes (no_input) : le menu choisit le DÉFAUT = 1er du chemin = storage-simple.
+        mounted = self._spy_launch()
+        topo, hist = self._fixtures()
+        code, out, _ = _capture(
+            ["next", "-f", topo, "--target", "atlas", "--history", hist, "--yes"]
+        )
+        self.assertEqual(code, 0)
+        self.assertEqual(len(mounted), 1)
+        self.assertTrue(mounted[0].endswith("local-path.yaml"))  # storage-simple
+
+    def _stub_input(self, reponses):
+        """Stube le builtin `input` (le menu et _confirm l'appellent) + force le TTY.
+        `reponses` : itérable des saisies successives. Restauré en cleanup."""
+        import builtins
+
+        it = iter(reponses)
+        orig_input, orig_isatty = builtins.input, sys.stdin.isatty
+        builtins.input = lambda _prompt="": next(it)
+        sys.stdin.isatty = lambda: True
+        self.addCleanup(setattr, builtins, "input", orig_input)
+        self.addCleanup(setattr, sys.stdin, "isatty", orig_isatty)
+
+    def test_interactive_choice_picks_metrics_over_storage(self):
+        # TTY + saisie « 2 » : l'opérateur choisit metrics-server AVANT storage-simple.
+        # Le choix au menu VAUT décision → AUCUNE confirmation [o/N] redondante après.
+        mounted = self._spy_launch()
+        topo, hist = self._fixtures()
+        self._stub_input(["2"])  # 2e du menu = metrics-server ; pas de 2e prompt
+        code, out, err = _capture(["next", "-f", topo, "--target", "atlas", "--history", hist])
+        self.assertEqual(code, 0)
+        self.assertEqual(len(mounted), 1)
+        self.assertTrue(mounted[0].endswith("metrics-server.yaml"))  # metrics, pas storage
+        self.assertIn("installables", err)  # le menu a bien été affiché
+
+    def test_interactive_empty_picks_default(self):
+        # TTY + Entrée (saisie vide) au menu : défaut = storage-simple, monté direct.
+        mounted = self._spy_launch()
+        topo, hist = self._fixtures()
+        self._stub_input([""])  # menu défaut ; pas de confirmation supplémentaire
+        code, _, _ = _capture(["next", "-f", topo, "--target", "atlas", "--history", hist])
+        self.assertEqual(code, 0)
+        self.assertTrue(mounted[0].endswith("local-path.yaml"))  # storage-simple (défaut)
+
+    def test_single_installable_no_menu(self):
+        # storage-simple déjà fait : seul metrics-server reste montable → PAS de menu
+        # (une seule couche), montage direct sous --yes.
+        mounted = self._spy_launch()
+        topo = _tmp(self._ATLAS_LOCAL)
+        hist = _tmp(
+            f"runs:\n  - id: r1\n    date: {dt_today()}\n    profil: dataops\n"
+            f"    topologie: atlas-local\n    phases: {{up: 1, bootstrap: 1, storage-simple: 1}}\n"
+        )
+        self.addCleanup(os.unlink, topo)
+        self.addCleanup(os.unlink, hist)
+        code, out, err = _capture(
+            ["next", "-f", topo, "--target", "atlas", "--history", hist, "--yes"]
+        )
+        self.assertEqual(code, 0)
+        self.assertTrue(mounted[0].endswith("metrics-server.yaml"))
+        self.assertNotIn("installables", err)  # pas de menu pour une seule couche
+
+
 class Metrics(unittest.TestCase):
     _HIST = """\
 runs:

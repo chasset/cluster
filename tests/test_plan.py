@@ -19,8 +19,10 @@ from cluster_topology.plan import (  # noqa: E402
     default_target,
     diff_phases,
     expected_phase_sequence,
+    installable_now,
     observed_done_phases,
     phase_label,
+    phase_playbook,
     suggest_next,
 )
 
@@ -304,6 +306,105 @@ class PhaseTable(unittest.TestCase):
     def test_phase_label_falls_back_to_name(self):
         # Phase inconnue de la table → repli sur le nom (pas de masquage).
         self.assertEqual(phase_label("frobnicate"), "frobnicate")
+
+    def test_phase_playbook_accessor(self):
+        # Accesseur du mapping : play unitaire → chemin ; phase amont/script → None.
+        self.assertEqual(phase_playbook("storage-simple"), "bootstrap/local-path.yaml")
+        self.assertIsNone(phase_playbook("up"))  # amont, pas un play
+        self.assertIsNone(phase_playbook("frobnicate"))  # inconnue
+
+
+# Carte de dépendances PHASE→PHASE local-path (figée, == ce que phase_deps dérive du
+# graphe atomique — cf. test_layers.PhaseDeps qui le PROUVE contre le bash). On la
+# fixe ici pour tester `installable_now` PUREMENT (sans sheller). storage-simple et
+# metrics-server sont des RACINES indépendantes ; monitoring/gitops dépendent du
+# stockage ; dataops de monitoring ; gitops-seed de gitops.
+_DEPS_LOCAL = {
+    "storage-simple": set(),
+    "metrics-server": set(),
+    "monitoring": {"storage-simple"},
+    "gitops": {"storage-simple"},
+    "dataops": {"monitoring", "storage-simple"},
+    "gitops-seed": {"gitops"},
+}
+
+
+class InstallableNow(unittest.TestCase):
+    """`installable_now` : couches montables MAINTENANT (deps réelles satisfaites)."""
+
+    def _deps_fn(self):
+        return lambda: dict(_DEPS_LOCAL)
+
+    def test_amont_missing_is_sole_offer(self):
+        # VMs/socle absents : on ne propose QUE l'amont (prérequis dur), jamais un menu.
+        topo = _topo(backend="local-path")
+        got = installable_now(topo, "atlas", set(), "frais", deps_fn=self._deps_fn())
+        self.assertEqual(got, ["up"])
+
+    def test_bootstrap_is_sole_offer_after_up(self):
+        topo = _topo(backend="local-path")
+        got = installable_now(topo, "atlas", {"up"}, "frais", deps_fn=self._deps_fn())
+        self.assertEqual(got, ["bootstrap"])
+
+    def test_menu_storage_and_metrics_both_installable(self):
+        # Socle fait : storage-simple ET metrics-server sont montables (indépendants).
+        # Les DEUX sont proposés, l'ordre du chemin en tête (storage d'abord = défaut).
+        topo = _topo(backend="local-path")
+        got = installable_now(topo, "atlas", {"up", "bootstrap"}, "frais", deps_fn=self._deps_fn())
+        self.assertEqual(got[:2], ["storage-simple", "metrics-server"])
+        # monitoring/gitops NE sont PAS montables (dépendent de storage-simple, absent).
+        self.assertNotIn("monitoring", got)
+        self.assertNotIn("gitops", got)
+
+    def test_metrics_then_storage_choosable_independently(self):
+        # Si metrics-server est monté AVANT storage (choix opérateur), storage reste
+        # proposé ensuite — la dépendance conventionnelle n'INTERDIT pas cet ordre.
+        topo = _topo(backend="local-path")
+        got = installable_now(
+            topo, "atlas", {"up", "bootstrap", "metrics-server"}, "frais", deps_fn=self._deps_fn()
+        )
+        self.assertEqual(got, ["storage-simple"])  # metrics fait, storage débloque la suite
+
+    def test_storage_done_unlocks_monitoring_and_gitops(self):
+        topo = _topo(backend="local-path")
+        got = installable_now(
+            topo,
+            "atlas",
+            {"up", "bootstrap", "storage-simple", "metrics-server"},
+            "frais",
+            deps_fn=self._deps_fn(),
+        )
+        # monitoring + gitops débloqués (deps storage satisfaites) ; dataops PAS encore
+        # (dépend de monitoring), gitops-seed PAS encore (dépend de gitops).
+        self.assertIn("monitoring", got)
+        self.assertIn("gitops", got)
+        self.assertNotIn("dataops", got)
+        self.assertNotIn("gitops-seed", got)
+
+    def test_deps_fn_none_falls_back_to_first_drift(self):
+        # Sans carte de deps : repli SÛR sur la 1re phase manquante seule (pas de menu).
+        topo = _topo(backend="local-path")
+        got = installable_now(topo, "atlas", {"up", "bootstrap"}, "frais", deps_fn=None)
+        self.assertEqual(got, ["storage-simple"])  # 1er drift, jamais 2 sans la carte
+
+    def test_deps_fn_not_called_for_amont(self):
+        # Garde-fou amont : deps_fn n'est PAS invoqué (pas de bash pour décider de
+        # créer les VMs) — important pour l'isolation des tests façade.
+        topo = _topo(backend="local-path")
+        calls = []
+
+        def boom():
+            calls.append(1)
+            return dict(_DEPS_LOCAL)
+
+        installable_now(topo, "atlas", set(), "frais", deps_fn=boom)
+        self.assertEqual(calls, [])  # jamais appelé : up est la seule offre
+
+    def test_all_done_returns_empty(self):
+        topo = _topo(backend="local-path")
+        seq = set(expected_phase_sequence(topo, "atlas"))
+        got = installable_now(topo, "atlas", seq, "frais", deps_fn=self._deps_fn())
+        self.assertEqual(got, [])
 
 
 if __name__ == "__main__":

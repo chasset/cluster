@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from cluster_topology.layers import (  # noqa: E402
     layers_from_profile,
+    phase_deps,
     resolve_layers,
 )
 from cluster_topology.model import TopologyError  # noqa: E402
@@ -99,6 +100,51 @@ class LayersFromProfile(unittest.TestCase):
         # profile=obs → layers [base,metrics,store,obs] → resolve == socle+metrics+store+obs.
         seq = resolve_layers(layers_from_profile("obs"), "local-path")
         self.assertEqual(seq, ["storage-simple", "metrics-server", "monitoring"])
+
+
+class PhaseDeps(unittest.TestCase):
+    """`phase_deps` : dépendances PHASE→PHASE dérivées du VRAI graphe atomique.
+
+    C'est la base de `plan.installable_now` (le menu de `next`) : on PROUVE ici,
+    contre le bash réel (pas un stub), que `metrics-server` et `storage-simple` sont
+    des RACINES indépendantes (le cœur du besoin : choisir l'un avant l'autre), et
+    que monitoring/gitops/dataops/gitops-seed portent bien leurs vraies arêtes.
+    """
+
+    def test_local_path_storage_and_metrics_are_independent_roots(self):
+        deps = phase_deps("local-path")
+        # Aucune arête entre eux : montables dans n'importe quel ordre (ADR 0066).
+        self.assertEqual(deps["storage-simple"], set())
+        self.assertEqual(deps["metrics-server"], set())
+
+    def test_local_path_apps_depend_on_storage(self):
+        deps = phase_deps("local-path")
+        # gitea/prometheus consomment des PVC → monitoring/gitops dépendent du stockage
+        # (arête perdue si on oubliait le repli storage-simple = sa propre phase).
+        self.assertIn("storage-simple", deps["monitoring"])
+        self.assertIn("storage-simple", deps["gitops"])
+
+    def test_local_path_dataops_needs_monitoring(self):
+        deps = phase_deps("local-path")
+        self.assertIn("monitoring", deps["dataops"])
+
+    def test_local_path_gitops_seed_needs_gitops(self):
+        deps = phase_deps("local-path")
+        self.assertEqual(deps["gitops-seed"], {"gitops"})
+
+    def test_local_path_excludes_ceph_only_phases(self):
+        # datalake/ceph/sc n'existent pas en local-path → absentes de la carte.
+        deps = phase_deps("local-path")
+        for ceph_only in ("datalake", "ceph", "sc"):
+            self.assertNotIn(ceph_only, deps)
+
+    def test_ceph_storage_chain(self):
+        deps = phase_deps("ceph")
+        # En ceph le stockage est ceph→sc→datalake ; metrics reste une racine.
+        self.assertEqual(deps["ceph"], set())
+        self.assertEqual(deps["sc"], {"ceph"})
+        self.assertEqual(deps["datalake"], {"ceph", "sc"})
+        self.assertEqual(deps["metrics-server"], set())
 
 
 if __name__ == "__main__":

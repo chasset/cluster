@@ -21,8 +21,12 @@ phase aval avant son amont.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from cluster_topology.model import Topology
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 
 # ── Mapping phase → playbook bootstrap + clés `-e` (ADR 0063 G3) ─────────────
@@ -96,6 +100,16 @@ def phase_label(phase: str) -> str:
     table) — préserve l'information plutôt que de masquer."""
     spec = PHASE_PLAYBOOK.get(phase)
     return spec.label if spec and spec.label else phase
+
+
+def phase_playbook(phase: str) -> str | None:
+    """Playbook unitaire d'une phase (chemin relatif au repo), ou None si la phase
+    n'est pas un play lançable isolément (amont/script/enchaînement délégué).
+
+    Accesseur de la table PHASE_PLAYBOOK (source unique du mapping, alignée sur
+    run-phases.sh) — évite d'exposer la table mutable à la façade."""
+    spec = PHASE_PLAYBOOK.get(phase)
+    return spec.playbook if spec else None
 
 
 # ── Séquences ordonnées des chemins nommés (transcription de run-phases.sh) ──
@@ -320,3 +334,55 @@ def suggest_next(
         message=f"Prochaine étape (1er drift) : {phase} sur le chemin {target} — {raison}.",
         run_params=dict(run_params or {}),
     )
+
+
+# Phases AMONT strictement séquentielles : le provisioning (VMs) et l'amorçage du
+# socle k8s sont des prérequis DURS de TOUT le reste — jamais un « choix » parmi
+# d'autres. Tant qu'une de ces phases manque, c'est la SEULE chose à proposer.
+_AMONT_PHASES = frozenset({"up", "bootstrap", "bootstrap-ha", "join-cp"})
+
+
+def installable_now(
+    topo: Topology,
+    target: str | None,
+    done: set[str],
+    freshness: str,
+    deps_fn: Callable[[], dict[str, set[str]]] | None = None,
+) -> list[str]:
+    """Phases du chemin `target` MONTABLES MAINTENANT, dans l'ordre du chemin.
+
+    « Montable » = phase manquante (cf. `diff_phases`) dont TOUTES les dépendances
+    RÉELLES (graphe atomique, `layers.phase_deps`) sont déjà dans `done`. C'est ce
+    qui permet à `next` de proposer un MENU : `metrics-server` et `storage-simple`
+    n'ayant aucune arête entre eux, les deux sont montables après le socle —
+    l'opérateur choisit l'ordre (l'ordre conventionnel du chemin reste le DÉFAUT,
+    c.-à-d. le premier de la liste renvoyée).
+
+    Garde-fou amont : si une phase de `_AMONT_PHASES` manque, elle est un prérequis
+    DUR (pas de cluster sans VMs ni socle) → on renvoie CETTE seule phase, jamais un
+    menu (on ne « choisit » pas de créer les VMs vs monter une couche applicative).
+
+    `deps_fn` est un FOURNISSEUR PARESSEUX de la carte de dépendances (la façade y
+    branche `layers.phase_deps`, qui SHELLE le graphe). Module PUR : `plan` n'appelle
+    pas bash lui-même — il invoque `deps_fn` SEULEMENT au-delà du garde-fou amont
+    (inutile pour `up`/`bootstrap`, et évite un appel bash quand il n'y a rien à
+    désambiguïser). `deps_fn` None → repli SÛR « 1er drift » seul (au plus une phase) :
+    sans la carte, on ne PRÉSUME pas l'indépendance de deux couches.
+    """
+    target = target or default_target(topo)
+    seq = expected_phase_sequence(topo, target)
+    manquantes = diff_phases(seq, done, freshness)
+    if not manquantes:
+        return []
+    # Prérequis dur : la première phase amont manquante est la seule offre possible.
+    # (On NE consulte PAS deps_fn ici — pas de bash pour décider de créer les VMs.)
+    for phase in seq:
+        if phase in _AMONT_PHASES and phase in manquantes:
+            return [phase]
+    if deps_fn is None:
+        return [manquantes[0]]
+    deps = deps_fn()
+    # Une phase manquante est montable si aucune de ses dépendances n'est elle-même
+    # manquante (⇔ toutes ses deps sont satisfaites). On préserve l'ordre du chemin.
+    manquantes_set = set(manquantes)
+    return [p for p in manquantes if not (deps.get(p, set()) & manquantes_set)]

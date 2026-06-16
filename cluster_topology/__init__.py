@@ -37,7 +37,7 @@ from cluster_topology.gates import (
 )
 from cluster_topology.generator import render_lima_inventory, render_prod_inventory
 from cluster_topology.history import Run, load_runs, verdict_for_run
-from cluster_topology.layers import layers_from_profile, resolve_layers
+from cluster_topology.layers import layers_from_profile, phase_deps, resolve_layers
 from cluster_topology.metrics import RunMetrics, format_metrics, metrics_of
 from cluster_topology.model import Topology, TopologyError, load_topology
 from cluster_topology.plan import (
@@ -47,8 +47,10 @@ from cluster_topology.plan import (
     default_target,
     diff_phases,
     expected_phase_sequence,
+    installable_now,
     observed_done_phases,
     phase_label,
+    phase_playbook,
     suggest_next,
 )
 from cluster_topology.profile import consumes_storage, derive_run_params
@@ -100,9 +102,12 @@ __all__ = [
     "default_target",
     "diff_phases",
     "expected_phase_sequence",
+    "installable_now",
     "layers_from_profile",
     "observed_done_phases",
+    "phase_deps",
     "phase_label",
+    "phase_playbook",
     "resolve_layers",
     "suggest_next",
     "RunMetrics",
