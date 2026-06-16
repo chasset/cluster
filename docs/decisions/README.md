@@ -95,3 +95,4 @@ Format léger inspiré de Michael Nygard :
 | 0073 | [Hubble UI : activer l'observabilité réseau (opt-in)](0073-hubble-ui-observabilite-reseau.md)                                        | Proposed           |
 | 0074 | [`cluster discover` : reconstruire un `topology.yaml` depuis un cluster réel](0074-cluster-discover-reconstruire-topologie.md)       | Accepted           |
 | 0075 | [Kyverno CLI en CI : valider nos invariants de manifeste en statique](0075-kyverno-cli-statique-ci.md)                               | Proposed           |
+| 0076 | [`cluster refresh` : matérialiser une évolution voulue du réel dans la déclaration](0076-cluster-refresh-reel-vers-declaration.md)   | Accepted           |
