@@ -39,5 +39,18 @@ cluster() {
         [ -n "${_out}" ] && eval "${_out}"
         return 0
     fi
+    # Toute autre commande (up/next/preview/…) : délégation normale.
     "${_bin}" "$@"
+    local _rc=$?
+    # AUTO-ENV : un `up`/`next` réussi peut RENDRE le banc joignable (1er control-plane
+    # installé → l'API répond). On (re)pose alors KUBECONFIG=banc dans le shell, pour
+    # que `kubectl` direct marche sans `cluster env` manuel — et pour écraser le
+    # placeholder /dev/null posé par un `stack select` fait AVANT le montage. `env`
+    # ne pose que si le kubeconfig banc EXISTE (sinon erreur d'usage avalée) ; --force
+    # parce que le shell porte peut-être /dev/null (cf. ADR 0053).
+    if [ "${_rc}" -eq 0 ] && { [ "$1" = "up" ] || [ "$1" = "next" ]; }; then
+        local _env
+        _env=$("${_bin}" env --force 2> /dev/null) && [ -n "${_env}" ] && eval "${_env}"
+    fi
+    return "${_rc}"
 }

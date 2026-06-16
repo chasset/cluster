@@ -949,9 +949,9 @@ class Stack(unittest.TestCase):
         self.assertIn("cluster non installé", err)
 
     def test_select_exports_bench_when_present(self):
-        # Banc monté + re-sélection de la MÊME stack (pas d'invalidation) → l'export
-        # pointe le banc, pas /dev/null. On active la stack D'ABORD, puis on crée un
-        # VRAI fichier kubeconfig au banc, puis on re-select (ancienne == nouvelle).
+        # Banc monté ET JOIGNABLE → l'export pointe le banc, pas /dev/null. On crée un
+        # fichier kubeconfig au banc et on stube `_kubeconfig_reaches_api` à True (select
+        # sonde l'API, pas juste la présence du fichier).
         name = "zz-test-ctx-bench"
         target = self._catalog(name)
         self.addCleanup(lambda: os.path.exists(target) and os.unlink(target))
@@ -962,7 +962,10 @@ class Stack(unittest.TestCase):
             with open(bench, "w", encoding="utf-8") as f:
                 f.write("apiVersion: v1\nkind: Config\n")
             self.addCleanup(lambda: os.path.exists(bench) and os.unlink(bench))
-        code, out, _ = _capture(["stack", "select", name])  # même stack → banc conservé
+        orig = cli._kubeconfig_reaches_api
+        cli._kubeconfig_reaches_api = lambda _kc: True  # banc joignable
+        self.addCleanup(setattr, cli, "_kubeconfig_reaches_api", orig)
+        code, out, _ = _capture(["stack", "select", name])
         self.assertEqual(code, 0)
         self.assertIn("export KUBECONFIG=", out)
         self.assertNotIn(os.devnull, out)  # le banc, pas /dev/null

@@ -171,6 +171,26 @@ def _kubectl_env() -> dict[str, str]:
     return {**os.environ, "KUBECONFIG": _bench_kubeconfig()}
 
 
+def _kubeconfig_reaches_api(kubeconfig: str) -> bool:
+    """`True` si ce kubeconfig joint RÉELLEMENT l'API (pas juste un fichier présent).
+
+    Un kubeconfig peut exister mais être vide/cassé (server absent) ou pointer une API
+    tombée (forward mort) → kubectl retombe sur localhost. On sonde `/healthz` borné.
+    Read-only, FAIL-CLOSED : toute erreur → False."""
+    try:
+        out = subprocess.run(  # noqa: S603 — argv fixe, lecture seule
+            ["kubectl", "get", "--raw=/healthz", "--request-timeout=4s"],
+            check=False,
+            capture_output=True,
+            text=True,
+            env={**os.environ, "KUBECONFIG": kubeconfig},
+            timeout=_REFRESH_TIMEOUT_S,
+        )
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return False
+    return out.returncode == 0 and out.stdout.strip() == "ok"
+
+
 # Chemins nommés connus de l'historique (ADR 0045 §6) pour le verdict par chemin.
 _CHEMINS_NOMMES = ["atlas", "storage-real", "cluster-dataops"]
 
@@ -459,33 +479,24 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
 
     # Garde-fou : valider AVANT d'activer (ne pas pointer le symlink sur un fichier cassé).
     topo = load_topology(target_abs)
-    # Stack active AVANT le switch : si on change de cible, le kubeconfig banc en place
-    # pointe l'ANCIENNE stack. On l'invalide (ADR 0053) → la prochaine `up`/`bootstrap`
-    # le régénère pour la nouvelle stack. Re-sélectionner la MÊME stack n'y touche pas.
-    ancienne = _active_stack_name(None)
-    nouvelle = topo.catalog.get("topology")
     _activate_symlink(target_rel)
     print(
         f"✓ activée : topology.yaml → {target_rel} (chemin dérivé : {default_target(topo)})",
         file=sys.stderr,
     )
-    if ancienne is not None and ancienne != nouvelle and os.path.exists(_BENCH_KUBECONFIG):
-        os.remove(_BENCH_KUBECONFIG)
-        print(
-            f"  kubeconfig banc invalidé (pointait `{ancienne}`) — "
-            "`cluster up` le régénère pour la nouvelle stack.",
-            file=sys.stderr,
-        )
 
-    # KUBECONFIG cible : le banc de la stack s'il est monté, sinon /dev/null (jamais
-    # la prod). Message humain SIMPLE sur STDERR.
-    if os.path.exists(_BENCH_KUBECONFIG):
+    # KUBECONFIG cible : le banc s'il est monté ET JOIGNABLE, sinon /dev/null (jamais la
+    # prod, ADR 0053). On NE supprime PAS le kubeconfig (le détruire casserait l'accès à
+    # un banc vivant ; il sera de toute façon réécrit par le prochain up/bootstrap). On
+    # vise /dev/null seulement s'il n'existe pas OU ne répond plus (banc d'une autre
+    # stack, ou API tombée) — `_context_targets_bench` le sonde sans toucher au fichier.
+    if os.path.exists(_BENCH_KUBECONFIG) and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
         cible = os.path.abspath(_BENCH_KUBECONFIG)
     else:
         cible = os.devnull
         _warn(
-            "cluster non installé — pas de connexion possible pour l'instant "
-            "(le monter : `cluster up`)."
+            "cluster non installé (ou banc injoignable) — pas de connexion possible "
+            "pour l'instant (le monter : `cluster up`)."
         )
     # La ligne `export …` n'est utile QU'à `eval`. En appel direct (stdout = TTY), on
     # ne la déverse pas brute dans le terminal — on suggère plutôt `eval`. Si stdout
@@ -978,9 +989,18 @@ def cmd_env(args: argparse.Namespace) -> int:
         )
     bench = os.path.abspath(_BENCH_KUBECONFIG)
     current = os.environ.get("KUBECONFIG")
-    if current and not args.force and os.path.abspath(current) != bench:
-        # KUBECONFIG déjà posé, ≠ banc : on NE l'écrase PAS (sauf --force). Rappel commenté
-        # (sur stdout pour rester `eval`-safe : un commentaire shell est inerte).
+    # `/dev/null` (placeholder posé par `stack select` quand le banc n'existait pas
+    # encore) ou un chemin VIDE/INEXISTANT ne sont PAS une intention explicite de
+    # l'utilisateur : on les remplace par le banc sans exiger --force (sinon on reste
+    # bloqué sur /dev/null après le montage). Seul un VRAI kubeconfig tiers est respecté.
+    placeholder = (
+        not current
+        or os.path.abspath(current) == os.path.abspath(os.devnull)
+        or not os.path.exists(current)
+    )
+    if current and not args.force and not placeholder and os.path.abspath(current) != bench:
+        # KUBECONFIG tiers RÉEL déjà posé : on NE l'écrase PAS (sauf --force). Rappel
+        # commenté (sur stdout pour rester `eval`-safe : un commentaire shell est inerte).
         print(f"# KUBECONFIG déjà défini ({current}) — `env --force` pour viser le banc")
         return 0
     # Ligne eval-able. `eval "$(topology.py env)"` exporte dans le shell courant.
