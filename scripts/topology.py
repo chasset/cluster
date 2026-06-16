@@ -2216,6 +2216,35 @@ def cmd_roundtrip(args: argparse.Namespace) -> int:
     return 0 if result.reversible else 1
 
 
+def cmd_remove(args: argparse.Namespace) -> int:
+    """`remove` : supprime UNE couche applicative et sa clôture descendante (inverse de `next`).
+
+    DESTRUCTIF (efface la couche + ses données) : délègue à `run-phases.sh rollback`
+    (périmètre dans rollback-lib.sh, ADR 0054), en ordre aval→amont. Détruire une couche
+    entraîne celle de ses dépendantes (clôture, ADR 0066) — affichées et confirmées
+    AVANT. Une clôture de STOCKAGE (≈ démontage du socle) exige `--full`. `--yes` saute
+    la confirmation (hors TTY).
+
+    Mêmes gardes d'isolation que `next` (ADR 0053) : le rollback vise le banc (kubeconfig
+    + node-side ceph) → `_assert_bench_target` ; `BANC_JETABLE=1` est imposé par
+    run-phases.sh (jamais la prod). Code 0 si supprimé, 1 si une étape échoue /
+    confirmation refusée, 2 si usage."""
+    _assert_bench_target(f"cluster remove ({args.phase})")
+    try:
+        result = _roundtrip.run_remove(args.phase, allow_full=args.full, assume_yes=args.yes)
+    except _roundtrip.RoundtripError as exc:
+        raise _UsageError(str(exc)) from exc
+    print(f"Remove — couche `{result.phase}` → clôture {result.layers} :")
+    for step in result.steps:
+        marque = "✓" if step.ok else "✗"
+        print(f"  {marque} {step.nom} — {step.detail}")
+    if result.removed:
+        print(f"→ couche supprimée — re-monter avec `cluster next` ({result.phase}).")
+        return 0
+    print("→ suppression INCOMPLÈTE (voir ci-dessus).")
+    return 1
+
+
 # Verbes du groupe `stack` (calque `pulumi stack` : GESTION des stacks).
 _STACK_DISPATCH = {
     "new": cmd_stack_new,
@@ -2264,6 +2293,7 @@ _DISPATCH = {
     "refresh": cmd_refresh,  # réaligne la topo active sur le réel voulu (ADR 0076, fusion + confirmation)  # noqa: E501
     "up": cmd_up,  # calque `pulumi up` : monte TOUTE la séquence (délègue à run-phases.sh)
     "next": cmd_next,  # applique la PROCHAINE couche (1er drift, granularité fine)
+    "remove": cmd_remove,  # supprime UNE couche + sa clôture (inverse de next, ADR 0054)
     "destroy": cmd_destroy,  # calque `pulumi destroy`
     # Groupes noun-verb (annexe rangée) : artefacts dérivés/constatés + épreuves.
     "artifact": cmd_artifact,
@@ -2318,6 +2348,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "  stack       choisir/créer/lister les configurations (new·ls·select·validate)\n"
             "  preview     voir l'état sans rien changer (voulu / réel / à monter)\n"
             "  next        monter UNE couche : la prochaine qui manque\n"
+            "  remove      supprimer UNE couche (et ses dépendantes) — inverse de next\n"
             "  up          construire le cluster en entier (machines + couches)\n"
             "  destroy     supprimer les machines (VMs) de la stack active\n"
             "\n"
@@ -2560,6 +2591,27 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_next.add_argument(
         "--yes", action="store_true", help="monter sans demander confirmation (requis hors TTY)"
+    )
+
+    p_remove = sub.add_parser(
+        "remove",
+        help="supprimer UNE couche et ses dépendantes (inverse de next, DESTRUCTIF banc)",
+    )
+    p_remove.add_argument(
+        "--phase",
+        required=True,
+        choices=list(_roundtrip.KNOWN_PHASES),
+        help="couche à supprimer (sa clôture descendante est retirée avec elle)",
+    )
+    p_remove.add_argument(
+        "--full",
+        action="store_true",
+        help="autoriser une clôture de STOCKAGE (ceph/sc/datalake → ≈ démontage du socle)",
+    )
+    p_remove.add_argument(
+        "--yes",
+        action="store_true",
+        help="supprimer sans demander confirmation (requis hors TTY)",
     )
 
     p_met = artifact_sub.add_parser(

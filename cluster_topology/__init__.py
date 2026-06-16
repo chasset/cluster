@@ -55,7 +55,12 @@ from cluster_topology.plan import (
 )
 from cluster_topology.profile import consumes_storage, derive_run_params
 from cluster_topology.refresh import RefreshState, classify_refresh
-from cluster_topology.roundtrip import RoundtripResult, run_roundtrip
+from cluster_topology.roundtrip import (
+    RemoveResult,
+    RoundtripResult,
+    run_remove,
+    run_roundtrip,
+)
 from cluster_topology.scaffold import (
     QUESTION_LB_MODE,
     QUESTIONS,
@@ -115,6 +120,8 @@ __all__ = [
     "format_metrics",
     "RoundtripResult",
     "run_roundtrip",
+    "RemoveResult",
+    "run_remove",
     "RefreshState",
     "classify_refresh",
     "InitPlan",

@@ -726,8 +726,8 @@ workers:
 
         self.launched = []
         orig_lp = cli._runner.launch_phase
-        cli._runner.launch_phase = lambda *a, **k: self.launched.append(a) or RunResult(
-            rc=0, status="successful"
+        cli._runner.launch_phase = lambda *a, **k: (
+            self.launched.append(a) or RunResult(rc=0, status="successful")
         )
         self.addCleanup(setattr, cli._runner, "launch_phase", orig_lp)
         # Une topo lima vise `_BENCH_INVENTORY` : on y écrit un inventaire CONTAMINÉ par
@@ -779,9 +779,7 @@ workers:
         hist = _tmp("runs: []\n")
         self.addCleanup(os.unlink, topo)
         self.addCleanup(os.unlink, hist)
-        code, _, _ = _capture(
-            ["next", "-f", topo, "--target", "atlas", "--history", hist, "--yes"]
-        )
+        code, _, _ = _capture(["next", "-f", topo, "--target", "atlas", "--history", hist, "--yes"])
         self.assertEqual(code, 0)
         self.assertEqual(len(self.launched), 1)  # lancé — sur le banc, pas la prod
         # l'inventaire passé à launch_phase est bien celui du BANC
@@ -1856,6 +1854,70 @@ target_kind: lima
         self.assertEqual(code, 0)
         self.assertIn("annulé", err)
         self.assertEqual(self._read(path), before)
+
+
+class Remove(unittest.TestCase):
+    """`remove` : supprime une couche via run_remove (délégué à run-phases.sh rollback)."""
+
+    def test_unknown_phase_is_argparse_usage(self):
+        with self.assertRaises(SystemExit) as ctx:
+            cli.main(["remove", "--phase", "frobnicate"])
+        self.assertEqual(ctx.exception.code, 2)  # argparse refuse le choix
+
+    def test_phase_required(self):
+        with self.assertRaises(SystemExit) as ctx:
+            cli.main(["remove"])
+        self.assertEqual(ctx.exception.code, 2)
+
+    def test_delegates_to_run_remove_and_maps_rc(self):
+        # Stub run_remove (la logique est testée dans test_roundtrip) : on couvre le
+        # dispatch + le mapping de code de la façade.
+        from cluster_topology.roundtrip import RemoveResult, RoundtripStep
+
+        captured = {}
+
+        def fake(phase, *, allow_full, assume_yes):
+            captured.update(phase=phase, allow_full=allow_full, assume_yes=assume_yes)
+            return RemoveResult(
+                phase=phase,
+                layers=[phase],
+                steps=[RoundtripStep("supprimer", True), RoundtripStep("vérifier supprimé", True)],
+            )
+
+        orig = cli._roundtrip.run_remove
+        cli._roundtrip.run_remove = fake
+        self.addCleanup(setattr, cli._roundtrip, "run_remove", orig)
+        code, out, _ = _capture(["remove", "--phase", "monitoring", "--yes"])
+        self.assertEqual(code, 0)
+        self.assertEqual(captured, {"phase": "monitoring", "allow_full": False, "assume_yes": True})
+        self.assertIn("couche supprimée", out)
+
+    def test_incomplete_removal_is_rc1(self):
+        from cluster_topology.roundtrip import RemoveResult, RoundtripStep
+
+        def fake(phase, *, allow_full, assume_yes):
+            return RemoveResult(
+                phase=phase, layers=[phase], steps=[RoundtripStep("supprimer", False)]
+            )
+
+        orig = cli._roundtrip.run_remove
+        cli._roundtrip.run_remove = fake
+        self.addCleanup(setattr, cli._roundtrip, "run_remove", orig)
+        code, out, _ = _capture(["remove", "--phase", "monitoring", "--yes"])
+        self.assertEqual(code, 1)
+        self.assertIn("INCOMPLÈTE", out)
+
+    def test_storage_opt_in_error_is_usage(self):
+        # run_remove lève RoundtripError (clôture stockage sans --full) → usage (2).
+        def boom(phase, *, allow_full, assume_yes):
+            raise cli._roundtrip.RoundtripError("clôture de stockage — exiger --full")
+
+        orig = cli._roundtrip.run_remove
+        cli._roundtrip.run_remove = boom
+        self.addCleanup(setattr, cli._roundtrip, "run_remove", orig)
+        code, _, err = _capture(["remove", "--phase", "ceph", "--yes"])
+        self.assertEqual(code, 2)
+        self.assertIn("--full", err)
 
 
 class Dispatch(unittest.TestCase):
