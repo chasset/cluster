@@ -520,6 +520,22 @@ runs:
 class Next(unittest.TestCase):
     """`next` : applique LA prochaine couche manquante via runner (1er drift)."""
 
+    def setUp(self):
+        # `cmd_next` constate le RÉEL (VMs/nœuds) pour ne pas se fier au seul historique
+        # (sinon il sauterait `up`/`bootstrap` sur un banc détruit). Par défaut on simule
+        # un SOCLE PRÉSENT : TOUTES les VMs de _EXAMPLE existent + un nœud Ready → up &
+        # bootstrap considérés faits (observed_done_phases), et les tests de couches
+        # applicatives fonctionnent. Les tests du socle re-stubent vide via _set_real.
+        all_vms = ["cp1", "node1", "node2", "node3"]  # nœuds de socle.example
+        self._set_real(vms=all_vms, ready=["cp1"])
+
+    def _set_real(self, *, vms, ready):
+        orig_vms, orig_ready = cli._real_vms, cli._ready_nodes
+        cli._real_vms = lambda: vms
+        cli._ready_nodes = lambda: ready
+        self.addCleanup(setattr, cli, "_real_vms", orig_vms)
+        self.addCleanup(setattr, cli, "_ready_nodes", orig_ready)
+
     _EMPTY_HIST = "runs: []\n"
     # Historique frais où le socle Ceph est joué → la 1re couche manquante de
     # cluster-dataops est `datalake` (qui A un playbook unitaire, donc applicable).
@@ -603,13 +619,13 @@ runs:
         )
         self.assertEqual(code, 1)  # run KO → code 1
 
-    def test_upstream_phase_delegates_to_socle(self):
-        # Phase AMONT (up/bootstrap, depuis un historique vide) : pas de play unitaire,
-        # mais `next` la RÉALISE en déléguant au socle via run-phases.sh (cohérence avec
-        # preview : next fait toujours « la prochaine étape », VMs comprises). On stube
-        # le subprocess pour vérifier l'argv `run-phases.sh socle` (code 0).
+    def test_upstream_phase_up_delegates_to_run_phases_up(self):
+        # PAS de banc (aucune VM) → `next` propose `up` (créer les VMs SEULES, comme le
+        # PLAN de preview) et délègue à l'arm `run-phases.sh up` — PAS `socle` (qui
+        # monterait tout). Phase par phase : au next suivant, ce serait `bootstrap`.
         import subprocess as sp
 
+        self._set_real(vms=[], ready=[])  # banc inexistant → up est la 1re phase
         calls = []
 
         def fake_run(argv, **kw):
@@ -625,12 +641,12 @@ runs:
             ["next", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist, "--yes"]
         )
         self.assertEqual(code, 0)
-        # un appel run-phases.sh socle a bien été émis
+        # un appel `run-phases.sh up` (VMs seules), PAS `socle` (tout le socle)
         self.assertTrue(
-            any("run-phases.sh" in str(a) and "socle" in a for a in calls),
-            f"attendu un appel `run-phases.sh socle`, vu : {calls}",
+            any("run-phases.sh" in str(a) and a[-1] == "up" for a in calls),
+            f"attendu un appel `run-phases.sh up`, vu : {calls}",
         )
-        self.assertIn("socle", out)
+        self.assertFalse(any("socle" in a for a in calls), "ne doit PAS appeler `socle`")
 
     def test_refuses_without_yes_off_tty(self):
         # Hors TTY sans --yes : la confirmation refuse → code 2, RIEN n'est monté.

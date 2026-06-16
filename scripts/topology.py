@@ -1532,6 +1532,15 @@ def cmd_next(args: argparse.Namespace) -> int:
     run = _run_for_target(runs, target)
     etat_frais, _ = verdict_for_run(run, target, now)
     done = set(run.phases) if run is not None else set()
+    # Le RÉEL prime sur l'historique (même logique que `preview`, ADR 0052/0056 §7) :
+    # un vieux run consigne `up`/`bootstrap`, mais si les VMs ont été détruites, ces
+    # phases ne sont PLUS faites. On RESTREINT `done` aux phases socle réellement
+    # observées (VMs présentes / nœud Ready) — sans ça, `next` saute la création des
+    # VMs et propose `storage-simple` sur un banc inexistant. `next` respecte ainsi le
+    # PLAN de `preview` (qui fait ce même calcul).
+    declared = topo.control_nodes + topo.worker_nodes
+    observed_socle = observed_done_phases(declared, _real_vms(), _ready_nodes())
+    done -= {"up", "bootstrap"} - observed_socle  # retire le socle que le réel CONTREDIT
     run_params = derive_run_params(topo)
     try:
         sugg = suggest_next(topo, target, done, etat_frais, run_params=run_params)
@@ -1546,36 +1555,39 @@ def cmd_next(args: argparse.Namespace) -> int:
     # déclenchent un montage de socle complet). --yes saute (CI/non-TTY) ; hors TTY
     # sans --yes, _confirm renvoie le défaut (False) → on refuse plutôt que d'agir
     # à l'aveugle. Le libellé dit CE qui va être monté.
-    quoi = (
-        "le socle (VMs + Kubernetes + CNI)"
-        if sugg.phase in ("up", "bootstrap")
-        else f"la couche `{sugg.phase}`"
-    )
+    # Libellé de CE qui va être monté — `next` distingue les phases comme `preview` :
+    # `up` = créer les VMs SEULES, `bootstrap` = Kubernetes + CRI + CNI (pas tout le
+    # socle d'un coup ; ça, c'est `up` complet). Une couche applicative sinon.
+    _libelles_amont = {
+        "up": "créer les VMs",
+        "bootstrap": "monter Kubernetes (CRI + kubeadm + CNI Cilium)",
+    }
+    quoi = _libelles_amont.get(sugg.phase, f"la couche `{sugg.phase}`")
     no_input = args.yes or not sys.stdin.isatty()
-    if not _confirm(f"Monter {quoi} ?", default=args.yes, no_input=no_input):
+    if not _confirm(f"{quoi[0].upper()}{quoi[1:]} ?", default=args.yes, no_input=no_input):
         print("montage annulé.", file=sys.stderr)
         return 2
 
-    # Phases AMONT (up = créer les VMs, bootstrap = socle k8s + CNI) : pas de playbook
-    # unitaire — elles relèvent du provisioning bash (limactl, cni.sh, ADR 0049). `next`
-    # les RÉALISE quand même, en déléguant au socle via run-phases.sh (cohérence : next
-    # fait toujours « la prochaine étape de preview », VMs comprises). Le socle provisionne
-    # les VMs ET monte k8s+CNI ensemble (des VMs sans k8s ne servent à rien) ; un nœud
-    # déjà Ready le rend idempotent. Au `next` suivant, la 1re couche applicative se monte.
+    # Phases AMONT (`up` = créer les VMs, `bootstrap` = k8s + CRI + CNI) : pas de
+    # playbook unitaire — elles relèvent du provisioning bash (limactl, cni.sh, ADR
+    # 0049). `next` les RÉALISE UNE PAR UNE en déléguant à l'arm run-phases.sh du MÊME
+    # nom (`up`/`bootstrap` sont deux arms distincts) — cohérence stricte avec le PLAN
+    # de `preview` : un `next` = exactement une phase de la séquence. Au `next` suivant,
+    # la phase d'après (bootstrap, puis la 1re couche applicative) se monte.
     if sugg.phase in ("up", "bootstrap"):
-        _assert_bench_target("cluster next (socle)")
+        _assert_bench_target(f"cluster next ({sugg.phase})")
         stack_name = topo.catalog.get("topology", "—")
         runphases = os.path.join(_ROOT, "bench", "lima", "run-phases.sh")
-        print(f"→ {sugg.phase} : montage du socle (VMs + Kubernetes + CNI) via run-phases.sh…")
+        print(f"→ {sugg.phase} : {quoi} via run-phases.sh…")
         rc = subprocess.run(  # noqa: S603 — chemin codé, env dérivé d'une topo validée
-            ["bash", runphases, "socle"],
+            ["bash", runphases, sugg.phase],
             check=False,
             env=_runphases_env(topo, stack_name),
         ).returncode
         if rc != 0:
-            print(f"échec du montage du socle (rc={rc}).", file=sys.stderr)
+            print(f"échec de la phase `{sugg.phase}` (rc={rc}).", file=sys.stderr)
             return 1
-        print(f"✓ socle monté — relancer `next` pour la couche suivante ({stack_name}).")
+        print(f"✓ `{sugg.phase}` terminée — relancer `next` pour l'étape suivante ({stack_name}).")
         return 0
     # Toute autre phase sans playbook unitaire (cas théorique) reste une erreur d'usage.
     if sugg.playbook is None:
