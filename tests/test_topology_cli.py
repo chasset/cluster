@@ -375,12 +375,17 @@ runs:
 
     def setUp(self):
         # Stub de l'I/O réelle (limactl/kubectl) : les tests preview NE dépendent PAS
-        # du banc réel. Sans VM réelle, pas d'orphelin parasite dans la sortie.
+        # du banc réel. Sans VM réelle, pas d'orphelin parasite dans la sortie. On stube
+        # AUSSI `_observed_layers` (sondes santé kubectl) → aucune couche applicative vue
+        # « saine » par défaut : sinon le test dépend d'un banc en cours de montage.
         self._orig_vms, self._orig_ready = cli._real_vms, cli._ready_nodes
+        self._orig_obs = cli._observed_layers
         cli._real_vms = lambda: []
         cli._ready_nodes = lambda: []
+        cli._observed_layers = lambda phases: set()
         self.addCleanup(setattr, cli, "_real_vms", self._orig_vms)
         self.addCleanup(setattr, cli, "_ready_nodes", self._orig_ready)
+        self.addCleanup(setattr, cli, "_observed_layers", self._orig_obs)
 
     def test_three_sections_voulu_reel_plan(self):
         # preview absorbe status (VOULU) + refresh (RÉEL) : les 3 sections présentes.
@@ -447,7 +452,11 @@ runs:
         self.assertIn("CRI containerd", out)
 
     def test_shows_full_sequence_with_labels(self):
-        # Historique frais partiel → socle à-jour, queue à installer ; libellés MÉTIER.
+        # Historique frais ET socle RÉELLEMENT présent (VMs + nœud Ready) → socle à-jour,
+        # queue à installer ; libellés MÉTIER. Le RÉEL doit confirmer le socle, pas
+        # seulement l'historique (sinon « ✓ à-jour » mentirait, cf. le bug VMs détruites).
+        cli._real_vms = lambda: ["cp1", "node1", "node2", "node3"]  # nœuds de _EXAMPLE
+        cli._ready_nodes = lambda: ["cp1"]
         hist = _tmp(self._SOCLE_FRESH)
         self.addCleanup(os.unlink, hist)
         code, out, _ = _capture(
@@ -455,9 +464,29 @@ runs:
         )
         self.assertEqual(code, 0)
         self.assertIn("créer les VMs", out)  # libellé métier de `up`
-        self.assertIn("à-jour", out)  # socle joué
+        self.assertIn("à-jour", out)  # socle joué ET réel le confirme
         self.assertIn("à installer", out)  # queue
         self.assertIn("datalake", out)  # libellé de queue présent (plan complet)
+
+    def test_fresh_socle_history_but_no_vms_is_all_a_installer(self):
+        # Régression (bug vécu) : historique socle FRAIS mais VMs DÉTRUITES (limactl vide) →
+        # le plan NE doit PAS afficher « ✓ créer les VMs à-jour » ni « ✓ ceph à-jour ». Le
+        # réel prime : socle absent → TOUTE la séquence « à installer ». preview == next.
+        cli._real_vms = lambda: []  # aucune VM (banc détruit)
+        cli._ready_nodes = lambda: []
+        hist = _tmp(self._SOCLE_FRESH)
+        self.addCleanup(os.unlink, hist)
+        code, out, _ = _capture(
+            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
+        )
+        self.assertEqual(code, 0)
+        # aucune couche du PLAN n'est « à-jour » (lignes commençant par ✓).
+        plan_lines = [ln for ln in out.splitlines() if ln.strip().startswith(("✓", "+"))]
+        self.assertTrue(plan_lines)  # le plan est bien affiché
+        self.assertFalse(
+            [ln for ln in plan_lines if ln.strip().startswith("✓")],
+            "aucune couche ne doit être à-jour quand les VMs n'existent pas",
+        )
 
     def test_never_run_is_a_installer_not_rejeu(self):
         # Stack jamais montée (historique vide) → « à installer » (inédit), PAS « rejeu ».

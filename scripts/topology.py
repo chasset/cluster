@@ -1875,15 +1875,25 @@ def cmd_preview(args: argparse.Namespace) -> int:
     run = last_run_for_topology(runs, stack_name)
     freshness, _ = verdict_for_run(run, resolved_target, now)
     done = set(run.phases) if run is not None else set()
+    observed_socle = observed_done_phases(declared, real.vms_present, real.nodes_ready)
+    # Le RÉEL PRIME (ADR 0052/0056 §7) — dans LES DEUX SENS, comme `cmd_next` (sinon preview
+    # CONTREDIT next). Un vieux run consigne `up`/`bootstrap` et peut être « frais », mais si
+    # les VMs ont été DÉTRUITES (limactl vide), ces phases ne sont PLUS faites : on RESTREINT
+    # `done` au socle que le réel CONFIRME, AVANT diff_phases — sinon le plan affiche « ✓ créer
+    # les VMs (à-jour) » alors que `VMs présentes : —` (bug vécu : banc Ceph jamais monté).
+    done -= {"up", "bootstrap"} - observed_socle
+    # COHÉRENCE DE DÉPENDANCE : rien ne tient au-dessus d'un socle absent. Si `up` n'est pas
+    # fait (VMs à créer), AUCUNE couche aval ne peut l'être (pas de cluster) — l'historique
+    # frais ment alors sur ceph/sc/… On vide `done` de tout sauf le socle réellement observé,
+    # sinon le plan affiche l'absurde « VMs à créer MAIS ceph à-jour ».
+    if "up" not in done:
+        done &= observed_socle
     a_appliquer = set(diff_phases(seq, done, freshness))
-    # Le RÉEL PRIME sur l'absence de trace (ADR 0052/0056 §7) : un cluster qui TOURNE
-    # ne « s'installe » pas, même si l'historique ne le matche pas (run non consigné /
-    # ancien label de topologie). On retire les phases socle (up/bootstrap) observées
-    # faites du RÉEL, ET les couches applicatives PROUVÉES SAINES sur le banc (dernier
+    # ET pour les couches applicatives : on retire celles PROUVÉES SAINES sur le banc (dernier
     # maillon Ready : Loki pour monitoring, argocd-server pour gitops…). « Sain », pas
-    # « namespace présent » : une couche posée à MOITIÉ (ns créé mais Loki absent)
-    # RESTE « à installer » — sinon un montage échoué à mi-chemin s'afficherait « ✓ ».
-    a_appliquer -= observed_done_phases(declared, real.vms_present, real.nodes_ready)
+    # « namespace présent » : une couche posée à MOITIÉ (ns créé mais Loki absent) RESTE « à
+    # installer » — sinon un montage échoué à mi-chemin s'afficherait « ✓ ».
+    a_appliquer -= observed_socle
     a_appliquer -= _observed_layers([p for p in seq if p in a_appliquer])
     # jamais monté ≠ rejeu : `jamais` (aucun run de la stack) → « à installer » (inédit) ;
     # `perime` (run existant mais plus frais) → « à rejouer ».
