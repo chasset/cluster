@@ -2380,6 +2380,59 @@ class Remove(unittest.TestCase):
         self.assertEqual(sorted(finalized), ["dagster", "postgres"])
 
 
+class NodeExec(unittest.TestCase):
+    """ADR 0081 : `_node_exec` exécute sur un nœud, transport résolu de l'inventaire."""
+
+    _LIMA_INV = (
+        "cloud:\n"
+        "  vars:\n    ansible_user: lima\n    target_kind: lima\n"
+        "control:\n  hosts:\n    node1:\n      ansible_host: lima-node1\n"
+    )
+    _PROD_INV = (
+        "cloud:\n"
+        "  vars:\n    ansible_user: debian\n    target_kind: prod\n"
+        "control:\n  hosts:\n    cp1:\n      ansible_host: 10.0.0.11\n"
+    )
+
+    def _capture_cmd(self, inv_text, node):
+        # stub subprocess.run dans le module CLI → capte l'argv sans rien exécuter.
+        captured = {}
+
+        class _CP:
+            returncode = 0
+            stdout = "ok"
+            stderr = ""
+
+        def fake_run(cmd, **kw):
+            captured["cmd"] = cmd
+            return _CP()
+
+        orig = cli.subprocess.run
+        cli.subprocess.run = fake_run
+        self.addCleanup(setattr, cli.subprocess, "run", orig)
+        path = _tmp(inv_text)
+        self.addCleanup(os.unlink, path)
+        cli._node_exec(node, ["hostname"], inventory_path=path)
+        return captured["cmd"]
+
+    def test_lima_node_uses_limactl(self):
+        cmd = self._capture_cmd(self._LIMA_INV, "node1")
+        self.assertEqual(cmd[:3], ["limactl", "shell", "lima-node1"])
+        self.assertEqual(cmd[-1], "hostname")
+
+    def test_prod_node_uses_ssh_with_user_host(self):
+        cmd = self._capture_cmd(self._PROD_INV, "cp1")
+        self.assertEqual(cmd[0], "ssh")
+        self.assertIn("debian@10.0.0.11", cmd)
+        self.assertEqual(cmd[-1], "hostname")
+
+    def test_unknown_node_is_usage_error(self):
+        path = _tmp(self._PROD_INV)
+        self.addCleanup(os.unlink, path)
+        with self.assertRaises(cli._UsageError):
+            cli._node_exec("ghost", ["hostname"], inventory_path=path)
+
+
 class Dispatch(unittest.TestCase):
     def test_unknown_command_is_usage(self):
         with self.assertRaises(SystemExit) as ctx:

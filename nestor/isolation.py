@@ -19,6 +19,8 @@ hôtes ne sont pas tous locaux, est traité comme NON-banc (fail-closed).
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 # Marqueurs d'un hôte LOCAL (banc piloté depuis le poste, pas de SSH distant). Un
 # inventaire dont TOUS les hôtes distants sont locaux ne peut pas muter une prod.
 _LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
@@ -102,3 +104,81 @@ def classify_inventory_target(inventory: dict, intended_kind: str) -> tuple[bool
         f"inventaire target_kind={declared} ≠ intention {intended_kind} ; "
         f"hôtes distants ({hosts_str}) — risque de muter la mauvaise cible",
     )
+
+
+# ── Résolution d'une CIBLE node-side depuis l'inventaire (ADR 0081, socle node_exec) ────
+# Le MÊME inventaire qui sert la garde d'isolation (ci-dessus) sert à résoudre, pour un
+# nœud logique, COMMENT l'atteindre : transport (limactl pour le banc Lima, SSH pour la
+# prod) + hôte + user + args SSH. Source UNIQUE (pas de 2e liste de nœuds, ADR 0053/0081).
+# PUR : la façade lit le YAML et exécute ; ici on ne fait que CLASSER un dict déjà chargé.
+
+
+@dataclass(frozen=True)
+class NodeTarget:
+    """Comment atteindre un nœud (PUR) : transport + coordonnées, pour la brique node_exec."""
+
+    node: str
+    transport: str  # "lima" (limactl shell) | "ssh" (ssh direct)
+    host: str  # ansible_host (lima-<vm> en banc ; IP/hostname en prod) ; repli = nom du nœud
+    user: str | None = None  # ansible_user (lima | debian…) — None si non déclaré
+    ssh_args: str | None = None  # ansible_ssh_common_args (ex. -F ~/.lima/<vm>/ssh.config)
+
+
+class IsolationError(ValueError):
+    """Nœud introuvable dans l'inventaire, ou inventaire sans cible résoluble."""
+
+
+def _find_host_attrs(inventory: dict, node: str) -> dict | None:
+    """Attributs (`ansible_host`/`ansible_user`…) du nœud `node`, cherchés dans tout l'arbre
+    de groupes (`hosts:` à n'importe quel niveau). None si le nœud n'existe pas (PUR)."""
+    found: dict | None = None
+    seen: set[int] = set()
+
+    def walk(grp) -> None:
+        nonlocal found
+        if found is not None or not isinstance(grp, dict) or id(grp) in seen:
+            return
+        seen.add(id(grp))
+        hosts = grp.get("hosts")
+        if isinstance(hosts, dict) and node in hosts:
+            found = hosts[node] or {}
+            return
+        for child in (grp.get("children") or {}).values():
+            walk(child)
+
+    for value in inventory.values():
+        walk(value)
+    return found
+
+
+def resolve_node_target(inventory: dict, node: str) -> NodeTarget:
+    """Résout `node` → `NodeTarget` depuis l'inventaire (PUR, ADR 0081).
+
+    Le transport est DÉRIVÉ du `target_kind` de l'inventaire : `lima` → `limactl shell`
+    (le banc n'utilise pas SSH brut), sinon `ssh` direct. Coordonnées prises sur l'hôte
+    (`ansible_host`/`ansible_user`/`ansible_ssh_common_args`) ; `user` remonte en repli des
+    vars du groupe `cloud`/`all` (où l'inventaire pose `ansible_user`). Lève `IsolationError`
+    si le nœud est absent (fail-closed : on ne devine pas une cible)."""
+    attrs = _find_host_attrs(inventory, node)
+    if attrs is None:
+        raise IsolationError(f"nœud `{node}` absent de l'inventaire")
+    transport = "lima" if _inventory_target_kind(inventory) == "lima" else "ssh"
+    user = attrs.get("ansible_user") or _group_var(inventory, "ansible_user")
+    return NodeTarget(
+        node=node,
+        transport=transport,
+        host=str(attrs.get("ansible_host", node)),
+        user=str(user) if user else None,
+        ssh_args=attrs.get("ansible_ssh_common_args"),
+    )
+
+
+def _group_var(inventory: dict, key: str) -> str | None:
+    """Valeur d'une var au niveau groupe `cloud` puis `all` (repli), ou None (PUR)."""
+    for group in ("cloud", "all"):
+        node = inventory.get(group)
+        if isinstance(node, dict):
+            val = node.get("vars", {}).get(key)
+            if val:
+                return str(val)
+    return None
