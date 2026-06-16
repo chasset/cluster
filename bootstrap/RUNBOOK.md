@@ -222,8 +222,8 @@ Exemple pour `cp1` :
 auto ens10f0np0
 iface ens10f0np0 inet static
     address 10.0.0.11/22
-    gateway 10.67.0.1          # à adapter : passerelle réelle du /22
-    dns-nameservers 10.67.0.1  # à adapter : résolveur(s) DNS
+    gateway 10.0.0.1           # à adapter : passerelle réelle du /22
+    dns-nameservers 10.0.0.1   # à adapter : résolveur(s) DNS
 ```
 
 Appliquer avec `sudo systemctl restart networking` (ou au redémarrage).
