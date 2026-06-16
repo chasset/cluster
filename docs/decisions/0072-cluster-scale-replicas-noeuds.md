@@ -36,11 +36,11 @@ Deux modélisations s'affrontent.
    ([ADR 0069](0069-topology-layers-dag-grain-phase.md)). Une couche est un
    ENSEMBLE ordonné par le graphe de dépendances atomique (`rollback-lib.sh`,
    ADR 0066), montée une fois, idempotente, **dérivée du déclaré**
-   (`declared_layers`, `cluster_topology/model.py:91-100`). Le nombre de
-   replicas « bon » dépend du nombre de **workers Ready au runtime** — une
-   donnée du RÉEL, pas du DAG. Mettre `scale` dans le DAG, ce serait y injecter
-   une valeur qui change entre deux `kubectl get nodes` : mauvais fit (un DAG
-   ordonne des briques déclarées, il ne lit pas le cluster).
+   (`declared_layers`, `nestor/model.py:91-100`). Le nombre de replicas « bon »
+   dépend du nombre de **workers Ready au runtime** — une donnée du RÉEL, pas du
+   DAG. Mettre `scale` dans le DAG, ce serait y injecter une valeur qui change
+   entre deux `kubectl get nodes` : mauvais fit (un DAG ordonne des briques
+   déclarées, il ne lit pas le cluster).
 
 2. **Le scaling comme COMMANDE** `cluster scale`, façade fine au-dessus de
    `_ready_nodes()`, qui DÉRIVE une cible de replicas du réel et l'applique.
@@ -134,9 +134,9 @@ de **runtime** (lit le réel, ajuste un compte), distinct du cycle déclaratif
 `scale` est un **verbe top-level** du cycle de vie (à côté de
 `preview`/`up`/`next`/`destroy`, `_DISPATCH` `topology.py:1392-1407`), routé par
 une `cmd_scale` façade fine. La logique pure (dérivation cible = f(workers
-Ready, allowlist), clamp, exclusions) vit dans le paquet `cluster_topology/`
-(ADR 0017/0056 §2 : la logique testable hors I/O), testée sans cluster ; la
-seule I/O réelle est `_ready_nodes()` + `kubectl scale`.
+Ready, allowlist), clamp, exclusions) vit dans le paquet `nestor/` (ADR
+0017/0056 §2 : la logique testable hors I/O), testée sans cluster ; la seule I/O
+réelle est `_ready_nodes()` + `kubectl scale`.
 
 ## Conséquences
 

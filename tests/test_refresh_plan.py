@@ -1,4 +1,4 @@
-"""Tests du plan de refresh (cluster_topology/refresh_plan.py, ADR 0076).
+"""Tests du plan de refresh (nestor/refresh_plan.py, ADR 0076).
 
 Pur : dicts en entrée (topo déclarée + réel sondé), RefreshPlan en sortie. Aucun
 cluster, aucun subprocess — la collecte (kubectl, via discover) est à la façade.
@@ -10,7 +10,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.refresh_plan import (  # noqa: E402
+from nestor.refresh_plan import (  # noqa: E402
     NodeChange,
     format_plan,
     plan_refresh,

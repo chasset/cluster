@@ -18,7 +18,7 @@ liste inline (`[a, b]`) ou absent. Si un cas sort de ces formes, `fuse_topology`
 
 from __future__ import annotations
 
-from cluster_topology.refresh_plan import RefreshPlan
+from nestor.refresh_plan import RefreshPlan
 
 
 class FuseError(ValueError):

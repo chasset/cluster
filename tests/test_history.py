@@ -1,4 +1,4 @@
-"""Tests de la lecture d'historique + fraîcheur (cluster_topology/history.py, P4).
+"""Tests de la lecture d'historique + fraîcheur (nestor/history.py, P4).
 
 unittest stdlib. Le test CRITIQUE est la PARITÉ Python↔bash : age_days /
 freshness_verdict / seuil_for_target doivent rendre le MÊME verdict que
@@ -15,7 +15,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.history import (  # noqa: E402
+from nestor.history import (  # noqa: E402
     age_days,
     freshness_verdict,
     last_run_for_target,

@@ -1,4 +1,4 @@
-"""Tests du module « que faire ensuite » (cluster_topology/plan.py, P5).
+"""Tests du module « que faire ensuite » (nestor/plan.py, P5).
 
 unittest stdlib, fixtures pures (Topology + done/freshness en paramètres) — aucun
 subprocess, aucun réseau. Vérifie que la séquence de phases est une transcription
@@ -12,8 +12,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.model import topology_from_dict  # noqa: E402
-from cluster_topology.plan import (  # noqa: E402
+from nestor.model import topology_from_dict  # noqa: E402
+from nestor.plan import (  # noqa: E402
     PHASE_PLAYBOOK,
     PlanError,
     default_target,

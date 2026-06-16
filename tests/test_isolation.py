@@ -1,4 +1,4 @@
-"""Tests de la garde d'isolation de cible Ansible (cluster_topology/isolation.py, ADR 0053).
+"""Tests de la garde d'isolation de cible Ansible (nestor/isolation.py, ADR 0053).
 
 Pur : dict d'inventaire + intention → verdict. Reproduit la FAILLE constatée (intention
 banc `lima` sur un inventaire prod → REFUS) et les cas sûrs. Valeurs génériques (ADR
@@ -11,7 +11,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.isolation import classify_inventory_target  # noqa: E402
+from nestor.isolation import classify_inventory_target  # noqa: E402
 
 # Inventaire PROD (forme de bootstrap/hosts.yaml) : groupe cloud, target_kind prod,
 # hôtes génériques cp1/node1-3 (ADR 0023) + un control_host localhost.

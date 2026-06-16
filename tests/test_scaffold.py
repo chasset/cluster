@@ -1,4 +1,4 @@
-"""Tests du module PUR de création de topologie (cluster_topology/scaffold.py).
+"""Tests du module PUR de création de topologie (nestor/scaffold.py).
 
 unittest stdlib, fixtures pures (nom + réponses en dict) — aucun subprocess, aucune
 I/O. Vérifie les garde-fous du nom (anti `.example`, anti traversée), la construction
@@ -11,8 +11,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.model import load_topology, topology_from_dict  # noqa: E402
-from cluster_topology.scaffold import (  # noqa: E402
+from nestor.model import load_topology, topology_from_dict  # noqa: E402
+from nestor.scaffold import (  # noqa: E402
     ScaffoldError,
     build_topology_dict,
     plan_init,

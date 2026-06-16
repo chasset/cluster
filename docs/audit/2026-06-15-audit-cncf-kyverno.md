@@ -116,13 +116,13 @@ outil de plus.** ADR 0064 §4 impose un profil de stockage à la fois (alternati
 Tout le reste est écarté avec motif vérifié — l'intérêt de la trace est de
 montrer **qu'on a regardé** :
 
-| Famille                | Écarté (extrait)                                  | Raison vérifiée                                                                                                                                                     |
-| ---------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Autoscaling / coût     | Karpenter, KEDA, HPA, VPA, OpenCost               | Bare-metal à nœuds fixes ; scaling event-driven déjà natif Dagster ; FinOps écartée sciemment (ADR 0062) ; replicas←nœuds = `cluster_topology/scale.py` (ADR 0072). |
-| Packaging / templating | Helm-runtime, Kustomize, Helmfile, cdk8s, CUE     | Helm **déjà adopté** en `helm template` vendored-figé ; un 2ᵉ/3ᵉ moteur fragmenterait (ADR 0049).                                                                   |
-| Workflow / événements  | Argo Workflows/Events/Rollouts, Knative, NATS     | Doublon de Dagster (ADR 0026) ; pas de bus ni de serverless ; broker évité par choix (ADR 0041).                                                                    |
-| Résilience / tenant    | Chaos Mesh, Litmus, kube-bench, Capsule, vCluster | Chaos déjà maison (`test/scenarios/`, ADR 0025) ; multi-tenant = **non-goal** (ADR 0010/0012, conflit 0061 critère 1).                                              |
-| Storage / mesh         | MinIO, OpenEBS, Istio/Linkerd, Strimzi, KubeVirt  | S3 tranché (ADR 0036) ; mesh = Cilium (ADR 0019/0020) ; KubeVirt déjà supprimé (CHANGELOG v2.0.0).                                                                  |
+| Famille                | Écarté (extrait)                                  | Raison vérifiée                                                                                                                                           |
+| ---------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Autoscaling / coût     | Karpenter, KEDA, HPA, VPA, OpenCost               | Bare-metal à nœuds fixes ; scaling event-driven déjà natif Dagster ; FinOps écartée sciemment (ADR 0062) ; replicas←nœuds = `nestor/scale.py` (ADR 0072). |
+| Packaging / templating | Helm-runtime, Kustomize, Helmfile, cdk8s, CUE     | Helm **déjà adopté** en `helm template` vendored-figé ; un 2ᵉ/3ᵉ moteur fragmenterait (ADR 0049).                                                         |
+| Workflow / événements  | Argo Workflows/Events/Rollouts, Knative, NATS     | Doublon de Dagster (ADR 0026) ; pas de bus ni de serverless ; broker évité par choix (ADR 0041).                                                          |
+| Résilience / tenant    | Chaos Mesh, Litmus, kube-bench, Capsule, vCluster | Chaos déjà maison (`test/scenarios/`, ADR 0025) ; multi-tenant = **non-goal** (ADR 0010/0012, conflit 0061 critère 1).                                    |
+| Storage / mesh         | MinIO, OpenEBS, Istio/Linkerd, Strimzi, KubeVirt  | S3 tranché (ADR 0036) ; mesh = Cilium (ADR 0019/0020) ; KubeVirt déjà supprimé (CHANGELOG v2.0.0).                                                        |
 
 ## Note de gouvernance
 

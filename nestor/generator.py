@@ -13,7 +13,7 @@ import os
 
 from jinja2 import Environment, FileSystemLoader
 
-from cluster_topology.model import Topology
+from nestor.model import Topology
 
 _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 

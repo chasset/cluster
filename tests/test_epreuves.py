@@ -1,4 +1,4 @@
-"""Tests du catalogue d'épreuves + filtrage (cluster_topology/epreuves.py, P4).
+"""Tests du catalogue d'épreuves + filtrage (nestor/epreuves.py, P4).
 
 unittest stdlib. Couvre le filtrage par profil/backend/nœuds/offensif ET deux
 garde-fous de PARITÉ anti-dérive (ADR 0058) :
@@ -13,13 +13,13 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.epreuves import (  # noqa: E402
+from nestor.epreuves import (  # noqa: E402
     EPREUVES,
     TERRAIN_OFFENSIF,
     epreuve_jouable,
     filter_epreuves,
 )
-from cluster_topology.model import topology_from_dict  # noqa: E402
+from nestor.model import topology_from_dict  # noqa: E402
 
 _ROOT = os.path.join(os.path.dirname(__file__), "..")
 _SCENARIOS_DIR = os.path.join(_ROOT, "bench", "scenarios")

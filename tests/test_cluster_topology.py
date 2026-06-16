@@ -1,4 +1,4 @@
-"""Tests de l'outil déclaratif cluster_topology (ADR 0056 / ADR 0017).
+"""Tests de l'outil déclaratif nestor (ADR 0056 / ADR 0017).
 
 unittest (stdlib). Deux niveaux :
   - fonctions PURES (dérivations control/worker, validation) sur des dicts injectés ;
@@ -14,13 +14,13 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology import load_topology, render_prod_inventory  # noqa: E402
-from cluster_topology.generator import render_lima_inventory  # noqa: E402
-from cluster_topology.model import (  # noqa: E402
+from nestor import load_topology, render_prod_inventory  # noqa: E402
+from nestor.generator import render_lima_inventory  # noqa: E402
+from nestor.model import (  # noqa: E402
     TopologyError,
     topology_from_dict,
 )
-from cluster_topology.profile import (  # noqa: E402
+from nestor.profile import (  # noqa: E402
     consumes_storage,
     derive_osd_expected,
     derive_run_params,

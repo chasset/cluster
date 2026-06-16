@@ -1638,7 +1638,7 @@ phase_ha_cni() {
 }
 
 # NB : l'orchestration HA (bootstrap primaire, gates VIP/etcd, promotion des CP)
-# vit désormais en PYTHON (cluster_topology/ha.py via runner.launch_phase, ADR
+# vit désormais en PYTHON (nestor/ha.py via runner.launch_phase, ADR
 # 0063), déléguée par run_ha_3cp ; seuls le provisioning VM et la CNI (phase_ha_cni)
 # restent du bash ici (orchestration de CLI, ADR 0049).
 

@@ -79,15 +79,14 @@ diffs « gros consommateurs » à la main.
 
 **2.3 — Outil topologie (Python) — chemins par défaut & docstrings :**
 
-- [ ] `scripts/topology.py` (4), `cluster_topology/history.py` (3),
-      `cluster_topology/epreuves.py` (2), `cluster_topology/metrics.py` (1),
-      `cluster_topology/plan.py` (1), `cluster_topology/__init__.py` (1). ⚠️
-      Vérifier les **valeurs par défaut** de chemins (`test/lima/…`) — un défaut
-      oublié fausse silencieusement le runner.
+- [ ] `scripts/topology.py` (4), `nestor/history.py` (3), `nestor/epreuves.py`
+      (2), `nestor/metrics.py` (1), `nestor/plan.py` (1), `nestor/__init__.py`
+      (1). ⚠️ Vérifier les **valeurs par défaut** de chemins (`test/lima/…`) —
+      un défaut oublié fausse silencieusement le runner.
 
 **2.4 — Tests unitaires pytest (chemins en dur dans les assertions) :**
 
-- [ ] `tests/test_epreuves.py` (3), `tests/test_cluster_topology.py` (2),
+- [ ] `tests/test_epreuves.py` (3), `tests/test_nestor.py` (2),
       `tests/test_check_md_orphans.py` (2), `tests/test_parity.py` (1),
       `tests/test_history.py` (1). Ces fichiers **restent dans `tests/`** ;
       seules leurs chaînes `"test/…"` deviennent `"bench/…"`.
@@ -179,10 +178,10 @@ de lisibilité :
       `audit-log-baseline`, `rollback`, `state.sh`). L'ordre canonique
       d'exécution reste le RUNBOOK.
 - [ ] Une ligne dans `topologies/README.md` (ou `docs/`) clarifiant les **quatre
-      « topology »** : `cluster_topology/` (paquet, logique pure),
-      `scripts/topology.py` (façade CLI), `topologies/` (catalogue de données),
-      `topology.yaml` (symlink d'activation). Friction relevée à l'audit, hors
-      périmètre du renommage mais bon compagnon de PR.
+      « topology »** : `nestor/` (paquet, logique pure), `scripts/topology.py`
+      (façade CLI), `topologies/` (catalogue de données), `topology.yaml`
+      (symlink d'activation). Friction relevée à l'audit, hors périmètre du
+      renommage mais bon compagnon de PR.
 
 > **Pas** de préfixe numérique sur les playbooks, **pas** de déplacement en
 > sous-dossiers : ~60 références littérales (`plan.py`, banc, Justfile, tests,

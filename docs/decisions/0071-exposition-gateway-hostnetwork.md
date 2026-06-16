@@ -71,8 +71,8 @@ hostNetwork ne réclamant ni plage IP ni interface L2, c'est le plus
 
 ### 2. `hostport` et `lb-ipam` deviennent des alias de `gateway`
 
-`VALID_EXPOSITION_MODES = {"gateway", "none"}` (`cluster_topology/model.py`).
-Les anciens noms sont des **alias déprécié-doux** résolus à la lecture
+`VALID_EXPOSITION_MODES = {"gateway", "none"}` (`nestor/model.py`). Les anciens
+noms sont des **alias déprécié-doux** résolus à la lecture
 (`_EXPOSITION_ALIASES = {"lb-ipam": "gateway", "hostport": "gateway"}`), pour ne
 casser aucun `topology.yaml` existant :
 

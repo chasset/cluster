@@ -29,7 +29,7 @@ from __future__ import annotations
 import os
 import subprocess
 
-from cluster_topology.model import TopologyError
+from nestor.model import TopologyError
 
 _REPO = os.path.join(os.path.dirname(__file__), "..")
 _ROLLBACK_LIB = os.path.join(_REPO, "bench", "lima", "rollback-lib.sh")
@@ -171,7 +171,7 @@ def layers_from_profile(profile: str) -> list[str]:
     Un profil = le PRÉFIXE cumulatif de la chaîne jusqu'à lui. On renvoie les alias
     de ce préfixe (resolve_layers fera la fermeture/tri). Import LOCAL de
     required_profiles pour éviter un cycle profile↔layers."""
-    from cluster_topology.profile import required_profiles
+    from nestor.profile import required_profiles
 
     return list(required_profiles(profile))
 

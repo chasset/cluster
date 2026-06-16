@@ -86,8 +86,8 @@ tableau regroupe les playbooks par rôle, il ne prescrit pas la séquence.
 
 Quatre objets portent le mot _topology_, à ne pas confondre :
 
-- **`cluster_topology/`** — le paquet Python (logique pure : chargement,
-  dérivation, rendu d'une topologie).
+- **`nestor/`** — le paquet Python (logique pure : chargement, dérivation, rendu
+  d'une topologie).
 - **`scripts/topology.py`** — la façade CLI (l'outil `cluster`).
 - **`topologies/`** — le catalogue de données (les `*.example.yaml`).
 - **`topology.yaml`** — le symlink d'activation (gitignoré) qui désigne la

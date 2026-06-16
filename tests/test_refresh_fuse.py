@@ -1,4 +1,4 @@
-"""Tests de la fusion texte (cluster_topology/refresh_fuse.py, ADR 0076 §4).
+"""Tests de la fusion texte (nestor/refresh_fuse.py, ADR 0076 §4).
 
 Pur : texte source + plan → texte fusionné. On vérifie que SEULES les lignes des
 ajouts changent (commentaires/status/ordre préservés) et que la sortie reste un YAML
@@ -13,9 +13,9 @@ import yaml
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.model import topology_from_dict  # noqa: E402
-from cluster_topology.refresh_fuse import FuseError, fuse_topology  # noqa: E402
-from cluster_topology.refresh_plan import NodeChange, RefreshPlan  # noqa: E402
+from nestor.model import topology_from_dict  # noqa: E402
+from nestor.refresh_fuse import FuseError, fuse_topology  # noqa: E402
+from nestor.refresh_plan import NodeChange, RefreshPlan  # noqa: E402
 
 _SRC = """\
 # commentaire d'en-tête à préserver (ADR 0023).

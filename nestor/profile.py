@@ -13,12 +13,12 @@ l'outil en DÉDUIT, par des fonctions PURES :
      le banc ne versionne aucun group_vars de profil, tout part en `-e`).
 
 Aucune I/O ici : tout dérive d'une Topology (déjà chargée). Testé par
-tests/test_cluster_topology.py (ADR 0017).
+tests/test_nestor.py (ADR 0017).
 """
 
 from __future__ import annotations
 
-from cluster_topology.model import Topology, TopologyError
+from nestor.model import Topology, TopologyError
 
 # ── Inclusion cumulative des profils (ADR 0039) ─────────────────────────────
 # Chaque profil inclut les précédents. L'ordre EST le graphe de dépendances de

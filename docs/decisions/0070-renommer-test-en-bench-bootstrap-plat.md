@@ -17,7 +17,7 @@ deux natures de tests **totalement différentes** :
 | Dossier  | Contenu réel                                             | Nature             |
 | -------- | -------------------------------------------------------- | ------------------ |
 | `test/`  | Banc **Lima** end-to-end (shell, VMs, scénarios, spikes) | E2E / opérationnel |
-| `tests/` | 20 fichiers **pytest** du paquet `cluster_topology`      | unitaires Python   |
+| `tests/` | 20 fichiers **pytest** du paquet `nestor`                | unitaires Python   |
 
 `tests/` est la **convention Python standard** (découverte par
 `unittest discover -s tests`, `package.json`). C'est `test/` qui est mal nommé :
@@ -40,7 +40,7 @@ La tentation est de **déplacer les playbooks en sous-dossiers**
 un mauvais marché : les chemins `bootstrap/<playbook>.yaml` sont **codés en dur
 comme littéraux** dans des surfaces qui sont précisément les preuves du dépôt :
 
-- `cluster_topology/plan.py` — chaque `PhaseSpec` porte le chemin en littéral
+- `nestor/plan.py` — chaque `PhaseSpec` porte le chemin en littéral
   (`"bootstrap/ceph-cluster.yaml"`…), consommé par le runner P5 (ADR 0063) ;
 - le banc E2E — `test/lima/run-phases.sh`, `env.sh`, `metrology.sh` (≈ 22 refs)
   ;

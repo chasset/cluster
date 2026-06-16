@@ -149,12 +149,12 @@ def _signal_present(signal: list[str], *, api=None) -> list[str]:
     present: list[str] = []
     needs_api = any(s.startswith("ns/") for s in signal)
     if needs_api and api is None:
-        from cluster_topology import smoke
+        from nestor import smoke
 
         api = smoke._core_v1()
     for item in signal:
         if item.startswith("ns/"):
-            from cluster_topology import smoke
+            from nestor import smoke
 
             if smoke._ns_exists(api, item[3:]):
                 present.append(item)

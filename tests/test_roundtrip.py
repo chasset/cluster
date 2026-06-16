@@ -1,4 +1,4 @@
-"""Tests du round-trip par clôture de dépendances (cluster_topology/roundtrip.py).
+"""Tests du round-trip par clôture de dépendances (nestor/roundtrip.py).
 
 Pur/injecté : `run_phase`/`signal_present`/`confirm_fn` sont stubés — aucun banc,
 aucun cluster. Couvre le graphe de clôture, l'ordre destroy/rebuild, le garde-fou
@@ -14,7 +14,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology import roundtrip  # noqa: E402
+from nestor import roundtrip  # noqa: E402
 
 
 class Closure(unittest.TestCase):

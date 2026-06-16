@@ -23,7 +23,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from cluster_topology.model import Topology
+from nestor.model import Topology
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -146,7 +146,7 @@ _CEPH_PATHS = {"storage-real", "cluster-dataops", "atlas-ceph"}
 # « socle » n'est PAS up→bootstrap→storage mais l'amorçage HA (bootstrap du CP
 # primaire derrière la VIP + promotion des CP additionnels), porté par le chemin
 # nommé run-phases.sh ha-3cp qui DÉLÈGUE l'orchestration Ansible à Python
-# (cluster_topology/ha.py). On l'expose comme chemin connu (sélection via
+# (nestor/ha.py). On l'expose comme chemin connu (sélection via
 # default_target) avec sa séquence propre — pas un socle+tail.
 _HA_3CP_SEQUENCE = ["up", "bootstrap-ha", "join-cp", "storage-simple"]
 

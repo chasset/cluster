@@ -1,4 +1,4 @@
-"""Tests de la dérivation `topology.layers` (cluster_topology/layers.py, ADR 0069).
+"""Tests de la dérivation `topology.layers` (nestor/layers.py, ADR 0069).
 
 `resolve_layers` PROJETTE le graphe atomique réel de rollback-lib.sh (source unique
 ADR 0066) — on l'exerce donc CONTRE le vrai graphe (bash), pas un stub : c'est ce
@@ -12,12 +12,12 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.layers import (  # noqa: E402
+from nestor.layers import (  # noqa: E402
     layers_from_profile,
     phase_deps,
     resolve_layers,
 )
-from cluster_topology.model import TopologyError  # noqa: E402
+from nestor.model import TopologyError  # noqa: E402
 
 
 class ResolveLayersLocalPath(unittest.TestCase):

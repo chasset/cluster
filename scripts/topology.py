@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Façade CLI/CI de l'outil déclaratif des topologies (ADR 0056 §2, palier P3).
 
-Le paquet `cluster_topology/` porte la LOGIQUE PURE (chargement, validation,
+Le paquet `nestor/` porte la LOGIQUE PURE (chargement, validation,
 dérivation, rendu byte-identique) ; ce script n'est qu'une FAÇADE FINE par-dessus :
 il lit `argv`, appelle la surface publique du paquet, formate la sortie et mappe
 les exceptions en codes de sortie. Aucune logique de dérivation nouvelle ici
@@ -77,7 +77,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import yaml  # noqa: E402
 
-from cluster_topology import (  # noqa: E402
+from nestor import (  # noqa: E402
     QUESTION_LB_MODE,
     QUESTIONS,
     PlanError,
@@ -109,17 +109,17 @@ from cluster_topology import (  # noqa: E402
     suggest_next,
     verdict_for_run,
 )
-from cluster_topology import bootstrap as _bootstrap  # noqa: E402
-from cluster_topology import discover as _discover  # noqa: E402
-from cluster_topology import ha as _ha  # noqa: E402
-from cluster_topology import isolation as _isolation  # noqa: E402
-from cluster_topology import refresh_fuse as _refresh_fuse  # noqa: E402
-from cluster_topology import refresh_plan as _refresh_plan  # noqa: E402
-from cluster_topology import roundtrip as _roundtrip  # noqa: E402
-from cluster_topology import runner as _runner  # noqa: E402
-from cluster_topology import scale as _scale  # noqa: E402
-from cluster_topology import smoke as _smoke  # noqa: E402
-from cluster_topology.history import (  # noqa: E402
+from nestor import bootstrap as _bootstrap  # noqa: E402
+from nestor import discover as _discover  # noqa: E402
+from nestor import ha as _ha  # noqa: E402
+from nestor import isolation as _isolation  # noqa: E402
+from nestor import refresh_fuse as _refresh_fuse  # noqa: E402
+from nestor import refresh_plan as _refresh_plan  # noqa: E402
+from nestor import roundtrip as _roundtrip  # noqa: E402
+from nestor import runner as _runner  # noqa: E402
+from nestor import scale as _scale  # noqa: E402
+from nestor import smoke as _smoke  # noqa: E402
+from nestor.history import (  # noqa: E402
     last_run_for_target,
     last_run_for_topology,
     latest_run,
@@ -709,7 +709,7 @@ def _observed_layers(phases: list[str]) -> set[str]:
 
 # ── Sondes de `discover` (ADR 0074) : I/O kubectl irréductible (ADR 0049). Lisent
 #    le réel et le RÉDUISENT à des structures simples ; toute la logique (mapping,
-#    backend, exposition, santé) est PURE dans cluster_topology/discover.py.
+#    backend, exposition, santé) est PURE dans nestor/discover.py.
 
 
 def _discover_node_roles() -> list[dict]:
@@ -1491,7 +1491,7 @@ def cmd_refresh(args: argparse.Namespace) -> int:
     # On REVALIDE le résultat avant d'écrire (le fichier fusionné doit rester une topo
     # valide — sinon on n'écrit pas et on signale). Import local : topology_from_dict
     # n'est pas dans l'API du paquet, on le prend du modèle.
-    from cluster_topology.model import topology_from_dict
+    from nestor.model import topology_from_dict
 
     try:
         topology_from_dict(yaml.safe_load(fused))

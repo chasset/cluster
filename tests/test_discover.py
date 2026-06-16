@@ -1,4 +1,4 @@
-"""Tests de la reconstruction de topologie (cluster_topology/discover.py, ADR 0074).
+"""Tests de la reconstruction de topologie (nestor/discover.py, ADR 0074).
 
 INVERSE de `generate` : à partir de sondes du réel (dicts en entrée), `discover`
 assemble (1) une topologie déclarative, (2) l'INCONNU (jamais ignoré, ADR 0052),
@@ -12,7 +12,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.discover import (  # noqa: E402
+from nestor.discover import (  # noqa: E402
     ABSENT,
     DEGRADE,
     SAIN,
@@ -25,7 +25,7 @@ from cluster_topology.discover import (  # noqa: E402
     detect_exposition,
     detect_platforms,
 )
-from cluster_topology.model import topology_from_dict  # noqa: E402
+from nestor.model import topology_from_dict  # noqa: E402
 
 
 class ClassifyNamespaces(unittest.TestCase):

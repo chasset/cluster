@@ -727,7 +727,7 @@ pas un Job synthétique. Frontière ADR 0022/0045 respectée.
 Le harnais a aussi attrapé un runConfig invalide (`RunConfigValidationInvalid`
 remonté) avant correction — preuve qu'il valide bien le schéma du job.
 
-## Outil déclaratif `cluster_topology` — validation partielle sur banc vivant (P6, 2026-06-13)
+## Outil déclaratif `cluster_topology` (depuis renommé `nestor`) — validation partielle sur banc vivant (P6, 2026-06-13)
 
 Première confrontation de l'outil déclaratif
 ([ADR 0056](../../docs/decisions/0056-modele-declaratif-topologies.md), paliers

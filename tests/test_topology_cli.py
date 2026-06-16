@@ -3,7 +3,7 @@
 unittest stdlib (lancé par `pnpm test:python` = unittest discover -s tests). La
 CLI est conçue ARGV-INJECTABLE (`main(argv)`) : on appelle `main([...])` et on
 asserte la valeur de RETOUR (code de sortie) + la sortie capturée, SANS subprocess
-(rapide, pur). La logique métier est déjà testée dans test_cluster_topology.py ;
+(rapide, pur). La logique métier est déjà testée dans test_nestor.py ;
 ici on couvre la façade : dispatch, codes de sortie, mapping des exceptions,
 garde-fou byte-identique de `diff`.
 """
@@ -78,7 +78,7 @@ def tearDownModule():
     cli._assert_bench_target = _REAL_ASSERT_BENCH
 
 
-from cluster_topology import (  # noqa: E402
+from nestor import (  # noqa: E402
     derive_run_params,
     load_topology,
     render_lima_inventory,
@@ -568,7 +568,7 @@ runs:
 
     def test_applies_one_layer_and_maps_rc(self):
         # `up` appelle runner.launch_phase (stub rc=0) → code 0 ; UNE couche.
-        from cluster_topology.runner import RunResult
+        from nestor.runner import RunResult
 
         self._ensure_inventory()
         calls = []
@@ -606,7 +606,7 @@ runs:
         self.assertIn("inventaire absent", err)
 
     def test_propagates_failure_rc(self):
-        from cluster_topology.runner import RunResult
+        from nestor.runner import RunResult
 
         self._ensure_inventory()
         orig = cli._runner.launch_phase
@@ -722,7 +722,7 @@ workers:
         self._stub("phase_deps", lambda _b: {"storage-simple": set(), "metrics-server": set()})
         # Stub launch_phase : si la garde laissait passer, on le SAURAIT (ne doit JAMAIS
         # être appelé sur un inventaire prod).
-        from cluster_topology.runner import RunResult
+        from nestor.runner import RunResult
 
         self.launched = []
         orig_lp = cli._runner.launch_phase
@@ -854,7 +854,7 @@ runs:
 
     def _spy_launch(self):
         """Stub launch_phase qui capture la phase (via le playbook) montée."""
-        from cluster_topology.runner import RunResult
+        from nestor.runner import RunResult
 
         mounted = []
 
@@ -1105,7 +1105,7 @@ runs:
 
 class Smoke(unittest.TestCase):
     def test_reversible_is_zero(self):
-        from cluster_topology.smoke import SmokeResult, SmokeStep
+        from nestor.smoke import SmokeResult, SmokeStep
 
         res = SmokeResult(
             namespace="topo-smoke",
@@ -1119,7 +1119,7 @@ class Smoke(unittest.TestCase):
         self.assertIn("réversible", out)
 
     def test_not_reversible_is_one(self):
-        from cluster_topology.smoke import SmokeResult, SmokeStep
+        from nestor.smoke import SmokeResult, SmokeStep
 
         res = SmokeResult(namespace="x", steps=[SmokeStep("créer", False, "échec")])
         orig = cli._smoke.run_smoke
@@ -1147,7 +1147,7 @@ class Roundtrip(unittest.TestCase):
         self.addCleanup(setattr, cli._roundtrip, "run_roundtrip", orig)
 
     def test_reversible_is_zero(self):
-        from cluster_topology.roundtrip import RoundtripResult, RoundtripStep
+        from nestor.roundtrip import RoundtripResult, RoundtripStep
 
         self._stub(
             RoundtripResult(
@@ -1161,7 +1161,7 @@ class Roundtrip(unittest.TestCase):
         self.assertIn("réversible", out)
 
     def test_not_reversible_is_one(self):
-        from cluster_topology.roundtrip import RoundtripResult, RoundtripStep
+        from nestor.roundtrip import RoundtripResult, RoundtripStep
 
         self._stub(
             RoundtripResult(
@@ -1186,7 +1186,7 @@ class Roundtrip(unittest.TestCase):
         self.assertIn("usage", err)
 
     def test_full_and_yes_flags_passed(self):
-        from cluster_topology.roundtrip import RoundtripResult, RoundtripStep
+        from nestor.roundtrip import RoundtripResult, RoundtripStep
 
         seen = {}
 
@@ -1872,7 +1872,7 @@ class Remove(unittest.TestCase):
     def test_delegates_to_run_remove_and_maps_rc(self):
         # Stub run_remove (la logique est testée dans test_roundtrip) : on couvre le
         # dispatch + le mapping de code de la façade.
-        from cluster_topology.roundtrip import RemoveResult, RoundtripStep
+        from nestor.roundtrip import RemoveResult, RoundtripStep
 
         captured = {}
 
@@ -1899,7 +1899,7 @@ class Remove(unittest.TestCase):
         self.assertIn("couche supprimée", out)
 
     def test_incomplete_removal_is_rc1(self):
-        from cluster_topology.roundtrip import RemoveResult, RoundtripStep
+        from nestor.roundtrip import RemoveResult, RoundtripStep
 
         def fake(phase, *, backend, allow_full, assume_yes):
             return RemoveResult(

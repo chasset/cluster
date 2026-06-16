@@ -25,8 +25,8 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from cluster_topology.model import topology_from_dict  # noqa: E402
-from cluster_topology.plan import expected_phase_sequence  # noqa: E402
+from nestor.model import topology_from_dict  # noqa: E402
+from nestor.plan import expected_phase_sequence  # noqa: E402
 
 # ── Table de référence : la séquence ORDONNÉE de chaque arm (transcription bash) ──
 # Sans hardening.
@@ -112,7 +112,7 @@ class ParityLayersArm(unittest.TestCase):
     posé par l'arm atlas en queue, hors clôture du graphe)."""
 
     def test_layers_atlas_equiv_local_path(self):
-        from cluster_topology.layers import resolve_layers
+        from nestor.layers import resolve_layers
 
         # layers = le profil dataops complet (atlas) en local-path.
         resolved = resolve_layers(["metrics", "store", "obs", "gitops", "dataops"], "local-path")
