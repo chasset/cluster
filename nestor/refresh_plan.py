@@ -1,4 +1,4 @@
-"""Diff RÉEL ↔ DÉCLARATION pour `cluster refresh` (ADR 0076).
+"""Diff RÉEL ↔ DÉCLARATION pour `nestor refresh` (ADR 0076).
 
 `refresh` matérialise une évolution VOULUE du réel dans `topology.yaml` (nœud/couche
 ajoutés délibérément), bornée par l'ADR 0046 (jamais blanchir une dérive en silence :

@@ -1,7 +1,7 @@
 """Garde d'isolation de CIBLE ANSIBLE (ADR 0053) : un montage qui vise le banc ne doit
 JAMAIS s'exécuter sur un inventaire de PRODUCTION.
 
-Pourquoi ce module. `cluster next <couche applicative>` lance un playbook via
+Pourquoi ce module. `nestor next <couche applicative>` lance un playbook via
 ansible-runner sur l'inventaire `bootstrap/hosts.yaml`. Cet inventaire est une config
 LOCALE non versionnée (ADR 0023) qui, en pratique, porte la PROD. La garde existante
 (`_assert_bench_target`) ne valide QUE le KUBECONFIG — or les plays `hosts: cloud`

@@ -1,4 +1,4 @@
-"""Fusion par ÉDITION TEXTE d'un `topology.yaml` pour `cluster refresh` (ADR 0076 §4).
+"""Fusion par ÉDITION TEXTE d'un `topology.yaml` pour `nestor refresh` (ADR 0076 §4).
 
 `refresh` ÉDITE le fichier en place — il ne le RÉGÉNÈRE pas (différence nette avec
 `discover -o` qui produit un fichier neuf). On préserve commentaires, `catalog.status`,

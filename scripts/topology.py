@@ -492,20 +492,20 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
     """`stack select` : active une topologie EXISTANTE et POSE le KUBECONFIG de la cible.
 
     Calque `pulumi stack select` : choisit la stack courante parmi le catalogue,
-    repointe le symlink `topology.yaml`, et — comme `cluster env` — imprime sur
+    repointe le symlink `topology.yaml`, et — comme `nestor env` — imprime sur
     STDOUT une ligne `export KUBECONFIG=…` à `eval` dans le shell :
 
-        eval "$(cluster stack select banc)"
+        eval "$(nestor stack select banc)"
 
     Le KUBECONFIG posé est celui de la cible (ADR 0053) : le **banc de la stack**
     s'il est monté (`bench/lima/.work/kubeconfig`), sinon **`/dev/null`** (vide) —
     JAMAIS `~/.kube/config` (la prod). Un `kubectl`/`cilium` direct dans le shell
     vise alors la bonne cible, ou échoue proprement (« pas de banc »), au lieu de
     taper la prod par accident. Un process NE PEUT PAS exporter dans le shell PARENT
-    (invariant Unix) → le patron `eval`, comme `ssh-agent`/`cluster env`.
+    (invariant Unix) → le patron `eval`, comme `ssh-agent`/`nestor env`.
 
     TOUS les messages humains vont sur STDERR (inertes pour `eval`) ; seule la ligne
-    `export` va sur STDOUT. Sans `eval` (appel nu `cluster stack select`), la stack
+    `export` va sur STDOUT. Sans `eval` (appel nu `nestor stack select`), la stack
     est bien activée et les messages s'affichent ; seul le KUBECONFIG du shell n'est
     pas posé (la ligne export apparaît, inoffensive).
 
@@ -548,14 +548,14 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
         cible = os.devnull
         _warn(
             "cluster non installé (ou banc injoignable) — pas de connexion possible "
-            "pour l'instant (le monter : `cluster up`)."
+            "pour l'instant (le monter : `nestor up`)."
         )
     # La ligne `export …` n'est utile QU'à `eval`. En appel direct (stdout = TTY), on
     # ne la déverse pas brute dans le terminal — on suggère plutôt `eval`. Si stdout
     # est capturé (`eval "$(…)"`/pipe), on l'imprime pour que le shell la pose.
     if sys.stdout.isatty():
         print(
-            f'  pointer le shell : `eval "$(cluster stack select {args.name})"`',
+            f'  pointer le shell : `eval "$(nestor stack select {args.name})"`',
             file=sys.stderr,
         )
     else:
@@ -807,7 +807,7 @@ def cmd_destroy(args: argparse.Namespace) -> int:
 
     Codes : 0 succès (ou rien à détruire) ; 1 échec du down délégué ; 2 confirmation
     refusée / hors TTY sans --yes."""
-    _assert_bench_target("cluster destroy")
+    _assert_bench_target("nestor destroy")
     path = _resolve(args.file)
     topo = load_topology(path)
     stack = topo.catalog.get("topology", "—")
@@ -991,7 +991,7 @@ def cmd_epreuves(args: argparse.Namespace) -> int:
         else:
             print(f"  {e.num} [{e.type:<5}] {e.categorie:<13} {e.nom}")
     if runtime:
-        print("  ✓ prête = sa couche tourne ; ○ = topo OK mais couche à monter (`cluster up`).")
+        print("  ✓ prête = sa couche tourne ; ○ = topo OK mais couche à monter (`nestor up`).")
     else:
         print("  (jouable selon la topologie ; l'état réel est vérifié au lancement, P5)")
     if args.all:
@@ -1101,7 +1101,7 @@ def cmd_access(args: argparse.Namespace) -> int:
     via l'arm `run-phases.sh access`, en passant les options telles quelles
     (`--stop` / `--print-hosts` / `--no-hosts`). Code 0/1 = celui de access.sh ; 2 si
     le banc n'a pas de kubeconfig (socle non monté)."""
-    _assert_bench_target("cluster access")
+    _assert_bench_target("nestor access")
     # Reconstruit les flags d'access.sh depuis les options parsées (un set fixe, sûr).
     flags = [
         flag
@@ -1248,7 +1248,7 @@ def _assert_inventory_safe(action: str, inventory_path: str, topo: Topology) -> 
             "  • Banc : utiliser l'inventaire Lima (target_kind: lima) — il est généré "
             "par le montage du banc (`bench/lima/run-phases.sh up`).\n"
             "  • Régénérer l'inventaire de la stack active : "
-            "`cluster artifact generate -o bootstrap/hosts.yaml`."
+            "`nestor artifact generate -o bootstrap/hosts.yaml`."
         )
 
 
@@ -1262,11 +1262,11 @@ def cmd_scale(args: argparse.Namespace) -> int:
     si tout est appliqué/à-jour ; 1 si un `kubectl scale` échoue ; 2 si banc
     injoignable (usage)."""
     if args.apply:
-        _assert_bench_target("cluster scale --apply")
+        _assert_bench_target("nestor scale --apply")
     ready = _ready_nodes()
     if not ready:
         raise _UsageError(
-            "banc injoignable (aucun nœud Ready) — monter le cluster d'abord (`cluster up`)"
+            "banc injoignable (aucun nœud Ready) — monter le cluster d'abord (`nestor up`)"
         )
     # Capacité d'exécution = nœuds Ready (le banc détaint les control → schedulables).
     workers_ready = len(ready)
@@ -1296,7 +1296,7 @@ def cmd_scale(args: argparse.Namespace) -> int:
             print(f"  ✗ {wl.name:<10} → échec : {detail}", file=sys.stderr)
             rc = 1
     if not args.apply:
-        print("→ PLAN (rien appliqué) — `cluster scale --apply` pour exécuter.")
+        print("→ PLAN (rien appliqué) — `nestor scale --apply` pour exécuter.")
     return rc
 
 
@@ -1337,8 +1337,8 @@ def cmd_discover(args: argparse.Namespace) -> int:
     Read-only. Code 0 si le cluster est joignable ; 2 (usage) sinon."""
     if not _ready_nodes():
         raise _UsageError(
-            "banc injoignable (aucun nœud Ready) — exporter KUBECONFIG ou `cluster env`, "
-            "ou monter le cluster (`cluster up`)"
+            "banc injoignable (aucun nœud Ready) — exporter KUBECONFIG ou `nestor env`, "
+            "ou monter le cluster (`nestor up`)"
         )
     result = _discover.assemble(
         nodes=_discover_node_roles(),
@@ -1352,8 +1352,8 @@ def cmd_discover(args: argparse.Namespace) -> int:
 
     # 1. le topology.yaml reconstruit (valide — passe stack validate, ADR 0074 §5)
     header = (
-        "# topology.yaml reconstruit par `cluster discover` (ADR 0074) — valeurs\n"
-        "# génériques (ADR 0023). Vérifier avant usage : `cluster stack validate`.\n"
+        "# topology.yaml reconstruit par `nestor discover` (ADR 0074) — valeurs\n"
+        "# génériques (ADR 0023). Vérifier avant usage : `nestor stack validate`.\n"
     )
     body = yaml.safe_dump(result.topology, sort_keys=False, allow_unicode=True)
     rendered = header + body
@@ -1429,7 +1429,7 @@ def cmd_refresh(args: argparse.Namespace) -> int:
     if real_backend is None and not real_layers:
         raise _UsageError(
             "cluster injoignable (aucun nœud Ready / aucune couche lue) — exporter "
-            "KUBECONFIG ou `cluster env`, ou monter le cluster (`cluster up`)"
+            "KUBECONFIG ou `nestor env`, ou monter le cluster (`nestor up`)"
         )
     # Le DÉCLARÉ, AU MÊME GRAIN que le réel : `discover` émet des PHASES (storage-simple,
     # monitoring, gitops, dataops…), tandis que `declared_layers` peut être des ALIAS de
@@ -1524,7 +1524,7 @@ def cmd_preview(args: argparse.Namespace) -> int:
     if _active_kubeconfig() is None and not _context_targets_bench():
         _warn(
             "cluster non installé — pas de connexion possible pour l'instant "
-            "(le monter : `cluster up`). L'état réel ci-dessous est vide."
+            "(le monter : `nestor up`). L'état réel ci-dessous est vide."
         )
     path = _resolve(args.file)
     topo = load_topology(path)
@@ -1694,7 +1694,7 @@ def cmd_up(args: argparse.Namespace) -> int:
     Là où `next` monte UNE couche (1er drift), `up` monte TOUTE la séquence. Code 0
     si le montage réussit ; 1 si run-phases.sh échoue ; 2 (usage) si confirmation
     refusée / chemin incohérent avec le backend."""
-    _assert_bench_target("cluster up")
+    _assert_bench_target("nestor up")
     path = _resolve(args.file)
     topo = load_topology(path)
     target = args.target or default_target(topo)
@@ -1801,7 +1801,7 @@ def _monter_phase(topo: Topology, phase: str, run_params: dict) -> int:
     # Phases AMONT (`up`/`bootstrap`) : pas de playbook unitaire — provisioning bash
     # (limactl, cni.sh, ADR 0049). On délègue à l'arm run-phases.sh du MÊME nom.
     if phase in ("up", "bootstrap"):
-        _assert_bench_target(f"cluster next ({phase})")
+        _assert_bench_target(f"nestor next ({phase})")
         stack_name = topo.catalog.get("topology", "—")
         runphases = os.path.join(_ROOT, "bench", "lima", "run-phases.sh")
         print(f"→ {phase} : {_quoi_couche(phase)} via run-phases.sh…")
@@ -1838,15 +1838,15 @@ def _monter_phase(topo: Topology, phase: str, run_params: dict) -> int:
             )
         raise _UsageError(
             f"inventaire absent : {rel} "
-            "— le générer (`cluster artifact generate -o bootstrap/hosts.yaml`) "
+            "— le générer (`nestor artifact generate -o bootstrap/hosts.yaml`) "
             "ou le copier depuis bootstrap/hosts.example.yaml"
         )
-    _assert_bench_target(f"cluster next ({phase})")
+    _assert_bench_target(f"nestor next ({phase})")
     # Garde de CIBLE ANSIBLE (ADR 0053) : valide que l'INVENTAIRE vise la topologie
     # voulue AVANT de lancer ansible-runner. _assert_bench_target ne couvre que le
     # KUBECONFIG ; un play `hosts: cloud` SSHe sur les nœuds de l'inventaire (chemin
     # disjoint). Sans ça, un banc KUBECONFIG + un inventaire prod mute la PROD.
-    _assert_inventory_safe(f"cluster next ({phase})", inventory, topo)
+    _assert_inventory_safe(f"nestor next ({phase})", inventory, topo)
     playbook = os.path.relpath(os.path.join(_ROOT, playbook_rel), private_data_dir)
     print(f"→ lancement de {phase} ({playbook_rel}) via ansible-runner…")
     try:
@@ -2202,7 +2202,7 @@ def cmd_roundtrip(args: argparse.Namespace) -> int:
     toute suppression définitive, CONFIRMATION sur TTY (ou `--yes` hors TTY). Code 0
     si réversible, 1 si une étape échoue / confirmation refusée, 2 si usage.
     """
-    _assert_bench_target("cluster roundtrip")
+    _assert_bench_target("nestor test roundtrip")
     try:
         result = _roundtrip.run_roundtrip(args.phase, allow_full=args.full, assume_yes=args.yes)
     except _roundtrip.RoundtripError as exc:
@@ -2231,7 +2231,7 @@ def cmd_remove(args: argparse.Namespace) -> int:
     (STORAGE_BACKEND) pour cibler les bonnes ressources : sans lui, le rollback
     retomberait sur `ceph` et tenterait de supprimer une OBC absente en local-path.
     Code 0 si supprimé, 1 si une étape échoue / confirmation refusée, 2 si usage."""
-    _assert_bench_target(f"cluster remove ({args.phase})")
+    _assert_bench_target(f"nestor remove ({args.phase})")
     topo = load_topology(_resolve(args.file))
     backend = topo.storage.get("backend", "local-path")
     try:
@@ -2245,7 +2245,7 @@ def cmd_remove(args: argparse.Namespace) -> int:
         marque = "✓" if step.ok else "✗"
         print(f"  {marque} {step.nom} — {step.detail}")
     if result.removed:
-        print(f"→ couche supprimée — re-monter avec `cluster next` ({result.phase}).")
+        print(f"→ couche supprimée — re-monter avec `nestor next` ({result.phase}).")
         return 0
     print("→ suppression INCOMPLÈTE (voir ci-dessus).")
     return 1
@@ -2339,7 +2339,7 @@ class _GroupedHelp(argparse.RawDescriptionHelpFormatter):
 
 def _build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
-        prog="cluster",
+        prog="nestor",
         formatter_class=_GroupedHelp,
         description=(
             "Monte et inspecte un cluster Kubernetes décrit dans un fichier.\n"
@@ -2348,7 +2348,7 @@ def _build_parser() -> argparse.ArgumentParser:
         # Liste des commandes GROUPÉES par usage (courantes vs annexes). argparse les
         # mettrait sinon dans un seul mur illisible : le formatter `_GroupedHelp` masque
         # la liste brute des sous-commandes et n'affiche QUE cet epilog. Détail d'une
-        # commande : `cluster <commande> -h`.
+        # commande : `nestor <commande> -h`.
         epilog=(
             "Commandes courantes (dans l'ordre d'un workflow) :\n"
             "  stack       choisir/créer/lister les configurations (new·ls·select·validate)\n"
@@ -2359,7 +2359,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "  destroy     supprimer les machines (VMs) de la stack active\n"
             "\n"
             "Commandes annexes :\n"
-            '  env         brancher kubectl sur le banc : eval "$(cluster env)"\n'
+            '  env         brancher kubectl sur le banc : eval "$(nestor env)"\n'
             "  access      ouvrir l'accès dev (URLs des services + identifiants)\n"
             "  scale       ajuster les replicas au nombre de nœuds\n"
             "  discover    reconstruire un topology.yaml depuis un cluster réel\n"
@@ -2367,7 +2367,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "  artifact    fichiers générés + historique (generate·diff·runs·metrics)\n"
             "  test        vérifier le cluster (scenarios·smoke·roundtrip)\n"
             "\n"
-            "Détail d'une commande : `cluster <commande> -h`."
+            "Détail d'une commande : `nestor <commande> -h`."
         ),
     )
     # ha-3cp n'est PAS un sous-parser ici (commande interne routée à part dans main) :
@@ -2513,7 +2513,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     p_env = sub.add_parser(
         "env",
-        help='brancher kubectl sur le cluster du banc : eval "$(cluster env)" dans ton shell',
+        help='brancher kubectl sur le cluster du banc : eval "$(nestor env)" dans ton shell',
     )
     p_env.add_argument(
         "--force", action="store_true", help="imprime le banc même si KUBECONFIG est déjà défini"
@@ -2523,7 +2523,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "access",
         help="ouvrir l'accès dev : URLs des services + identifiants (--stop pour fermer)",
     )
-    # Options déclarées explicitement (apparaissent dans `cluster access --help` ;
+    # Options déclarées explicitement (apparaissent dans `nestor access --help` ;
     # argparse.REMAINDER ne capture pas les `--flags` en tête — limite connue).
     p_access.add_argument("--stop", action="store_true", help="ferme les forwards SSH ouverts")
     p_access.add_argument(

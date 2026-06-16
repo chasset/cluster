@@ -1570,25 +1570,25 @@ class BenchTargetGuard(unittest.TestCase):
         # banc absent + contexte ≠ banc + pas de KUBECONFIG → REFUS (la prod en danger).
         self._arm(bench_exists=False, targets_bench=False)
         with self.assertRaises(cli._UsageError) as ctx:
-            cli._assert_bench_target("cluster up")
+            cli._assert_bench_target("nestor up")
         self.assertIn("REFUS", str(ctx.exception))
 
     def test_passes_when_kubeconfig_explicitly_exported(self):
         # KUBECONFIG exporté = intention explicite (ADR 0065) → la garde laisse passer.
         self._arm(bench_exists=False, targets_bench=False, kubeconfig_env="/tmp/whatever")
-        cli._assert_bench_target("cluster up")  # ne lève pas
+        cli._assert_bench_target("nestor up")  # ne lève pas
 
     def test_passes_when_bench_present_and_ctx_bench(self):
         # banc présent ET contexte = banc (127.0.0.1) → nominal, pas de refus.
         self._arm(bench_exists=True, targets_bench=True)
-        cli._assert_bench_target("cluster up")  # ne lève pas
+        cli._assert_bench_target("nestor up")  # ne lève pas
 
     def test_refuses_when_bench_present_but_ctx_not_bench(self):
         # banc présent mais contexte pointant AILLEURS (ex. prod) → refus (couvre le
         # cas que l'ancienne garde os.path.exists ne voyait pas).
         self._arm(bench_exists=True, targets_bench=False)
         with self.assertRaises(cli._UsageError):
-            cli._assert_bench_target("cluster up")
+            cli._assert_bench_target("nestor up")
 
 
 class ModuleGuard(unittest.TestCase):
