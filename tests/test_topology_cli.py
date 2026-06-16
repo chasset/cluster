@@ -896,10 +896,45 @@ class Stack(unittest.TestCase):
         target = self._catalog(name)
         self.addCleanup(lambda: os.path.exists(target) and os.unlink(target))
         _capture(["stack", "new", name, "--no-input"])  # sans activer
-        code, out, _ = _capture(["stack", "select", name])
+        code, out, err = _capture(["stack", "select", name])
         self.assertEqual(code, 0)
         self.assertEqual(os.readlink(self._link), f"topologies/{name}.yaml")
-        self.assertIn("dérivé", out)
+        # Messages humains sur stderr (eval-safe) ; ligne `export` eval-able sur stdout.
+        self.assertIn("dérivé", err)
+        self.assertIn("export KUBECONFIG=", out)
+
+    def test_select_exports_devnull_when_no_bench(self):
+        # Pas de banc monté → `export KUBECONFIG=/dev/null` (jamais la prod, ADR 0053).
+        name = "zz-test-ctx-devnull"
+        target = self._catalog(name)
+        self.addCleanup(lambda: os.path.exists(target) and os.unlink(target))
+        _capture(["stack", "new", name, "--no-input"])
+        orig_exists = cli.os.path.exists
+        cli.os.path.exists = lambda p: False if p == cli._BENCH_KUBECONFIG else orig_exists(p)
+        self.addCleanup(setattr, cli.os.path, "exists", orig_exists)
+        code, out, err = _capture(["stack", "select", name])
+        self.assertEqual(code, 0)
+        self.assertIn(f"export KUBECONFIG={os.devnull}", out)
+        self.assertIn("cluster non installé", err)
+
+    def test_select_exports_bench_when_present(self):
+        # Banc monté + re-sélection de la MÊME stack (pas d'invalidation) → l'export
+        # pointe le banc, pas /dev/null. On active la stack D'ABORD, puis on crée un
+        # VRAI fichier kubeconfig au banc, puis on re-select (ancienne == nouvelle).
+        name = "zz-test-ctx-bench"
+        target = self._catalog(name)
+        self.addCleanup(lambda: os.path.exists(target) and os.unlink(target))
+        _capture(["stack", "new", name, "--activate", "--no-input"])
+        bench = cli._BENCH_KUBECONFIG
+        os.makedirs(os.path.dirname(bench), exist_ok=True)
+        if not os.path.exists(bench):
+            with open(bench, "w", encoding="utf-8") as f:
+                f.write("apiVersion: v1\nkind: Config\n")
+            self.addCleanup(lambda: os.path.exists(bench) and os.unlink(bench))
+        code, out, _ = _capture(["stack", "select", name])  # même stack → banc conservé
+        self.assertEqual(code, 0)
+        self.assertIn("export KUBECONFIG=", out)
+        self.assertNotIn(os.devnull, out)  # le banc, pas /dev/null
 
     def test_activate_absent_is_business_error_with_catalog(self):
         code, _, err = _capture(["stack", "select", "zz-nexistepas"])

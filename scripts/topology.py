@@ -408,14 +408,25 @@ def cmd_stack_new(args: argparse.Namespace) -> int:
 
 
 def cmd_stack_select(args: argparse.Namespace) -> int:
-    """`stack select` : active une topologie EXISTANTE (repointe le symlink topology.yaml).
+    """`stack select` : active une topologie EXISTANTE et POSE le KUBECONFIG de la cible.
 
-    Calque `pulumi stack select` : choisit la stack courante parmi le catalogue.
+    Calque `pulumi stack select` : choisit la stack courante parmi le catalogue,
+    repointe le symlink `topology.yaml`, et — comme `cluster env` — imprime sur
+    STDOUT une ligne `export KUBECONFIG=…` à `eval` dans le shell :
 
-    Résout `topologies/<nom>(.example).yaml` → VALIDE le schéma (garde-fou : on
-    n'active pas un fichier cassé, contrairement à `ln -sf`) → repointe le symlink →
-    confirme le chemin dérivé. Accepte un modèle versionné (`<nom>.example`) comme
-    cible (activer le banc générique est légitime).
+        eval "$(cluster stack select banc)"
+
+    Le KUBECONFIG posé est celui de la cible (ADR 0053) : le **banc de la stack**
+    s'il est monté (`bench/lima/.work/kubeconfig`), sinon **`/dev/null`** (vide) —
+    JAMAIS `~/.kube/config` (la prod). Un `kubectl`/`cilium` direct dans le shell
+    vise alors la bonne cible, ou échoue proprement (« pas de banc »), au lieu de
+    taper la prod par accident. Un process NE PEUT PAS exporter dans le shell PARENT
+    (invariant Unix) → le patron `eval`, comme `ssh-agent`/`cluster env`.
+
+    TOUS les messages humains vont sur STDERR (inertes pour `eval`) ; seule la ligne
+    `export` va sur STDOUT. Sans `eval` (appel nu `cluster stack select`), la stack
+    est bien activée et les messages s'affichent ; seul le KUBECONFIG du shell n'est
+    pas posé (la ligne export apparaît, inoffensive).
 
     Codes : 0 succès ; 1 fichier absent / schéma invalide ; 2 usage (nom invalide).
     """
@@ -440,33 +451,35 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
     # Garde-fou : valider AVANT d'activer (ne pas pointer le symlink sur un fichier cassé).
     topo = load_topology(target_abs)
     # Stack active AVANT le switch : si on change de cible, le kubeconfig banc en place
-    # pointe l'ANCIENNE stack (mauvais cluster, ou la prod si l'ancien banc est détruit).
-    # On l'invalide (ADR 0053) → la prochaine `up`/`bootstrap` le régénère pour la
-    # nouvelle stack. Re-sélectionner la MÊME stack ne touche à rien (pas de régression
-    # d'accès à un banc vivant).
+    # pointe l'ANCIENNE stack. On l'invalide (ADR 0053) → la prochaine `up`/`bootstrap`
+    # le régénère pour la nouvelle stack. Re-sélectionner la MÊME stack n'y touche pas.
     ancienne = _active_stack_name(None)
     nouvelle = topo.catalog.get("topology")
     _activate_symlink(target_rel)
-    invalide = ""
+    print(
+        f"✓ activée : topology.yaml → {target_rel} (chemin dérivé : {default_target(topo)})",
+        file=sys.stderr,
+    )
     if ancienne is not None and ancienne != nouvelle and os.path.exists(_BENCH_KUBECONFIG):
         os.remove(_BENCH_KUBECONFIG)
-        invalide = (
-            f"\n  kubeconfig banc invalidé (pointait `{ancienne}`) — "
-            "`cluster up` le régénère pour la nouvelle stack."
-        )
-    print(
-        f"✓ activée : topology.yaml → {target_rel} "
-        f"(chemin dérivé : {default_target(topo)}){invalide}"
-    )
-    # Avertir TÔT (pas seulement au preview) si la stack n'a pas de banc monté : sans
-    # kubeconfig banc, les commandes de lecture retombent sur ~/.kube/config = la prod
-    # (ADR 0053). L'utilisateur sait ainsi qu'il doit monter le banc avant tout preview.
-    if not os.path.exists(_BENCH_KUBECONFIG) and not _context_targets_bench():
         print(
-            "  ⚠ banc non monté : `cluster preview` lira le contexte kubectl courant "
-            "(potentiellement la PROD). Monter le banc d'abord : `cluster up`.",
+            f"  kubeconfig banc invalidé (pointait `{ancienne}`) — "
+            "`cluster up` le régénère pour la nouvelle stack.",
             file=sys.stderr,
         )
+
+    # KUBECONFIG cible : le banc de la stack s'il est monté, sinon /dev/null (jamais
+    # la prod). Imprimé en ligne eval-able (STDOUT) ; message humain SIMPLE sur STDERR.
+    if os.path.exists(_BENCH_KUBECONFIG):
+        cible = os.path.abspath(_BENCH_KUBECONFIG)
+    else:
+        cible = os.devnull
+        print(
+            "  cluster non installé — pas de connexion possible pour l'instant "
+            "(le monter : `cluster up`).",
+            file=sys.stderr,
+        )
+    print(f"export KUBECONFIG={shlex.quote(cible)}")
     return 0
 
 
@@ -1233,13 +1246,13 @@ def cmd_preview(args: argparse.Namespace) -> int:
 
     Read-only : ne LANCE ni ne DÉTRUIT rien (`next` applique ; `destroy` détruit). Code 0
     (informatif) ; chemin incohérent avec le backend → usage (2)."""
-    # Lecture seule : on ne BLOQUE pas (preview/discover doivent rester possibles),
-    # mais on AVERTIT si la sonde retombe sur ~/.kube/config sans viser le banc — la
-    # section RÉEL refléterait alors la PROD, pas le banc (ADR 0053).
+    # Lecture seule : on ne BLOQUE pas. Quand aucun banc n'est monté, la sonde vise
+    # /dev/null (jamais la prod, ADR 0053) → la section RÉEL est VIDE. On le DIT
+    # simplement plutôt que de laisser croire à un cluster éteint.
     if _active_kubeconfig() is None and not _context_targets_bench():
         print(
-            "⚠ lecture hors banc : aucun kubeconfig banc et le contexte kubectl ne vise "
-            "pas le banc Lima — la section RÉEL peut refléter la PRODUCTION (ADR 0053).",
+            "ℹ cluster non installé — pas de connexion possible pour l'instant "
+            "(le monter : `cluster up`). L'état réel ci-dessous est vide.",
             file=sys.stderr,
         )
     path = _resolve(args.file)
@@ -1297,10 +1310,12 @@ def cmd_preview(args: argparse.Namespace) -> int:
     storage_part = (
         f"  ·  stockage : {topo.storage.get('backend', 'local-path')}" if consomme_stockage else ""
     )
-    print(
-        f"  couches        : {couches_label}{storage_part}  ·  "
-        f"exposition : {topo.exposition.get('mode', '—')}"
-    )
+    # exposition : le mode EFFECTIF (dérivé), pas la déclaration brute — un bloc
+    # `exposition` absent ne veut pas dire « pas d'exposition » : le défaut global est
+    # `gateway` (ADR 0071). On annote « (défaut) » quand rien n'est déclaré.
+    expo_declare = isinstance(topo.exposition, dict) and topo.exposition.get("mode")
+    expo_label = topo.exposition_mode + ("" if expo_declare else " (défaut)")
+    print(f"  couches        : {couches_label}{storage_part}  ·  exposition : {expo_label}")
 
     # ── RÉEL (ex-`refresh`) : l'état lu du réel (non stocké, ADR 0056 §7) ─────────
     declared = topo.control_nodes + topo.worker_nodes
