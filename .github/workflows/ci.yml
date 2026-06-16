@@ -6,6 +6,13 @@ on:
   pull_request:
     branches: [main]
 
+# Least-privilege explicite du GITHUB_TOKEN (check OpenSSF Scorecard
+# « Token-Permissions », ADR 0080). Tous les jobs sont en lecture seule
+# (lint/scan statiques, aucun commentaire/push) : le défaut restrictif suffit ;
+# un job qui aurait besoin d'écrire redéclarerait son propre bloc permissions.
+permissions:
+  contents: read
+
 jobs:
   prettier:
     runs-on: ubuntu-latest
