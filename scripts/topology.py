@@ -1526,6 +1526,18 @@ def cmd_preview(args: argparse.Namespace) -> int:
             "cluster non installé — pas de connexion possible pour l'instant "
             "(le monter : `nestor up`). L'état réel ci-dessous est vide."
         )
+    # MISMATCH SHELL ↔ preview (ADR 0053) : `_default_kubeconfig_to_bench` a posé le banc
+    # pour CE process (l'opérateur n'avait pas exporté KUBECONFIG) — mais le shell, lui,
+    # reste sans KUBECONFIG (process ≠ parent). preview lit donc le BANC pendant qu'un
+    # `kubectl` nu dans le shell vise ~/.kube/config (souvent la PROD). On AVERTIT (non
+    # bloquant) d'aligner le shell. Seulement si le banc est JOIGNABLE (sinon le 1er
+    # warning « cluster non installé » suffit).
+    elif _KUBECONFIG_AUTO_BENCH and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
+        _warn(
+            "preview lit le BANC, mais ton shell n'a pas KUBECONFIG exporté — un `kubectl` "
+            "direct vise ~/.kube/config (souvent la PROD). Aligne le shell : "
+            'eval "$(nestor env)".'
+        )
     path = _resolve(args.file)
     topo = load_topology(path)
     runs = load_runs(args.history or _RUNS_HISTORY)
@@ -2726,6 +2738,13 @@ _INTERNAL_PARSERS = {
 }
 
 
+# Posé par `_default_kubeconfig_to_bench` quand IL a dû pointer le banc lui-même (le
+# shell de l'opérateur n'avait PAS KUBECONFIG exporté). Signal pour `preview` : le
+# process voit le banc, mais le SHELL ne l'a pas → un `kubectl` nu y vise ~/.kube/config
+# (souvent la prod). Variable de PROCESS (le défaut process-local ne change pas le shell).
+_KUBECONFIG_AUTO_BENCH = False
+
+
 def _default_kubeconfig_to_bench() -> None:
     """Sans KUBECONFIG exporté, pointe le banc Lima par défaut (`_BENCH_KUBECONFIG`).
 
@@ -2734,9 +2753,13 @@ def _default_kubeconfig_to_bench() -> None:
     OU kubectl, qui lisent `KUBECONFIG`/`~/.kube/config`. Sans ce défaut, elles visent
     le contexte courant du poste (souvent l'endpoint prod-exemple de hosts.example.yaml)
     et échouent/`—` alors que le banc tourne. On NE force PAS si l'opérateur a déjà
-    exporté KUBECONFIG (intention explicite respectée)."""
+    exporté KUBECONFIG (intention explicite respectée). Mémorise dans
+    `_KUBECONFIG_AUTO_BENCH` qu'on a posé le défaut (≠ l'opérateur) — le shell, lui,
+    reste sans KUBECONFIG (process ≠ parent)."""
+    global _KUBECONFIG_AUTO_BENCH
     if not os.environ.get("KUBECONFIG") and os.path.exists(_BENCH_KUBECONFIG):
         os.environ["KUBECONFIG"] = _BENCH_KUBECONFIG
+        _KUBECONFIG_AUTO_BENCH = True
 
 
 def main(argv: list[str] | None = None) -> int:

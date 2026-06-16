@@ -484,6 +484,8 @@ rm -f /tmp/cluster-prod.config
 > - ou, pour une session prod assumée, `eval "$(bench/lima/env.sh export)"` côté
 >   banc et un `export KUBECONFIG=…` côté prod — jamais le contexte par défaut.
 
+<!-- séparateur : deux blockquotes distincts (MD028) -->
+
 > Cluster prod **déjà installé** sans `clusterName` (contexte homonyme
 > `kubernetes-admin@kubernetes`) ? Rejouer `bootstrap/initialisation.yaml` n'est
 > pas nécessaire : renommer le contexte en place

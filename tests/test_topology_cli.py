@@ -516,6 +516,26 @@ runs:
         self.assertEqual(code, 2)
         self.assertIn("usage", err)
 
+    def test_warns_when_bench_up_but_shell_kubeconfig_unset(self):
+        # Piège vécu : le banc est monté+joignable (preview le lit via le défaut auto),
+        # MAIS le shell n'a pas KUBECONFIG exporté → un `kubectl` nu vise ~/.kube/config
+        # (prod). preview doit AVERTIR de lancer `nestor env` (ADR 0053). On stube : banc
+        # présent (os.path.exists), joignable (_kubeconfig_reaches_api), KUBECONFIG absent
+        # → main() pose le défaut auto et arme _KUBECONFIG_AUTO_BENCH.
+        orig_exists = cli.os.path.exists
+        cli.os.path.exists = lambda p: p == cli._BENCH_KUBECONFIG or orig_exists(p)
+        self.addCleanup(setattr, cli.os.path, "exists", orig_exists)
+        orig_reach = cli._kubeconfig_reaches_api
+        cli._kubeconfig_reaches_api = lambda _kc: True
+        self.addCleanup(setattr, cli, "_kubeconfig_reaches_api", orig_reach)
+        orig_flag = cli._KUBECONFIG_AUTO_BENCH
+        self.addCleanup(setattr, cli, "_KUBECONFIG_AUTO_BENCH", orig_flag)
+        os.environ.pop("KUBECONFIG", None)  # _capture restaure l'env ensuite
+        code, _, err = _capture(["preview", "-f", _EXAMPLE])
+        self.assertEqual(code, 0)
+        self.assertIn("nestor env", err)  # avertit d'aligner le shell
+        self.assertIn("PROD", err)
+
 
 class Next(unittest.TestCase):
     """`next` : applique LA prochaine couche manquante via runner (1er drift)."""
@@ -845,12 +865,20 @@ runs:
         orig_safe = cli._assert_inventory_safe
         cli._assert_inventory_safe = lambda *a, **k: None
         self.addCleanup(setattr, cli, "_assert_inventory_safe", orig_safe)
-        # Inventaire présent (sinon garde-fou) — créé puis retiré.
-        inv = os.path.join(_ROOT, "bootstrap", "hosts.yaml")
-        if not os.path.exists(inv):
-            with open(inv, "w", encoding="utf-8") as f:
-                f.write("# inventaire de test (créé puis retiré)\n")
-            self.addCleanup(os.unlink, inv)
+        # Les topos de NextMenu sont `target_kind: lima` → `_inventory_for` renvoie
+        # l'inventaire BANC (`_BENCH_INVENTORY`), pas bootstrap/hosts.yaml. On garantit
+        # sa présence (absent en CI où le banc n'existe pas) — créé puis retiré, en
+        # sauvegardant un éventuel inventaire banc réel (poste dev).
+        inv = cli._BENCH_INVENTORY
+        os.makedirs(os.path.dirname(inv), exist_ok=True)
+        backup = inv + ".test-backup"
+        if os.path.exists(inv):
+            os.rename(inv, backup)
+            self.addCleanup(lambda: os.rename(backup, inv))
+        with open(inv, "w", encoding="utf-8") as f:
+            f.write("# inventaire de test (créé puis retiré)\n")
+        if not os.path.exists(backup):
+            self.addCleanup(lambda: os.path.exists(inv) and os.unlink(inv))
 
     def _spy_launch(self):
         """Stub launch_phase qui capture la phase (via le playbook) montée."""
