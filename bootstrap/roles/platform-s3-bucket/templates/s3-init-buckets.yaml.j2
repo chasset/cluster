@@ -46,9 +46,13 @@ spec:
                 # Idempotent : OK si mb réussit OU si le bucket existe déjà.
                 # Tout autre échec DOIT faire échouer le Job (drift L39 : ne pas
                 # masquer un "make_bucket failed").
+                # Deux dialectes S3 pour « bucket déjà là » : Ceph RGW / AWS renvoient
+                # BucketAlreadyOwnedByYou ; SeaweedFS (banc léger) renvoie
+                # BucketAlreadyExists (« can not be an existing collection »). Les DEUX
+                # sont bénins pour un re-jeu idempotent — sinon CrashLoopBackOff au 2e run.
                 if out="$(aws --endpoint-url "$S3_ENDPOINT" s3 mb "s3://$b" 2>&1)"; then
                   echo "bucket $b créé"
-                elif printf '%s' "$out" | grep -q "BucketAlreadyOwnedByYou"; then
+                elif printf '%s' "$out" | grep -qE "BucketAlreadyOwnedByYou|BucketAlreadyExists"; then
                   echo "bucket $b déjà présent"
                 else
                   echo "ÉCHEC création bucket $b : $out" >&2
