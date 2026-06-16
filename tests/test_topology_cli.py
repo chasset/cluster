@@ -1102,6 +1102,14 @@ class LayerHealthSignal(unittest.TestCase):
         got = cli._observed_layers(["metrics-server", "monitoring"])
         self.assertEqual(got, {"metrics-server"})
 
+    def test_gitops_seed_signal_targets_atlas_workflows(self):
+        # Régression : gitops-seed pose l'Application `atlas-workflows`, PAS `atlas`. Avec le
+        # mauvais nom, la couche n'était jamais vue faite → next la re-proposait en boucle.
+        kind, name, ns, ready = cli._LAYER_SIGNAL["gitops-seed"]
+        self.assertEqual((kind, name, ns), ("application", "atlas-workflows", "argocd"))
+        self._stub_kubectl({("application", "atlas-workflows"): (0, "")})
+        self.assertEqual(cli._observed_layers(["gitops-seed"]), {"gitops-seed"})
+
 
 class NextHealthGate(unittest.TestCase):
     """#355 : gate de santé ACTIVE après montage — `next` attend le dernier maillon Ready."""

@@ -645,7 +645,11 @@ _LAYER_SIGNAL: dict[str, tuple[str, str, str | None, bool]] = {
     "monitoring": ("statefulset", "loki", "monitoring", True),
     "gitops": ("deployment", "argocd-server", "argocd", True),
     "dataops": ("deployment", "dagster-dagster-webserver", "dagster", True),
-    "gitops-seed": ("application", "atlas", "argocd", False),
+    # gitops-seed pose l'Application Argo CD `atlas-workflows` (PAS `atlas` : cf. le
+    # manifeste atlas-workflow-sample/application.example.yaml + le scénario 27). Avec le
+    # mauvais nom, `_observed_layers` ne la voyait jamais faite → `next` la re-proposait en
+    # boucle même après un montage réussi.
+    "gitops-seed": ("application", "atlas-workflows", "argocd", False),
 }
 
 # Kinds dont la SANTÉ se lit via `status.readyReplicas` (workloads répliqués).
@@ -2089,8 +2093,12 @@ def cmd_next(args: argparse.Namespace) -> int:
         raise _UsageError(str(exc)) from exc
 
     if not montables:
-        # Rien à monter : suggest_next porte le message « à jour » détaillé.
-        sugg = suggest_next(topo, target, done, etat_frais, run_params=run_params)
+        # Rien à monter : suggest_next porte le message « à jour » détaillé. Il faut lui
+        # passer `done | observed` (PAS `done` seul, l'historique) — sinon `next`
+        # CONTREDIT `preview` : une couche faite mais non consignée (run non consigné /
+        # cache socle) ressortirait comme « 1er drift non encore joué » alors que preview
+        # la voit ✓ à-jour. Le RÉEL prime (ADR 0052/0056 §7), comme dans `cmd_preview`.
+        sugg = suggest_next(topo, target, done | observed, etat_frais, run_params=run_params)
         print(sugg.message)
         return 0
 
