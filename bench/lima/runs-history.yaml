@@ -192,3 +192,31 @@ runs:
     phases:
       up: 35
       bootstrap: 379
+  - id: 2026-06-16T21-ceph-c528b19
+    target: atlas-ceph
+    date: 2026-06-16T21:12:13Z
+    branche: fix/preview-socle-contredit-par-reel
+    commit: c528b19
+    profil: ceph
+    topologie: multi-node-3
+    arch: arm64
+    hote: 'Mac15,9'
+    total_s: 2062
+    phases:
+      up: 167
+      bootstrap: 425
+      ceph: 415
+      sc: 23
+      datalake: 89
+      monitoring: 149
+      gitops: 46
+      dataops: 745
+      gitops-seed: 2
+    metriques:
+      cpu_core_s: 1023
+      ram_peak_mib: 14355
+      ram_mean_mib: 10642
+      par_noeud:
+        192.168.104.3:9100: {cpu_core_s: 7400, ram_peak_mib: 4019, ram_mean_mib: 0}
+        192.168.104.4:9100: {cpu_core_s: 4011, ram_peak_mib: 3187, ram_mean_mib: 0}
+        192.168.104.9:9100: {cpu_core_s: 4140, ram_peak_mib: 3559, ram_mean_mib: 0}
