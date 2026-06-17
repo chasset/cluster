@@ -11,8 +11,11 @@ cnpg_namespace: postgres
 mlflow_cnpg_role_secret: pg-role-mlflow
 mlflow_pg_auth_secret: mlflow-pg-auth
 
-# Artefact store S3 (ADR 0036) — backing par défaut : RGW Ceph (prod / banc Ceph).
-# En banc léger, surcharger mlflow_s3_backing=seaweedfs.
+# Artefact store S3 (ADR 0036) — backing par défaut de RÔLE : RGW Ceph (prod).
+# DÉRIVÉ par topologie : nestor (derive_run_params) passe `mlflow_s3_backing` et
+# `mlflow_s3_endpoint` en `-e` selon le backend (rgw en Ceph, seaweedfs en banc
+# léger) — MÊME backing que Loki/CNPG. Ne JAMAIS coder le backing en dur côté banc :
+# le défaut rgw ne vaut que faute de dérivation (parité loki_s3_backing, ADR 0036).
 mlflow_s3_backing: rgw
 mlflow_s3_endpoint: http://rook-ceph-rgw-datalake.rook-ceph:80
 mlflow_obc_name: mlflow-artifacts

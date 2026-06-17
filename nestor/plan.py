@@ -79,6 +79,15 @@ PHASE_PLAYBOOK: dict[str, PhaseSpec] = {
         "registry + CNPG + Dagster + Marquez",
         "DataOps (registry + CNPG + Dagster + Marquez)",
     ),
+    # MLflow (ADR 0082) : layer AUTONOME (hors _PATH_TAIL) — montée à la demande
+    # via le chemin générique `layers`. Dépend de dataops (base CNPG `mlflow`) et
+    # du backing S3 (SeaweedFS de monitoring en local-path / RGW datalake en Ceph) —
+    # ces dépendances sont déclarées dans le graphe atomique (rollback-lib.sh).
+    "mlflow": PhaseSpec(
+        "bootstrap/mlflow.yaml",
+        "serveur MLflow (suivi de modèles, backend CNPG + artefacts S3)",
+        "MLflow (suivi de modèles)",
+    ),
     "gitops-seed": PhaseSpec(
         None, "init Gitea (données, ADR 0044 — script)", "init GitOps (seed Gitea)"
     ),

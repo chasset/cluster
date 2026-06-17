@@ -53,6 +53,7 @@ KNOWN_PHASES = (
     "metrics-server",
     "monitoring",
     "dataops",
+    "mlflow",
     "gitops",
     "gitops-seed",
 )

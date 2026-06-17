@@ -32,6 +32,7 @@ rollback_phase_namespaces() {
         ceph)            printf 'rook-ceph\n' ;;
         monitoring)      printf 'monitoring\n' ;;
         dataops)         printf 'postgres dagster marquez\n' ;;
+        mlflow)          printf 'mlflow\n' ;;  # layer autonome : son seul ns (la base CNPG `mlflow` reste à dataops)
         gitops)          printf 'argocd gitea\n' ;;
         *)               printf '\n' ;;  # sc, datalake, metrics-server, gitops-seed : pas de ns à supprimer
     esac
@@ -73,6 +74,13 @@ rollback_phase_targeted_resources() {
             # CONDITIONNEL au backend (cf. monitoring) : pas d'OBC ni de CRD en local-path.
             [ "$(_rb_backend)" = ceph ] \
                 && printf -- '-n rook-ceph objectbucketclaim.objectbucket.io cnpg-backups\n'
+            : ;;
+        mlflow)
+            # OBC de l'artefact store MLflow, posée par platform-s3-bucket DANS rook-ceph
+            # (ns ≠ mlflow). Même raison que dataops/monitoring : libère le datalake.
+            # CONDITIONNEL au backend : pas d'OBC ni de CRD objectbucket en local-path.
+            [ "$(_rb_backend)" = ceph ] \
+                && printf -- '-n rook-ceph objectbucketclaim.objectbucket.io mlflow-artifacts\n'
             : ;;
         gitops-seed)
             # Données dans Gitea (org/repo) + Application Argo CD seed — best-effort.
@@ -118,6 +126,9 @@ rollback_phase_has_nodeside() {
 rollback_phase_downstream() {
     case "${1:-}" in
         ceph)     printf 'sc datalake wordpress\n' ;;
+        # MLflow dépend de la base CNPG `mlflow` (posée par dataops) → on ne défait
+        # pas dataops tant que mlflow est monté (ordre inverse, ADR 0054 §4).
+        dataops)  printf 'mlflow\n' ;;
         gitops)   printf 'gitops-seed\n' ;;
         *)        printf '\n' ;;
     esac
@@ -128,7 +139,7 @@ rollback_phase_downstream() {
 #   dispatch à rejeter un nom inconnu.
 rollback_known_phase() {
     case "${1:-}" in
-        ceph | sc | datalake | metrics-server | monitoring | dataops | gitops | gitops-seed)
+        ceph | sc | datalake | metrics-server | monitoring | dataops | mlflow | gitops | gitops-seed)
             return 0 ;;
         *) return 1 ;;
     esac
@@ -226,6 +237,7 @@ component_namespace() {
         cnpg-cluster-pg)  printf 'postgres\n' ;;          # POSSESSEUR unique de postgres
         dagster)          printf 'dagster\n' ;;
         marquez)          printf 'marquez\n' ;;
+        mlflow)           printf 'mlflow\n' ;;           # POSSESSEUR du ns mlflow (layer autonome)
         gitea)            printf 'gitea\n' ;;
         argocd)           printf 'argocd\n' ;;
         # ∅ : racines (bootstrap→kube-system NON supprimable, build-images,
@@ -276,6 +288,11 @@ component_targeted() {
             printf -- '-n postgres scheduledbackup.postgresql.cnpg.io pg-daily\n' ;;
         s3-backing-cnpg)
             printf -- '-n rook-ceph objectbucketclaim.objectbucket.io cnpg-backups\n' ;;
+        s3-backing-mlflow)
+            # OBC de l'artefact store MLflow dans rook-ceph (ns d'autrui) → targeted
+            # du PRODUCTEUR (n'existe QU'en Ceph ; en local-path c'est SeaweedFS, pas
+            # d'OBC). component_profile=ceph le filtre hors du graphe local-path.
+            printf -- '-n rook-ceph objectbucketclaim.objectbucket.io mlflow-artifacts\n' ;;
         gitea)
             printf -- '-n gitea httproute.gateway.networking.k8s.io gitea\n'
             printf -- '-n gitea gateway.gateway.networking.k8s.io gitea\n' ;;
@@ -329,7 +346,7 @@ component_has_nodeside() {
 #   - always: tout le reste
 component_profile() {
     case "${1:-}" in
-        ceph | sc | datalake | s3-backing-loki | s3-backing-cnpg) printf 'ceph\n' ;;
+        ceph | sc | datalake | s3-backing-loki | s3-backing-cnpg | s3-backing-mlflow) printf 'ceph\n' ;;
         seaweedfs | storage-simple)                               printf 'leger\n' ;;
         *)                                                        printf 'always\n' ;;
     esac
@@ -386,9 +403,16 @@ component_deps() {
         barman-plugin)    printf 'cnpg-operator cert-manager\n' ;;
         cnpg-secrets)     printf '\n' ;;
         s3-backing-cnpg)  printf '%s\n' "$S3" ;;
+        s3-backing-mlflow) printf '%s\n' "$S3" ;;
         cnpg-cluster-pg)  printf 'cnpg-operator barman-plugin cnpg-secrets s3-backing-cnpg %s\n' "$SC" ;;
         dagster)          printf 'cnpg-cluster-pg registry build-images\n' ;;
         marquez)          printf 'cnpg-cluster-pg registry build-images\n' ;;
+        # MLflow (layer autonome ADR 0082) : jumeau de marquez (base CNPG `mlflow`)
+        # MAIS image multi-arch officielle → PAS d'image maison (pas de registry/
+        # build-images), et un artefact store S3 (arête → s3-backing-mlflow codée en
+        # dur dans les deux backends, qui résout $S3 = datalake|seaweedfs). Le ns mlflow
+        # n'expose pas d'UI Gateway TLS dans le graphe banc (cert-manager via le socle).
+        mlflow)           printf 'cnpg-cluster-pg s3-backing-mlflow\n' ;;
         gitea)            printf 'cert-manager gateway-api %s\n' "$SC" ;;
         argocd)           printf 'cert-manager gateway-api gitea\n' ;;
         gitops-seed)      printf 'argocd gitea build-images\n' ;;
@@ -404,7 +428,8 @@ component_known() {
             | ceph | sc | datalake | seaweedfs | storage-simple | registry \
             | s3-backing-loki | prometheus-stack | loki | cnpg-operator \
             | barman-plugin | cnpg-secrets | s3-backing-cnpg | cnpg-cluster-pg \
-            | dagster | marquez | gitea | argocd | gitops-seed)
+            | dagster | marquez | mlflow | s3-backing-mlflow \
+            | gitea | argocd | gitops-seed)
             return 0 ;;
         *) return 1 ;;
     esac
@@ -417,7 +442,8 @@ component_all() {
         bootstrap build-images gateway-api cert-manager metrics-server \
         ceph sc datalake seaweedfs storage-simple registry s3-backing-loki \
         prometheus-stack loki cnpg-operator barman-plugin cnpg-secrets \
-        s3-backing-cnpg cnpg-cluster-pg dagster marquez gitea argocd gitops-seed
+        s3-backing-cnpg cnpg-cluster-pg dagster marquez \
+        mlflow s3-backing-mlflow gitea argocd gitops-seed
 }
 
 # component_expand_alias ALIAS
@@ -442,6 +468,11 @@ component_expand_alias() {
             : ;;
         dataops)      printf '%s\n' registry cnpg-operator barman-plugin \
             cnpg-secrets s3-backing-cnpg cnpg-cluster-pg dagster marquez ;;
+        # MLflow (layer AUTONOME ADR 0082) : alias = le serveur + son backing S3.
+        # Le backing SeaweedFS partagé (composant `seaweedfs`) N'EST PAS dans l'alias
+        # (mlflow ne le POSSÈDE pas — il vient en dépendance transitive via
+        # s3-backing-mlflow → $S3). En Ceph l'alias est byte-identique.
+        mlflow)       printf '%s\n' mlflow s3-backing-mlflow ;;
         gitops)       printf '%s\n' gitea argocd ;;
         gitops-seed)  printf '%s\n' gitops-seed ;;
         # atlas-ceph = clôture Ceph SANS metrics-server (monté par l'alias léger
@@ -475,6 +506,9 @@ component_alias_weight() {
         registry | cnpg-operator | barman-plugin | cnpg-secrets | s3-backing-cnpg | cnpg-cluster-pg | dagster | marquez)
             printf '6\n' ;;
         gitops-seed)                                                             printf '7\n' ;;
+        # MLflow (layer autonome) : APRÈS dataops/gitops (dépend de cnpg-cluster-pg,
+        # poids 6) — poids 8 le place en queue, avant le repli générique (9).
+        mlflow | s3-backing-mlflow)                                              printf '8\n' ;;
         *)                                                                       printf '9\n' ;;
     esac
 }
@@ -556,7 +590,7 @@ topo_sort() {
 # vérité (_DEPENDENTS/_MOUNT_ORDER en dur dans roundtrip.py — ADR 0066 §invariant 3).
 
 # Les phases (alias) que roundtrip éprouve. metrics-server inclus (couche à part).
-_ROUNDTRIP_PHASES="ceph sc datalake metrics-server monitoring dataops gitops gitops-seed"
+_ROUNDTRIP_PHASES="ceph sc datalake metrics-server monitoring dataops mlflow gitops gitops-seed"
 
 # phase_of_component COMP — la phase (alias) qui contient COMP, ou vide si COMP est
 # un composant SOCLE (bootstrap/cert-manager/gateway-api/build-images) qu'aucune

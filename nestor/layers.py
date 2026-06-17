@@ -58,6 +58,7 @@ _QUEUE_PHASES = frozenset(
         "monitoring",
         "gitops",
         "dataops",
+        "mlflow",
         "gitops-seed",
     }
 )

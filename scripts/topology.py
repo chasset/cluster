@@ -656,6 +656,10 @@ _LAYER_SIGNAL: dict[str, tuple[str, str, str | None, bool | str]] = {
     "monitoring": ("statefulset", "loki", "monitoring", True),
     "gitops": ("deployment", "argocd-server", "argocd", True),
     "dataops": ("deployment", "dagster-dagster-webserver", "dagster", True),
+    # MLflow (layer autonome ADR 0082) : le serveur est un Deployment `mlflow`
+    # (nom posé par platform/mlflow/mlflow.yaml) dans le ns `mlflow`. Sa présence
+    # Ready prouve la couche montée (sinon next/preview la croiraient à monter).
+    "mlflow": ("deployment", "mlflow", "mlflow", True),
     # gitops-seed pose l'Application Argo CD `atlas-workflows` (PAS `atlas` : cf. le
     # manifeste atlas-workflow-sample/application.example.yaml + le scénario 27). Avec le
     # mauvais nom, `_observed_layers` ne la voyait jamais faite → `next` la re-proposait en
