@@ -15,6 +15,17 @@
   become: true
   become_method: ansible.builtin.sudo
   block:
+    # `_needs_local_build` : un BUILD nerdctl tourne sur CE nœud si l'arch est arm64
+    # (rebuild des officielles amd64-only) OU si une image de la liste a `build_all_arch`
+    # (image dérivée à builder sur TOUTE arche, ex. mlflow — ADR 0082). En x86 SANS
+    # build_all_arch, on ne fait que pull+retag : ni git ni buildkit requis.
+    - name: Determine whether a local build runs on this node
+      ansible.builtin.set_fact:
+        _needs_local_build: >-
+          {{ ansible_facts.architecture == 'aarch64'
+             or (build_images | selectattr('build_all_arch', 'defined')
+                              | selectattr('build_all_arch') | list | length > 0) }}
+
     # ── Prépa build (drift L18 : git absent, buildkit disabled) ──────────────
     - name: Install build prerequisites (git)
       ansible.builtin.apt:
@@ -22,33 +33,41 @@
         state: present
         update_cache: true
         cache_valid_time: 3600
-      when: ansible_facts.architecture == 'aarch64'
+      when: _needs_local_build | bool
 
     - name: Enable and start buildkit
       ansible.builtin.systemd_service:
         name: buildkit
         enabled: true
         state: started
-      when: ansible_facts.architecture == 'aarch64'
+      when: _needs_local_build | bool
 
     # ── Sources sur le nœud (drift L27 : pas de montage hôte) ────────────────
-    - name: Ensure per-image build directories exist
+    # Images à CONTEXTE LOCAL (clé `src_context`) : dossier copié tel quel sur le nœud
+    # (Dagster pur Python, MLflow officielle+psycopg2). Générique sur `build_images` →
+    # une image build_all_arch (mlflow) est copiée même en x86. Marquez (clé
+    # `src_dockerfile` + clone) est traité séparément ci-dessous.
+    - name: Copy local build contexts to the builder node
+      ansible.builtin.copy:
+        src: '{{ item.src_context }}'
+        dest: '{{ item.build_context }}/'
+        mode: '0644'
+      loop: "{{ build_images | selectattr('src_context', 'defined') | list }}"
+      loop_control:
+        label: '{{ item.name }}'
+      when:
+        - _needs_local_build | bool
+        - ansible_facts.architecture == 'aarch64' or (item.build_all_arch | default(false) | bool)
+
+    # Répertoires des images Marquez (Dockerfile versionné copié à côté du clone source).
+    - name: Ensure Marquez build directories exist
       ansible.builtin.file:
         path: '{{ build_workdir }}/{{ item }}'
         state: directory
         mode: '0755'
       loop:
-        - dagster
         - marquez
         - marquez-web
-      when: ansible_facts.architecture == 'aarch64'
-
-    # Dagster : contexte local (Dockerfile pur Python) copié tel quel sur le nœud.
-    - name: Copy Dagster build context to the builder node
-      ansible.builtin.copy:
-        src: '{{ platform_repo_dir }}/platform/dagster/image/'
-        dest: '{{ build_workdir }}/dagster/'
-        mode: '0644'
       when: ansible_facts.architecture == 'aarch64'
 
     # Marquez : clone du source upstream SUR le nœud (contexte gradle/web).
