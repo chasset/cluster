@@ -1,0 +1,31 @@
+# code: language=ansible
+# Défauts du rôle platform-mlflow (ADR 0082) — serveur de suivi de modèles.
+# Valeurs génériques (ADR 0023) ; les vraies creds vivent hors dépôt.
+
+platform_repo_dir: '{{ playbook_dir }}/..'
+mlflow_namespace: mlflow
+cnpg_namespace: postgres
+
+# Backend store CNPG : on dérive le Secret `mlflow-pg-auth` (clé postgresql-password)
+# du Secret du rôle CNPG `pg-role-mlflow`.
+mlflow_cnpg_role_secret: pg-role-mlflow
+mlflow_pg_auth_secret: mlflow-pg-auth
+
+# Artefact store S3 (ADR 0036) — backing par défaut de RÔLE : RGW Ceph (prod).
+# DÉRIVÉ par topologie : nestor (derive_run_params) passe `mlflow_s3_backing` et
+# `mlflow_s3_endpoint` en `-e` selon le backend (rgw en Ceph, seaweedfs en banc
+# léger) — MÊME backing que Loki/CNPG. Ne JAMAIS coder le backing en dur côté banc :
+# le défaut rgw ne vaut que faute de dérivation (parité loki_s3_backing, ADR 0036).
+mlflow_s3_backing: rgw
+mlflow_s3_endpoint: http://rook-ceph-rgw-datalake.rook-ceph:80
+mlflow_obc_name: mlflow-artifacts
+mlflow_obc_namespace: rook-ceph
+mlflow_obc_storage_class: rook-ceph-datalake
+mlflow_buckets: [mlflow-artifacts]
+# Creds de test du backing SeaweedFS (banc léger) — ignorées en RGW (OBC auto-géré).
+mlflow_s3_access_key: seaweedadmin
+mlflow_s3_secret_key: seaweedadmin-secret
+
+# Gate Ready du Deployment mlflow.
+mlflow_ready_retries: 30
+mlflow_ready_delay: 10

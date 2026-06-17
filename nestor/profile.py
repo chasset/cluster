@@ -143,6 +143,12 @@ def derive_run_params(topo: Topology) -> dict:
         "cnpg_s3_endpoint": params["s3_endpoint"],
         "loki_s3_backing": params["s3_backing"],
         "loki_s3_endpoint": params["s3_endpoint"],
+        # MLflow (layer autonome, ADR 0082) consomme le MÊME backing S3 (artefact
+        # store) que Loki/CNPG : rgw (banc Ceph/prod) ou seaweedfs (banc léger).
+        # SANS ces clés, platform-mlflow retombe sur le défaut `rgw` → OBC sur un
+        # CRD objectbucketclaim ABSENT en local-path → échec (vécu au banc léger).
+        "mlflow_s3_backing": params["s3_backing"],
+        "mlflow_s3_endpoint": params["s3_endpoint"],
         "argocd_apply_gateway": params["argocd_apply_gateway"],
     }
     osd = derive_osd_expected(topo)

@@ -1,6 +1,7 @@
 # Ingress vers Postgres (port 5432) depuis les CONSOMMATEURS déclarés uniquement :
 #   - `dagster` (event log de l'orchestrateur, 1.7)
 #   - `marquez` (store de lineage OpenLineage, 1.8)
+#   - `mlflow` (backend store du suivi de modèles, ADR 0082)
 #   - `citation-serving` (consommateur de l'index pgvector, dépôt atlas)
 # Tout autre namespace est bloqué par le default-deny.
 apiVersion: networking.k8s.io/v1
@@ -22,6 +23,9 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: marquez
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mlflow
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: citation-serving

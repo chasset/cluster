@@ -52,6 +52,8 @@ spec:
       namespace: dagster
     - server: https://kubernetes.default.svc
       namespace: marquez
+    - server: https://kubernetes.default.svc
+      namespace: mlflow
 
   # (c1) Cluster-scoped : Namespace seul (les apps portent leur namespace.yaml).
   # Pas de group:'*'/kind:'*' → pas de RBAC/CRD/ClusterRole déployables par les

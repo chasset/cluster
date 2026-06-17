@@ -1,0 +1,32 @@
+# Egress vers l'artefact store S3 (ADR 0036) — selon le backing actif :
+#   - banc léger : SeaweedFS (ns s3, port 8333) ;
+#   - topologie Ceph : RGW (rook-ceph-rgw-datalake:80, pod 8080).
+# Modèle dagster/allow-s3-egress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-s3-egress
+  namespace: mlflow
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    # Banc léger : SeaweedFS.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: s3
+      ports:
+        - protocol: TCP
+          port: 8333
+    # Topologie Ceph : RGW (Service rook-ceph-rgw-datalake:80, pod 8080).
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rook-ceph
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 8080

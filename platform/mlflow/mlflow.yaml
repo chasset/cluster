@@ -1,0 +1,148 @@
+# Serveur de suivi de modèles MLflow (ADR 0082) — manifeste figé appliqué par le
+# rôle Ansible `platform-mlflow` (kubernetes.core.k8s), comme Dagster/Marquez.
+#
+# Ce fichier NE porte PAS `metadata.namespace` : le rôle l'applique dans le ns
+# `mlflow` (`kubectl apply -n mlflow`), comme les autres addons figés.
+#
+# MLflow = un seul serveur HTTP (API + UI, port 5000). Backend store = base CNPG
+# `mlflow` (`--backend-store-uri`). Artefact store = S3 (`--default-artifact-root`,
+# `MLFLOW_S3_ENDPOINT_URL`) ; le bucket OBC est résolu au runtime et injecté par le
+# rôle (env `MLFLOW_DEFAULT_ARTIFACT_ROOT`/`MLFLOW_S3_ENDPOINT_URL` patchés à l'apply,
+# comme Loki templise son endpoint S3). Image multi-arch officielle épinglée par
+# digest d'index (ADR 0006) — pas d'image maison (≠ Marquez/Dagster).
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/component: tracking-server
+    app.kubernetes.io/part-of: dataops
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/instance: mlflow
+  ports:
+    - name: http
+      port: 5000
+      targetPort: http
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/instance: mlflow
+    app.kubernetes.io/component: tracking-server
+    app.kubernetes.io/part-of: dataops
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mlflow
+      app.kubernetes.io/instance: mlflow
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mlflow
+        app.kubernetes.io/instance: mlflow
+        app.kubernetes.io/component: tracking-server
+        app.kubernetes.io/part-of: dataops
+    spec:
+      serviceAccountName: default
+      # Durcissement (KSV-0118) : non-root, pas d'escalade, capabilities droppées.
+      # rootfs NON read-only (KSV-0014 allowlisté) : MLflow écrit son cache/tmp et le
+      # spooling S3 dans /tmp — read-only casserait le serveur (acté comme Dagster).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      # wait-for-db : MLflow crée/migre son schéma au démarrage → attendre que CNPG
+      # réponde. Image postgres épinglée par digest d'index multi-arch (ADR 0006),
+      # identique à l'init Dagster/Marquez.
+      initContainers:
+        - name: wait-for-db
+          image: 'docker.io/library/postgres:14.6@sha256:f565573d74aedc9b218e1d191b04ec75bdd50c33b2d44d91bcd3db5f2fcea647'
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - sh
+            - -c
+            - 'until pg_isready -h "pg-rw.postgres.svc.cluster.local" -p 5432 -U mlflow; do echo waiting for database; sleep 2; done;'
+      containers:
+        - name: mlflow
+          # Image officielle MULTI-ARCH (amd64+arm64) épinglée par digest d'INDEX (ADR 0006).
+          image: 'ghcr.io/mlflow/mlflow:v3.4.0@sha256:9c9e24a3fc24a0e9dcc5ba1daa9ebfc59e01b0a23b6eb89a4fdf25b84ad5347c'
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          # `mlflow server` : backend store = base CNPG `mlflow` ; artefact store = S3
+          # (--default-artifact-root injecté par MLFLOW_DEFAULT_ARTIFACT_ROOT, résolu au
+          # runtime par le rôle car le bucket OBC est auto-nommé).
+          command:
+            - sh
+            - -c
+            - >-
+              mlflow server --host 0.0.0.0 --port 5000
+              --backend-store-uri "postgresql://mlflow:${MLFLOW_PG_PASSWORD}@pg-rw.postgres.svc.cluster.local:5432/mlflow"
+              --default-artifact-root "${MLFLOW_DEFAULT_ARTIFACT_ROOT}"
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          env:
+            # Backend store : mot de passe du rôle CNPG `mlflow` (Secret dérivé).
+            - name: MLFLOW_PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-pg-auth
+                  key: postgresql-password
+            # Artefact store S3 : endpoint + bucket résolus et injectés par le rôle
+            # Ansible (placeholders ; le rôle patche ces deux env à l'apply).
+            - name: MLFLOW_DEFAULT_ARTIFACT_ROOT
+              value: 's3://mlflow-artifacts/'
+            - name: MLFLOW_S3_ENDPOINT_URL
+              value: 'http://rook-ceph-rgw-datalake.rook-ceph:80'
+            # Creds S3 produits par platform-s3-bucket (Secret `mlflow-s3-creds`).
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-s3-creds
+                  key: ACCESS_KEY_ID
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mlflow-s3-creds
+                  key: ACCESS_SECRET_KEY
+          resources:
+            limits:
+              memory: 768Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi

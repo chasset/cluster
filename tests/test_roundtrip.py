@@ -20,7 +20,13 @@ from nestor import roundtrip  # noqa: E402
 class Closure(unittest.TestCase):
     def test_leaf_is_itself(self):
         self.assertEqual(roundtrip.closure("monitoring"), ["monitoring"])
-        self.assertEqual(roundtrip.closure("dataops"), ["dataops"])
+        # mlflow est une FEUILLE (rien ne dépend d'elle) — clôture = elle-même.
+        self.assertEqual(roundtrip.closure("mlflow"), ["mlflow"])
+
+    def test_dataops_pulls_mlflow(self):
+        # mlflow (layer autonome ADR 0082) dépend de la base CNPG posée par dataops
+        # → défaire dataops oblige à défaire mlflow d'abord (ordre inverse, ADR 0054).
+        self.assertEqual(roundtrip.closure("dataops"), ["dataops", "mlflow"])
 
     def test_gitops_pulls_seed(self):
         self.assertEqual(roundtrip.closure("gitops"), ["gitops", "gitops-seed"])
@@ -54,13 +60,15 @@ class Closure(unittest.TestCase):
     def test_closure_derives_full_dependents(self):
         # La clôture DÉRIVÉE doit reproduire l'ancien graphe validé à la main :
         # détruire `sc` orpheline aussi gitops (PVC gitea sur la StorageClass).
+        # mlflow (layer autonome ADR 0082) sort en QUEUE : elle dépend de dataops
+        # (base CNPG) → tout ce qui tire dataops tire aussi mlflow, défaite en dernier.
         self.assertEqual(
             roundtrip.closure("ceph"),
-            ["ceph", "sc", "datalake", "monitoring", "gitops", "dataops", "gitops-seed"],
+            ["ceph", "sc", "datalake", "monitoring", "gitops", "dataops", "gitops-seed", "mlflow"],
         )
         self.assertEqual(
             roundtrip.closure("sc"),
-            ["sc", "datalake", "monitoring", "gitops", "dataops", "gitops-seed"],
+            ["sc", "datalake", "monitoring", "gitops", "dataops", "gitops-seed", "mlflow"],
         )
 
     def test_unknown_phase_rejected(self):
@@ -74,7 +82,7 @@ class StorageGuard(unittest.TestCase):
             self.assertTrue(roundtrip.involves_storage(p))
 
     def test_app_layers_do_not(self):
-        for p in ("monitoring", "gitops", "dataops", "gitops-seed", "metrics-server"):
+        for p in ("monitoring", "gitops", "dataops", "mlflow", "gitops-seed", "metrics-server"):
             self.assertFalse(roundtrip.involves_storage(p))
 
 

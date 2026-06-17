@@ -656,6 +656,10 @@ _LAYER_SIGNAL: dict[str, tuple[str, str, str | None, bool | str]] = {
     "monitoring": ("statefulset", "loki", "monitoring", True),
     "gitops": ("deployment", "argocd-server", "argocd", True),
     "dataops": ("deployment", "dagster-dagster-webserver", "dagster", True),
+    # MLflow (layer autonome ADR 0082) : le serveur est un Deployment `mlflow`
+    # (nom posé par platform/mlflow/mlflow.yaml) dans le ns `mlflow`. Sa présence
+    # Ready prouve la couche montée (sinon next/preview la croiraient à monter).
+    "mlflow": ("deployment", "mlflow", "mlflow", True),
     # gitops-seed pose l'Application Argo CD `atlas-workflows` (PAS `atlas` : cf. le
     # manifeste atlas-workflow-sample/application.example.yaml + le scénario 27). Avec le
     # mauvais nom, `_observed_layers` ne la voyait jamais faite → `next` la re-proposait en
@@ -2275,7 +2279,14 @@ def cmd_next(args: argparse.Namespace) -> int:
     runs = load_runs(args.history or _RUNS_HISTORY)
     now = int(dt.datetime.now(tz=dt.UTC).timestamp())
     target = args.target  # None → plan.default_target le déduit
-    run = _run_for_target(runs, target)
+    # Run de référence ANCRÉ SUR LA STACK (sa topologie), comme `preview` (ADR 0052/0056
+    # §7) — JAMAIS un fallback `latest_run` global qui attraperait le run d'une AUTRE
+    # topologie (ex. un run `atlas-ceph` multi-node servant de référence à un banc
+    # `1cp` local-path → `done` pollué par ceph/sc/datalake/gitops-seed → `next`
+    # croit gitops-seed fait et dit « à jour » alors que `preview` le voit « à installer »).
+    # `last_run_for_topology` ne retombe sur AUCUN run d'une autre stack (cf. son docstring).
+    stack_name = topo.catalog.get("topology", "—")
+    run = last_run_for_topology(runs, stack_name)
     etat_frais, _ = verdict_for_run(run, target, now)
     done = set(run.phases) if run is not None else set()
     # Le RÉEL prime sur l'historique (même logique que `preview`, ADR 0052/0056 §7) :

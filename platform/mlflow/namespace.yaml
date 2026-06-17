@@ -1,0 +1,11 @@
+# Namespace du serveur de suivi de modèles MLflow (ADR 0082).
+# Les addons portent leur propre namespace. Ce ns héberge le serveur MLflow (API + UI,
+# port 5000). Le backend store persiste dans la base `mlflow` de CloudNativePG (ns
+# postgres) ; les artefacts dans un bucket S3 (OBC). atlas y logue ses runs/modèles.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mlflow
+  labels:
+    app.kubernetes.io/name: mlflow
+    app.kubernetes.io/part-of: dataops

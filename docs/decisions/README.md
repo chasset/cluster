@@ -101,3 +101,4 @@ Format léger inspiré de Michael Nygard :
 | 0079 | [Découverte de l'appartenance réelle : socle commun `health` + `remove`](0079-rollback-par-decouverte-appartenance.md)               | Accepted           |
 | 0080 | [Notations externes & badges README : doctrine d'affichage](0080-notations-et-badges-readme.md)                                      | Accepted           |
 | 0081 | [Socle d'exécution node-side : une brique `node_exec`, deux usages (`discover`, `remove`)](0081-socle-execution-node-side.md)        | Proposed           |
+| 0082 | [Suivi de modèles via MLflow](0082-suivi-modeles-mlflow.md)                                                                          | Proposed           |

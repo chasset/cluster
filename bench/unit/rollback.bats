@@ -314,8 +314,9 @@ setup() {
 @test "atom/acyclicité : topo_sort sur TOUS les composants réussit (pas de cycle)" {
     run topo_sort $(component_all)
     [ "$status" -eq 0 ]
-    # 24 composants (catalogue complet : + storage-simple, ADR 0069), tous émis.
-    [ "$(printf '%s\n' "$output" | grep -c .)" -eq 24 ]
+    # 26 composants (catalogue complet : 24 + mlflow + s3-backing-mlflow, ADR 0082),
+    # tous émis (pas de cycle).
+    [ "$(printf '%s\n' "$output" | grep -c .)" -eq 26 ]
 }
 
 @test "atom/acyclicité : un cycle injecté est DÉTECTÉ (échec, code ≠0)" {
@@ -439,21 +440,23 @@ setup() {
 # « → sc » (PVC bloc) sont load-bearing pour gitops/gitops-seed (workflow consigné
 # 2026-06-13, 2ᵉ trace).
 
-@test "phase/closure : ceph dérive TOUTE la pile (== ancien _DEPENDENTS)" {
+@test "phase/closure : ceph dérive TOUTE la pile (== ancien _DEPENDENTS + mlflow)" {
+    # mlflow (layer autonome ADR 0082) sort en QUEUE : dépend de dataops (base CNPG).
     run phase_closure ceph
-    [ "$(printf '%s' "$output" | tr '\n' ' ')" = "ceph sc datalake monitoring gitops dataops gitops-seed" ]
+    [ "$(printf '%s' "$output" | tr '\n' ' ')" = "ceph sc datalake monitoring gitops dataops gitops-seed mlflow" ]
 }
 
 @test "phase/closure : sc tire gitops/gitops-seed (arête gitea→sc load-bearing)" {
     local cl; cl=$(phase_closure sc | tr '\n' ' ')
-    [ "$cl" = "sc datalake monitoring gitops dataops gitops-seed " ]
+    [ "$cl" = "sc datalake monitoring gitops dataops gitops-seed mlflow " ]
     # Sans l'arête gitea→sc, gitops serait absent — c'est le cœur du fix Lot 1.
     [[ "$cl" == *"gitops"* ]]
 }
 
-@test "phase/closure : datalake tire monitoring + dataops, PAS gitops" {
+@test "phase/closure : datalake tire monitoring + dataops (+ mlflow), PAS gitops" {
+    # mlflow suit dataops (dépend de sa base CNPG) ; gitops reste hors clôture datalake.
     run phase_closure datalake
-    [ "$(printf '%s' "$output" | tr '\n' ' ')" = "datalake monitoring dataops" ]
+    [ "$(printf '%s' "$output" | tr '\n' ' ')" = "datalake monitoring dataops mlflow" ]
 }
 
 @test "phase/closure : gitops tire gitops-seed" {
@@ -464,10 +467,16 @@ setup() {
 @test "phase/closure : feuilles ne tirent qu'elles-mêmes" {
     run phase_closure monitoring
     [ "$output" = "monitoring" ]
-    run phase_closure dataops
-    [ "$output" = "dataops" ]
+    # mlflow est la VRAIE feuille (rien ne dépend d'elle) ; dataops la tire désormais.
+    run phase_closure mlflow
+    [ "$output" = "mlflow" ]
     run phase_closure metrics-server
     [ "$output" = "metrics-server" ]
+}
+
+@test "phase/closure : dataops tire mlflow (base CNPG mlflow, ADR 0082)" {
+    run phase_closure dataops
+    [ "$(printf '%s' "$output" | tr '\n' ' ')" = "dataops mlflow" ]
 }
 
 @test "phase/closure : ordre de MONTAGE (amont→aval, première occurrence)" {

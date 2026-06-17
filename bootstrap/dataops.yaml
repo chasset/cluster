@@ -8,6 +8,10 @@
 #
 # Ordre inter-briques : registry → cert-manager → CNPG → (build) → Dagster/Marquez.
 #
+# MLflow N'EST PAS ici : c'est une layer AUTONOME (bootstrap/mlflow.yaml, ADR 0082)
+# montée séparément (nestor `up --layers mlflow`). Elle DÉPEND de dataops (base CNPG
+# `mlflow`) — le graphe atomique (rollback-lib.sh) ordonne dataops avant mlflow.
+#
 # HÔTE D'EXÉCUTION k8s (`dataops_k8s_host`, défaut localhost) : les tâches
 # kubernetes.core ciblent l'API via le KUBECONFIG de l'exécuteur. Banc Lima :
 # localhost (kubeconfig rapatrié via port-forward). Prod : surcharger par un

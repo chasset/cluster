@@ -1,0 +1,145 @@
+# code: language=ansible
+# Rôle platform-mlflow (ADR 0033/0082) — serveur de suivi de modèles MLflow.
+# Backend store = base CNPG `mlflow` ; artefact store = S3 (RGW Ceph / SeaweedFS,
+# ADR 0036). Appliqué depuis le control-plane. Prérequis : CNPG (base/rôle mlflow) +
+# cert-manager (Gateway TLS) + le backing S3 (RGW datalake en Ceph). Calqué sur
+# platform-marquez (ns + Secret dérivé + apply + gate) + le bloc S3 de platform-loki.
+
+- name: Deploy MLflow tracking server
+  run_once: true
+  block:
+    - name: Apply MLflow namespace
+      kubernetes.core.k8s:
+        state: present
+        src: '{{ platform_repo_dir }}/platform/mlflow/namespace.yaml'
+
+    # NetworkPolicies : default-deny d'abord, puis les flux légitimes (DNS, intra,
+    # backend store PG, artefact store S3, ingress UI/API 5000).
+    - name: Apply MLflow network policies (default-deny first)
+      kubernetes.core.k8s:
+        state: present
+        namespace: '{{ mlflow_namespace }}'
+        src: '{{ platform_repo_dir }}/platform/network-policies/mlflow/{{ item }}'
+      loop:
+        - 00-default-deny.yaml
+        - allow-dns.yaml
+        - allow-intra-namespace.yaml
+        - allow-postgres-egress.yaml
+        - allow-s3-egress.yaml
+        - allow-web-ingress.yaml
+
+    # ── Backing S3 (bucket + Secret creds) via le rôle platform-s3-bucket ─────
+    # Factorisé (ADR 0036) : crée le bucket + le Secret `mlflow-s3-creds`, et résout
+    # le nom réel du bucket dans `s3b_bucket_resolved` (RGW : OBC auto-nommé).
+    - name: Provision the S3 backing (bucket + creds Secret)
+      ansible.builtin.include_role:
+        name: platform-s3-bucket
+      vars:
+        s3b_backing: '{{ mlflow_s3_backing }}'
+        s3b_endpoint: '{{ mlflow_s3_endpoint }}'
+        s3b_name: '{{ mlflow_obc_name }}'
+        s3b_namespace: '{{ mlflow_namespace }}'
+        s3b_secret_name: mlflow-s3-creds
+        s3b_buckets: '{{ mlflow_buckets }}'
+        s3b_obc_namespace: '{{ mlflow_obc_namespace }}'
+        s3b_obc_storage_class: '{{ mlflow_obc_storage_class }}'
+        s3b_access_key: '{{ mlflow_s3_access_key }}'
+        s3b_secret_key: '{{ mlflow_s3_secret_key }}'
+
+    # ── Secret dérivé du backend store : mot de passe du rôle CNPG `mlflow` →
+    #    clé `postgresql-password` (alignée Dagster). Source de vérité unique CNPG.
+    - name: Read the CNPG mlflow role password
+      kubernetes.core.k8s_info:
+        kind: Secret
+        name: '{{ mlflow_cnpg_role_secret }}'
+        namespace: '{{ cnpg_namespace }}'
+      register: mlflow_role_secret
+
+    - name: Assert the CNPG mlflow role password exists
+      ansible.builtin.assert:
+        that:
+          - mlflow_role_secret.resources | default([]) | length > 0
+          - mlflow_role_secret.resources[0].data.password is defined
+        fail_msg: >-
+          Secret {{ cnpg_namespace }}/{{ mlflow_cnpg_role_secret }} introuvable —
+          déployer platform-cnpg avant platform-mlflow.
+
+    - name: Derive the MLflow Postgres Secret
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: '{{ mlflow_pg_auth_secret }}'
+            namespace: '{{ mlflow_namespace }}'
+          type: Opaque
+          data:
+            postgresql-password: '{{ mlflow_role_secret.resources[0].data.password }}'
+
+    # ── Manifeste MLflow : on charge le rendu figé et on remplace les PLACEHOLDERS
+    #    S3 (bucket auto-nommé en RGW + endpoint du backing actif) par substitution de
+    #    chaîne AVANT le parse — pattern platform-loki/cnpg (une source figée + overlay,
+    #    ADR 0033). Le manifeste porte `s3://mlflow-artifacts/` et l'endpoint RGW comme
+    #    placeholders ; on les réécrit avec les valeurs RÉSOLUES.
+    - name: Load the MLflow manifest (S3 bucket + endpoint résolus)
+      ansible.builtin.set_fact:
+        mlflow_defs: >-
+          {{ lookup('file', platform_repo_dir ~ '/platform/mlflow/mlflow.yaml')
+             | replace('s3://mlflow-artifacts/', 's3://' ~ s3b_bucket_resolved ~ '/')
+             | replace('http://rook-ceph-rgw-datalake.rook-ceph:80', mlflow_s3_endpoint)
+             | from_yaml_all | select | list }}
+
+    - name: Apply MLflow resources
+      kubernetes.core.k8s:
+        state: present
+        namespace: '{{ mlflow_namespace }}'
+        definition: '{{ item }}'
+      loop: '{{ mlflow_defs }}'
+      loop_control:
+        label: "{{ item.kind | default('?') }}/{{ item.metadata.name | default('?') }}"
+
+    - name: Wait for MLflow to be Ready
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        name: mlflow
+        namespace: '{{ mlflow_namespace }}'
+      register: mlflow_deploy
+      until: >-
+        mlflow_deploy.resources | default([]) | length > 0
+        and (mlflow_deploy.resources[0].status.readyReplicas | default(0)) == 1
+      retries: '{{ mlflow_ready_retries }}'
+      delay: '{{ mlflow_ready_delay }}'
+
+  # Rescue DIAGNOSTIQUE (ADR 0050, #236) — calqué sur marquez/cnpg. Aucun delete.
+  rescue:
+    - name: Collect mlflow pods state (diagnostic)
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: '{{ mlflow_namespace }}'
+      register: mlflow_pods_diag
+      run_once: true
+    - name: Report mlflow convergence failure
+      ansible.builtin.debug:
+        msg: >-
+          MLflow non convergé. Pods non Running :
+          {{ mlflow_pods_diag.resources
+             | rejectattr('status.phase', 'equalto', 'Running')
+             | map(attribute='metadata.name') | list }}.
+          Causes fréquentes : base CNPG `mlflow` pas prête, bucket/creds S3 (OBC RGW),
+          image non pull. Diagnostic : kubectl -n {{ mlflow_namespace }} get
+          pods,events --sort-by=.lastTimestamp.
+      run_once: true
+    - name: Fail with an actionable message
+      ansible.builtin.fail:
+        msg: >-
+          Déploiement MLflow échoué (voir diagnostic ci-dessus). Le re-run du rôle
+          est idempotent et reprend — corriger d'abord la cause signalée.
+
+  always:
+    - name: MLflow deployment outcome
+      ansible.builtin.debug:
+        msg: >-
+          platform-mlflow terminé. Vérifier :
+          kubectl -n {{ mlflow_namespace }} get deploy mlflow.
+      run_once: true

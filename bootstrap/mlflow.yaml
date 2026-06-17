@@ -1,0 +1,61 @@
+# code: language=ansible
+# Layer MLflow (ADR 0082) — serveur de suivi de modèles, layer AUTONOME (nestor
+# `up --layers mlflow` / arm générique `layers`), DÉCOUPLÉE de dataops.yaml.
+#
+# MLflow est le jumeau de Marquez (backend store CNPG + artefact store S3) mais
+# avec une image MULTI-ARCH officielle (pas de build maison) → un SEUL play k8s
+# suffit (≠ dataops : pas d'étape nœuds/build). Ses PRÉREQUIS (déclarés au graphe
+# atomique rollback-lib.sh) sont montés AVANT par le chemin `layers` :
+#   - dataops (base CNPG `mlflow` + le cluster `pg`) — backend store ;
+#   - le backing S3 (SeaweedFS de monitoring en local-path / RGW datalake en Ceph)
+#     — artefact store ; le bucket `mlflow-artifacts` est créé par platform-s3-bucket.
+#
+# HÔTE D'EXÉCUTION k8s (`dataops_k8s_host`, défaut localhost) : pilote l'API via le
+# KUBECONFIG de l'exécuteur, comme dataops/monitoring (pré-tâches identiques). Les
+# valeurs de backing S3 sont DÉRIVÉES par nestor (derive_run_params) et passées en
+# `-e` (mlflow_s3_backing/mlflow_s3_endpoint) — jamais codées en dur (ADR 0036).
+
+- name: Layer MLflow — suivi de modèles (backend CNPG + artefacts S3)
+  hosts: "{{ dataops_k8s_host | default('localhost') }}"
+  gather_facts: false
+  # PAS d'audit-log : ce play pilote l'API k8s depuis le poste de contrôle
+  # (localhost), il ne `become` pas sur un nœud (cf. dataops.yaml Play 1).
+  # SSL_CERT_FILE : le Python d'Ansible n'utilise pas toujours le CA système →
+  # on pointe le bundle certifi de CE python (résolu en pré-tâche), comme dataops.
+  environment:
+    SSL_CERT_FILE: '{{ dataops_ca_bundle | default(omit) }}'
+  pre_tasks:
+    # kubernetes.core exige la lib Python `kubernetes` ; certifi fournit le CA.
+    # GARDE (#277) : libs versionnées (pyproject) + `uv sync` ; on VÉRIFIE leur
+    # présence et on oriente vers `uv sync` si elles manquent (idem dataops).
+    - name: 'Garde : client Python kubernetes+certifi présent (sinon : uv sync)'
+      block:
+        - name: Probe import kubernetes + certifi
+          ansible.builtin.command: "{{ ansible_python_interpreter | default('python3') }} -c 'import kubernetes, certifi'"
+          changed_when: false
+          check_mode: false
+      rescue:
+        - name: Manque le client Python — guider vers uv sync
+          ansible.builtin.fail:
+            msg: >-
+              Le client Python `kubernetes` (ou `certifi`) est introuvable dans
+              l'interpréteur {{ ansible_python_interpreter | default('python3') }}.
+              Provisionner le .venv du poste de contrôle avant de jouer ce play :
+              `uv sync` à la racine du dépôt (ADR 0006/0023, #277). Si le .venv
+              vit ailleurs, surcharger `ansible_python_interpreter` sur l'hôte
+              localhost de l'inventaire.
+    # Résout le bundle CA avec le MÊME interpréteur que les modules Ansible.
+    - name: Resolve the certifi CA bundle path
+      ansible.builtin.command: "{{ ansible_python_interpreter | default('python3') }} -c 'import certifi; print(certifi.where())'"
+      register: mlflow_certifi
+      changed_when: false
+    - name: Set the CA bundle for HTTPS requests
+      ansible.builtin.set_fact:
+        dataops_ca_bundle: '{{ mlflow_certifi.stdout | trim }}'
+  tasks:
+    # MLflow (suivi de modèles, ADR 0082) : image officielle multi-arch (pas de
+    # build), backend store CNPG `mlflow`, artefact store S3 (OBC RGW / SeaweedFS).
+    - name: Serveur de suivi de modèles MLflow (storage CNPG + artefacts S3)
+      ansible.builtin.import_role:
+        name: platform-mlflow
+      tags: mlflow
