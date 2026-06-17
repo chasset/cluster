@@ -103,3 +103,4 @@ Format léger inspiré de Michael Nygard :
 | 0081 | [Socle d'exécution node-side : une brique `node_exec`, deux usages (`discover`, `remove`)](0081-socle-execution-node-side.md)        | Proposed           |
 | 0082 | [Suivi de modèles via MLflow](0082-suivi-modeles-mlflow.md)                                                                          | Proposed           |
 | 0083 | [`layers` source unique de l'ordre : presets en alias, plus de chemins nommés par défaut](0083-layers-source-unique-de-l-ordre.md)   | Proposed           |
+| 0084 | [Sondes de lecture gatées par `target_kind` (isolation banc/prod, suite de 0053)](0084-sondes-de-lecture-gatees-par-target-kind.md)  | Proposed           |

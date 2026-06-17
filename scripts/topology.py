@@ -565,12 +565,19 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
     return 0
 
 
-def _real_vms() -> list[str]:
+def _real_vms(target_kind: str = "lima") -> list[str]:
     """Noms des VMs Lima EXISTANTES (toute stack), via `limactl list --format json`.
+
+    GATÉE par `target_kind` (ADR 0084) : `limactl` n'a de sens qu'en `lima`. Pour une
+    topo `prod` (baremetal), il n'existe AUCUNE « VM » créable localement (les nœuds
+    préexistent) → on rend `[]` sans lancer `limactl` (sinon `preview` prod listait les
+    VMs du banc Lima coexistant comme « orphelines » — faux RÉEL, ADR 0053/0084).
 
     Lecture seule du réel (ADR 0056 §7 : on ne stocke pas de state, on le lit). Une
     sortie illisible / `limactl` absent → liste vide (le refresh reste informatif,
     il ne plante pas le poste sans Lima)."""
+    if target_kind != "lima":
+        return []
     try:
         out = subprocess.run(  # noqa: S603 — argv fixe, pas d'entrée shell
             ["limactl", "list", "--format", "json"],
@@ -596,12 +603,21 @@ def _real_vms() -> list[str]:
     return vms
 
 
-def _ready_nodes() -> list[str]:
+def _ready_nodes(target_kind: str = "lima") -> list[str]:
     """Noms des nœuds k8s à l'état Ready (`kubectl get nodes`). Vide si injoignable.
 
-    Kubeconfig : `KUBECONFIG` exporté, sinon le banc, sinon un kubeconfig VIDE — jamais
-    `~/.kube/config` (la prod). Cf. `_bench_kubeconfig` (ADR 0053) : un banc absent
-    rend une liste vide (« pas de banc »), il ne lit pas la prod par accident."""
+    GATÉE par `target_kind` (ADR 0084) :
+    - `lima` : kubeconfig sûr (`_kubectl_env` → `KUBECONFIG` exporté, sinon banc, sinon
+      VIDE — jamais `~/.kube/config`, ADR 0053). Un banc absent rend une liste vide.
+    - `prod` : on ne sonde QUE si `KUBECONFIG` est EXPORTÉ explicitement (intention,
+      ADR 0053 (a)). Sinon `[]` — un `preview` prod sans cible nommée ne lit JAMAIS le
+      kubeconfig banc (qui afficherait `lima-*` Ready à tort) ni `~/.kube/config`."""
+    # En prod : sonder UNIQUEMENT si l'OPÉRATEUR a exporté KUBECONFIG explicitement.
+    # `_KUBECONFIG_AUTO_BENCH` distingue le défaut auto-posé vers le BANC par `main()`
+    # (≠ intention prod) : un KUBECONFIG auto-banc ne doit PAS faire sonder le banc pour
+    # une stack prod (sinon `preview` prod affiche `lima-*` Ready — bug #405, ADR 0084).
+    if target_kind != "lima" and (_KUBECONFIG_AUTO_BENCH or not os.environ.get("KUBECONFIG")):
+        return []
     try:
         out = subprocess.run(  # noqa: S603 — argv fixe, pas d'entrée shell
             # --request-timeout borne l'attente côté kubectl (cluster injoignable) ;
@@ -910,7 +926,7 @@ def cmd_destroy(args: argparse.Namespace) -> int:
     topo = load_topology(path)
     stack = topo.catalog.get("topology", "—")
     declared = topo.control_nodes + topo.worker_nodes
-    state = classify_refresh(stack, declared, _real_vms(), [])
+    state = classify_refresh(stack, declared, _real_vms(topo.target_kind), [])
     # On ne détruit QUE les VMs de la stack RÉELLEMENT présentes (vms_present) ; les
     # orphelines (autre stack) ne sont pas de notre ressort (destroy ≠ nettoyage).
     targets = state.vms_present
@@ -1921,7 +1937,9 @@ def cmd_preview(args: argparse.Namespace) -> int:
 
     # ── RÉEL (ex-`refresh`) : l'état lu du réel (non stocké, ADR 0056 §7) ─────────
     declared = topo.control_nodes + topo.worker_nodes
-    real = classify_refresh(stack_name, declared, _real_vms(), _ready_nodes())
+    real = classify_refresh(
+        stack_name, declared, _real_vms(topo.target_kind), _ready_nodes(topo.target_kind)
+    )
     print("RÉEL (lu, non stocké) :")
     print(f"  VMs présentes  : {', '.join(real.vms_present) or '—'}")
     print(f"  VMs à créer    : {', '.join(real.vms_missing) or '—'}")
@@ -1968,7 +1986,12 @@ def cmd_preview(args: argparse.Namespace) -> int:
     # « namespace présent » : une couche posée à MOITIÉ (ns créé mais Loki absent) RESTE « à
     # installer » — sinon un montage échoué à mi-chemin s'afficherait « ✓ ».
     a_appliquer -= observed_socle
-    a_appliquer -= _observed_layers([p for p in seq if p in a_appliquer])
+    # Couches applicatives observées (signaux kubectl) : ne sonder QUE si le cluster
+    # ciblé répond (nœuds Ready) — sinon `_observed_layers` (kubeconfig banc) lirait les
+    # couches du banc Lima pour une stack prod sans cible (ADR 0084). nodes_ready vide en
+    # prod sans KUBECONFIG → on ne soustrait rien (RÉEL honnêtement « rien d'observé »).
+    if real.nodes_ready:
+        a_appliquer -= _observed_layers([p for p in seq if p in a_appliquer])
     # jamais monté ≠ rejeu : `jamais` (aucun run de la stack) → « à installer » (inédit) ;
     # `perime` (run existant mais plus frais) → « à rejouer ».
     rejeu = freshness == "perime"
@@ -2291,7 +2314,9 @@ def cmd_next(args: argparse.Namespace) -> int:
     # VMs et propose `storage-simple` sur un banc inexistant. `next` respecte ainsi le
     # PLAN de `preview` (qui fait ce même calcul).
     declared = topo.control_nodes + topo.worker_nodes
-    observed_socle = observed_done_phases(declared, _real_vms(), _ready_nodes())
+    observed_socle = observed_done_phases(
+        declared, _real_vms(topo.target_kind), _ready_nodes(topo.target_kind)
+    )
     done -= {"up", "bootstrap"} - observed_socle  # retire le socle que le réel CONTREDIT
     run_params = derive_run_params(topo)
     # Les couches MONTABLES maintenant (deps réelles satisfaites). La carte de
@@ -2312,7 +2337,14 @@ def cmd_next(args: argparse.Namespace) -> int:
     # Sans ça, `next` re-propose une couche déjà installée. `observed` = socle observé
     # + couches applicatives observées : `installable_now` les retire TOUJOURS (prime
     # sur la fraîcheur — sinon un run `jamais`/`perime` rejouerait toute la séquence).
-    observed_layers = _observed_layers([p for p in seq if p not in ("up", "bootstrap")])
+    # Ne sonder les couches applicatives (kubectl) QUE si le socle réel répond (ADR 0084) :
+    # sinon `_observed_layers` (kubeconfig banc) lirait le banc pour une stack prod sans
+    # cible. `observed_socle` vide en prod sans KUBECONFIG → on ne sonde pas les couches.
+    observed_layers = (
+        _observed_layers([p for p in seq if p not in ("up", "bootstrap")])
+        if observed_socle
+        else set()
+    )
     observed = observed_socle | observed_layers
     try:
         montables = installable_now(
