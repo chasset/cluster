@@ -251,6 +251,20 @@ def _active_stack_name(file_arg: str | None) -> str | None:
         return None
 
 
+def _active_topology_safe() -> Topology | None:
+    """La topologie de la stack ACTIVE (`topology.yaml`), ou None si absente/illisible.
+
+    Sert aux gardes d'isolation (ADR 0084) qui doivent connaître `target_kind` sans `-f`
+    (ex. `env`, appelé par le wrapper sans argument). Robuste : toute erreur → None
+    (l'appelant retombe sur le comportement banc par défaut)."""
+    if not os.path.exists(_DEFAULT_TOPOLOGY):
+        return None
+    try:
+        return load_topology(_DEFAULT_TOPOLOGY)
+    except (TopologyError, FileNotFoundError, OSError):
+        return None
+
+
 def _render_inventory(topo, kind: str, lima_home: str | None) -> str:
     """Rend l'inventaire selon le `kind` (prod ou lima). Façade sur le paquet."""
     if kind == "lima":
@@ -565,12 +579,19 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
     return 0
 
 
-def _real_vms() -> list[str]:
+def _real_vms(target_kind: str = "lima") -> list[str]:
     """Noms des VMs Lima EXISTANTES (toute stack), via `limactl list --format json`.
+
+    GATÉE par `target_kind` (ADR 0084) : `limactl` n'a de sens qu'en `lima`. Pour une
+    topo `prod` (baremetal), il n'existe AUCUNE « VM » créable localement (les nœuds
+    préexistent) → on rend `[]` sans lancer `limactl` (sinon `preview` prod listait les
+    VMs du banc Lima coexistant comme « orphelines » — faux RÉEL, ADR 0053/0084).
 
     Lecture seule du réel (ADR 0056 §7 : on ne stocke pas de state, on le lit). Une
     sortie illisible / `limactl` absent → liste vide (le refresh reste informatif,
     il ne plante pas le poste sans Lima)."""
+    if target_kind != "lima":
+        return []
     try:
         out = subprocess.run(  # noqa: S603 — argv fixe, pas d'entrée shell
             ["limactl", "list", "--format", "json"],
@@ -596,12 +617,21 @@ def _real_vms() -> list[str]:
     return vms
 
 
-def _ready_nodes() -> list[str]:
+def _ready_nodes(target_kind: str = "lima") -> list[str]:
     """Noms des nœuds k8s à l'état Ready (`kubectl get nodes`). Vide si injoignable.
 
-    Kubeconfig : `KUBECONFIG` exporté, sinon le banc, sinon un kubeconfig VIDE — jamais
-    `~/.kube/config` (la prod). Cf. `_bench_kubeconfig` (ADR 0053) : un banc absent
-    rend une liste vide (« pas de banc »), il ne lit pas la prod par accident."""
+    GATÉE par `target_kind` (ADR 0084) :
+    - `lima` : kubeconfig sûr (`_kubectl_env` → `KUBECONFIG` exporté, sinon banc, sinon
+      VIDE — jamais `~/.kube/config`, ADR 0053). Un banc absent rend une liste vide.
+    - `prod` : on ne sonde QUE si `KUBECONFIG` est EXPORTÉ explicitement (intention,
+      ADR 0053 (a)). Sinon `[]` — un `preview` prod sans cible nommée ne lit JAMAIS le
+      kubeconfig banc (qui afficherait `lima-*` Ready à tort) ni `~/.kube/config`."""
+    # En prod : sonder UNIQUEMENT si l'OPÉRATEUR a exporté KUBECONFIG explicitement.
+    # `_KUBECONFIG_AUTO_BENCH` distingue le défaut auto-posé vers le BANC par `main()`
+    # (≠ intention prod) : un KUBECONFIG auto-banc ne doit PAS faire sonder le banc pour
+    # une stack prod (sinon `preview` prod affiche `lima-*` Ready — bug #405, ADR 0084).
+    if target_kind != "lima" and (_KUBECONFIG_AUTO_BENCH or not os.environ.get("KUBECONFIG")):
+        return []
     try:
         out = subprocess.run(  # noqa: S603 — argv fixe, pas d'entrée shell
             # --request-timeout borne l'attente côté kubectl (cluster injoignable) ;
@@ -910,7 +940,7 @@ def cmd_destroy(args: argparse.Namespace) -> int:
     topo = load_topology(path)
     stack = topo.catalog.get("topology", "—")
     declared = topo.control_nodes + topo.worker_nodes
-    state = classify_refresh(stack, declared, _real_vms(), [])
+    state = classify_refresh(stack, declared, _real_vms(topo.target_kind), [])
     # On ne détruit QUE les VMs de la stack RÉELLEMENT présentes (vms_present) ; les
     # orphelines (autre stack) ne sont pas de notre ressort (destroy ≠ nettoyage).
     targets = state.vms_present
@@ -1216,6 +1246,20 @@ def cmd_env(args: argparse.Namespace) -> int:
     Sans `--force`, on respecte un KUBECONFIG déjà exporté (intention explicite) : on
     n'imprime rien d'écrasant, juste un rappel commenté sur stderr. Si le banc n'a pas
     de kubeconfig (pas encore monté), erreur d'usage."""
+    # Garde d'isolation (ADR 0084) : `env` pose le kubeconfig du BANC — sans objet pour
+    # une stack active `target_kind: prod`. L'exporter polluerait le shell prod avec le
+    # banc (et DÉSARMERAIT `_assert_bench_target` qui voit alors un KUBECONFIG « explicite »
+    # → `up`/`next` croiraient pouvoir muter, créant des VMs Lima sur une cible prod).
+    # Le wrapper `nestor` appelle `env --force` après up/next : on refuse en prod.
+    active = _active_topology_safe()
+    if active is not None and active.target_kind != "lima":
+        print(
+            f"# stack active `{active.catalog.get('topology', '?')}` est "
+            f"target_kind={active.target_kind} — `nestor env` ne pose PAS le kubeconfig "
+            "du banc (ADR 0084). Pour la prod, exporter le KUBECONFIG prod explicitement "
+            "ou `nestor discover --cp <nœud>`."
+        )
+        return 0
     if not os.path.exists(_BENCH_KUBECONFIG):
         raise _UsageError(
             f"kubeconfig du banc absent ({_BENCH_KUBECONFIG}) — monter le socle d'abord "
@@ -1837,28 +1881,32 @@ def cmd_preview(args: argparse.Namespace) -> int:
 
     Read-only : ne LANCE ni ne DÉTRUIT rien (`next` applique ; `destroy` détruit). Code 0
     (informatif) ; chemin incohérent avec le backend → usage (2)."""
-    # Lecture seule : on ne BLOQUE pas. Quand aucun banc n'est monté, la sonde vise
-    # /dev/null (jamais la prod, ADR 0053) → la section RÉEL est VIDE. On le DIT
-    # simplement plutôt que de laisser croire à un cluster éteint.
-    if _active_kubeconfig() is None and not _context_targets_bench():
-        _warn(
-            "cluster non installé — pas de connexion possible pour l'instant "
-            "(le monter : `nestor up`). L'état réel ci-dessous est vide."
-        )
-    # MISMATCH SHELL ↔ preview (ADR 0053) : `_default_kubeconfig_to_bench` a posé le banc
-    # pour CE process (l'opérateur n'avait pas exporté KUBECONFIG) — mais le shell, lui,
-    # reste sans KUBECONFIG (process ≠ parent). preview lit donc le BANC pendant qu'un
-    # `kubectl` nu dans le shell vise ~/.kube/config (souvent la PROD). On AVERTIT (non
-    # bloquant) d'aligner le shell. Seulement si le banc est JOIGNABLE (sinon le 1er
-    # warning « cluster non installé » suffit).
-    elif _KUBECONFIG_AUTO_BENCH and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
-        _warn(
-            "preview lit le BANC, mais ton shell n'a pas KUBECONFIG exporté — un `kubectl` "
-            "direct vise ~/.kube/config (souvent la PROD). Aligne le shell : "
-            'eval "$(nestor env)".'
-        )
     path = _resolve(args.file)
     topo = load_topology(path)
+    # Avertissements d'ALIGNEMENT SHELL — propres au BANC (ADR 0053). Une stack
+    # `target_kind: prod` ne lit PAS le banc (gating ADR 0084) : ces messages, pensés
+    # pour le banc, seraient TROMPEURS en prod (ils invitent à `nestor env` qui, en prod,
+    # ne pose rien). On ne les émet donc que pour une stack lima.
+    if topo.target_kind == "lima":
+        # Lecture seule : on ne BLOQUE pas. Quand aucun banc n'est monté, la sonde vise
+        # /dev/null (jamais la prod, ADR 0053) → la section RÉEL est VIDE. On le DIT
+        # simplement plutôt que de laisser croire à un cluster éteint.
+        if _active_kubeconfig() is None and not _context_targets_bench():
+            _warn(
+                "cluster non installé — pas de connexion possible pour l'instant "
+                "(le monter : `nestor up`). L'état réel ci-dessous est vide."
+            )
+        # MISMATCH SHELL ↔ preview : `_default_kubeconfig_to_bench` a posé le banc pour CE
+        # process (l'opérateur n'avait pas exporté KUBECONFIG) — mais le shell reste sans
+        # KUBECONFIG (process ≠ parent). preview lit le BANC pendant qu'un `kubectl` nu du
+        # shell vise ~/.kube/config (souvent la PROD). On AVERTIT (non bloquant) d'aligner
+        # le shell. Seulement si le banc est JOIGNABLE (sinon le 1er warning suffit).
+        elif _KUBECONFIG_AUTO_BENCH and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
+            _warn(
+                "preview lit le BANC, mais ton shell n'a pas KUBECONFIG exporté — un "
+                "`kubectl` direct vise ~/.kube/config (souvent la PROD). Aligne le shell : "
+                'eval "$(nestor env)".'
+            )
     runs = load_runs(args.history or _RUNS_HISTORY)
     now = int(dt.datetime.now(tz=dt.UTC).timestamp())
     target = args.target  # None → default_target le déduit
@@ -1921,7 +1969,9 @@ def cmd_preview(args: argparse.Namespace) -> int:
 
     # ── RÉEL (ex-`refresh`) : l'état lu du réel (non stocké, ADR 0056 §7) ─────────
     declared = topo.control_nodes + topo.worker_nodes
-    real = classify_refresh(stack_name, declared, _real_vms(), _ready_nodes())
+    real = classify_refresh(
+        stack_name, declared, _real_vms(topo.target_kind), _ready_nodes(topo.target_kind)
+    )
     print("RÉEL (lu, non stocké) :")
     print(f"  VMs présentes  : {', '.join(real.vms_present) or '—'}")
     print(f"  VMs à créer    : {', '.join(real.vms_missing) or '—'}")
@@ -1968,7 +2018,12 @@ def cmd_preview(args: argparse.Namespace) -> int:
     # « namespace présent » : une couche posée à MOITIÉ (ns créé mais Loki absent) RESTE « à
     # installer » — sinon un montage échoué à mi-chemin s'afficherait « ✓ ».
     a_appliquer -= observed_socle
-    a_appliquer -= _observed_layers([p for p in seq if p in a_appliquer])
+    # Couches applicatives observées (signaux kubectl) : ne sonder QUE si le cluster
+    # ciblé répond (nœuds Ready) — sinon `_observed_layers` (kubeconfig banc) lirait les
+    # couches du banc Lima pour une stack prod sans cible (ADR 0084). nodes_ready vide en
+    # prod sans KUBECONFIG → on ne soustrait rien (RÉEL honnêtement « rien d'observé »).
+    if real.nodes_ready:
+        a_appliquer -= _observed_layers([p for p in seq if p in a_appliquer])
     # jamais monté ≠ rejeu : `jamais` (aucun run de la stack) → « à installer » (inédit) ;
     # `perime` (run existant mais plus frais) → « à rejouer ».
     rejeu = freshness == "perime"
@@ -2291,7 +2346,9 @@ def cmd_next(args: argparse.Namespace) -> int:
     # VMs et propose `storage-simple` sur un banc inexistant. `next` respecte ainsi le
     # PLAN de `preview` (qui fait ce même calcul).
     declared = topo.control_nodes + topo.worker_nodes
-    observed_socle = observed_done_phases(declared, _real_vms(), _ready_nodes())
+    observed_socle = observed_done_phases(
+        declared, _real_vms(topo.target_kind), _ready_nodes(topo.target_kind)
+    )
     done -= {"up", "bootstrap"} - observed_socle  # retire le socle que le réel CONTREDIT
     run_params = derive_run_params(topo)
     # Les couches MONTABLES maintenant (deps réelles satisfaites). La carte de
@@ -2312,7 +2369,14 @@ def cmd_next(args: argparse.Namespace) -> int:
     # Sans ça, `next` re-propose une couche déjà installée. `observed` = socle observé
     # + couches applicatives observées : `installable_now` les retire TOUJOURS (prime
     # sur la fraîcheur — sinon un run `jamais`/`perime` rejouerait toute la séquence).
-    observed_layers = _observed_layers([p for p in seq if p not in ("up", "bootstrap")])
+    # Ne sonder les couches applicatives (kubectl) QUE si le socle réel répond (ADR 0084) :
+    # sinon `_observed_layers` (kubeconfig banc) lirait le banc pour une stack prod sans
+    # cible. `observed_socle` vide en prod sans KUBECONFIG → on ne sonde pas les couches.
+    observed_layers = (
+        _observed_layers([p for p in seq if p not in ("up", "bootstrap")])
+        if observed_socle
+        else set()
+    )
     observed = observed_socle | observed_layers
     try:
         montables = installable_now(

@@ -38,6 +38,12 @@ _SPEC = importlib.util.spec_from_file_location(
 cli = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(cli)
 
+# Sondes RÉELLES captées au chargement, AVANT tout stub de test — pour vérifier le
+# gating par target_kind (ADR 0084) indépendamment de l'ordre des tests (les setUp
+# remplacent cli._real_vms/_ready_nodes ; ces références-ci restent les vraies).
+_PRISTINE_REAL_VMS = cli._real_vms
+_PRISTINE_READY_NODES = cli._ready_nodes
+
 # ── Blindage anti-provisionnement (filet de sécurité module) ──────────────────
 # Aucun test ne doit JAMAIS lancer un VRAI run-phases.sh / limactl / ansible-runner
 # (un test mal stubé a déjà provisionné 4 VMs Lima en démarrant un montage réel).
@@ -116,6 +122,21 @@ from nestor import (  # noqa: E402
 )
 
 _EXAMPLE = os.path.join(_ROOT, "topologies", "socle.example.yaml")
+
+
+def _example_as_lima(test):
+    """Copie temporaire de _EXAMPLE forcée en `target_kind: lima` (nettoyée en cleanup).
+
+    Les tests du comportement BANC (créer les VMs `up`, warning d'alignement shell,
+    délégation `run-phases.sh up`) doivent viser une topo lima : depuis ADR 0084, une
+    topo prod n'a plus la phase `up` ni le warning banc. _EXAMPLE est prod → on en dérive
+    une variante lima pour ces cas."""
+    with open(_EXAMPLE, encoding="utf-8") as f:
+        body = f.read().replace("target_kind: prod", "target_kind: lima")
+    path = _tmp(body)
+    test.addCleanup(os.unlink, path)
+    return path
+
 
 _INVALID_TOPO = """\
 catalog:
@@ -303,7 +324,7 @@ class Epreuves(unittest.TestCase):
             cli._observed_layers,
             cli.os.path.exists,
         )
-        cli._ready_nodes = lambda: ["node1"]  # banc up
+        cli._ready_nodes = lambda *_a: ["node1"]  # banc up
         cli._observed_layers = lambda phases: {"metrics-server"}  # seul metrics monté
         cli.os.path.exists = lambda p: True if p == cli._BENCH_KUBECONFIG else orig_exists(p)
         self.addCleanup(setattr, cli, "_ready_nodes", orig_ready)
@@ -328,7 +349,7 @@ class Epreuves(unittest.TestCase):
             "_observed_layers": cli._observed_layers,
             "_assert_bench_target": cli._assert_bench_target,
         }
-        cli._ready_nodes = lambda: ["node1"]
+        cli._ready_nodes = lambda *_a: ["node1"]
         cli._observed_layers = lambda phases: observed
         cli._assert_bench_target = lambda action: None
         self._orig_exists = cli.os.path.exists
@@ -462,8 +483,8 @@ runs:
         # « saine » par défaut : sinon le test dépend d'un banc en cours de montage.
         self._orig_vms, self._orig_ready = cli._real_vms, cli._ready_nodes
         self._orig_obs = cli._observed_layers
-        cli._real_vms = lambda: []
-        cli._ready_nodes = lambda: []
+        cli._real_vms = lambda *_a: []
+        cli._ready_nodes = lambda *_a: []
         cli._observed_layers = lambda phases: set()
         self.addCleanup(setattr, cli, "_real_vms", self._orig_vms)
         self.addCleanup(setattr, cli, "_ready_nodes", self._orig_ready)
@@ -540,12 +561,13 @@ runs:
         # Historique frais ET socle RÉELLEMENT présent (VMs + nœud Ready) → socle à-jour,
         # queue à installer ; libellés MÉTIER. Le RÉEL doit confirmer le socle, pas
         # seulement l'historique (sinon « ✓ à-jour » mentirait, cf. le bug VMs détruites).
-        cli._real_vms = lambda: ["cp1", "node1", "node2", "node3"]  # nœuds de _EXAMPLE
-        cli._ready_nodes = lambda: ["cp1"]
+        cli._real_vms = lambda *_a: ["cp1", "node1", "node2", "node3"]  # nœuds de _EXAMPLE
+        cli._ready_nodes = lambda *_a: ["cp1"]
         hist = _tmp(self._SOCLE_FRESH)
         self.addCleanup(os.unlink, hist)
+        # `up` (créer les VMs) n'existe qu'en lima (ADR 0084) → topo lima pour ce test banc.
         code, out, _ = _capture(
-            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
+            ["preview", "-f", _example_as_lima(self), "--target", "atlas-ceph", "--history", hist]
         )
         self.assertEqual(code, 0)
         self.assertIn("créer les VMs", out)  # libellé métier de `up`
@@ -557,8 +579,8 @@ runs:
         # Régression (bug vécu) : historique socle FRAIS mais VMs DÉTRUITES (limactl vide) →
         # le plan NE doit PAS afficher « ✓ créer les VMs à-jour » ni « ✓ ceph à-jour ». Le
         # réel prime : socle absent → TOUTE la séquence « à installer ». preview == next.
-        cli._real_vms = lambda: []  # aucune VM (banc détruit)
-        cli._ready_nodes = lambda: []
+        cli._real_vms = lambda *_a: []  # aucune VM (banc détruit)
+        cli._ready_nodes = lambda *_a: []
         hist = _tmp(self._SOCLE_FRESH)
         self.addCleanup(os.unlink, hist)
         code, out, _ = _capture(
@@ -596,7 +618,7 @@ runs:
 
     def test_orphan_vms_listed_to_destroy(self):
         # Des VMs réelles hors stack → preview les liste « à détruire d'abord ».
-        cli._real_vms = lambda: ["cp9", "cp8"]
+        cli._real_vms = lambda *_a: ["cp9", "cp8"]
         hist = _tmp(self._EMPTY_HIST)
         self.addCleanup(os.unlink, hist)
         code, out, _ = _capture(
@@ -605,6 +627,22 @@ runs:
         self.assertEqual(code, 0)
         self.assertIn("détruire", out)
         self.assertIn("cp9", out)
+
+    def test_prod_probes_return_empty_without_explicit_kubeconfig(self):
+        # ADR 0084 (issue #405) : pour `target_kind: prod` sans KUBECONFIG explicite, les
+        # sondes du RÉEL rendent [] — elles ne sondent PAS le banc Lima (limactl/kubectl
+        # banc). `_real_vms("prod")` court-circuite avant `limactl` ; `_ready_nodes("prod")`
+        # avant `kubectl` (KUBECONFIG absent / auto-banc). Test PUR : pas de subprocess à
+        # simuler (le gating retourne [] AVANT tout appel système).
+        os.environ.pop("KUBECONFIG", None)
+        orig_auto = cli._KUBECONFIG_AUTO_BENCH
+        cli._KUBECONFIG_AUTO_BENCH = True  # auto-export banc de main() ≠ intention prod
+        self.addCleanup(setattr, cli, "_KUBECONFIG_AUTO_BENCH", orig_auto)
+        # `_PRISTINE_*` : les vraies sondes captées au chargement du module (avant tout
+        # stub) → indépendant de l'ordre des tests. En prod sans KUBECONFIG explicite,
+        # le gating (ADR 0084) court-circuite AVANT limactl/kubectl → [].
+        self.assertEqual(_PRISTINE_REAL_VMS("prod"), [])
+        self.assertEqual(_PRISTINE_READY_NODES("prod"), [])
 
     def test_never_launches(self):
         # preview est READ-ONLY : le runner ansible n'est JAMAIS appelé.
@@ -660,7 +698,8 @@ runs:
         orig_flag = cli._KUBECONFIG_AUTO_BENCH
         self.addCleanup(setattr, cli, "_KUBECONFIG_AUTO_BENCH", orig_flag)
         os.environ.pop("KUBECONFIG", None)  # _capture restaure l'env ensuite
-        code, _, err = _capture(["preview", "-f", _EXAMPLE])
+        # Warning d'alignement shell = comportement BANC (ADR 0084) → topo lima.
+        code, _, err = _capture(["preview", "-f", _example_as_lima(self)])
         self.assertEqual(code, 0)
         self.assertIn("nestor env", err)  # avertit d'aligner le shell
         self.assertIn("PROD", err)
@@ -674,7 +713,7 @@ runs:
             "storage: {backend: local-path}\ntarget_kind: lima\n"
         )
         self.addCleanup(os.unlink, topo)
-        cli._ready_nodes = lambda: ["node1"]  # cluster joignable → on sonde les SC
+        cli._ready_nodes = lambda *_a: ["node1"]  # cluster joignable → on sonde les SC
         orig_sc = cli._discover_sc_provisioners
         cli._discover_sc_provisioners = lambda: ["rook-ceph.rbd.csi.ceph.com"]
         self.addCleanup(setattr, cli, "_discover_sc_provisioners", orig_sc)
@@ -692,7 +731,7 @@ runs:
             "storage: {backend: local-path}\ntarget_kind: lima\n"
         )
         self.addCleanup(os.unlink, topo)
-        cli._ready_nodes = lambda: []  # cluster down
+        cli._ready_nodes = lambda *_a: []  # cluster down
         orig_sc = cli._discover_sc_provisioners
         cli._discover_sc_provisioners = lambda: ["rook-ceph.rbd.csi.ceph.com"]
         self.addCleanup(setattr, cli, "_discover_sc_provisioners", orig_sc)
@@ -715,8 +754,8 @@ class Next(unittest.TestCase):
 
     def _set_real(self, *, vms, ready):
         orig_vms, orig_ready = cli._real_vms, cli._ready_nodes
-        cli._real_vms = lambda: vms
-        cli._ready_nodes = lambda: ready
+        cli._real_vms = lambda *_a: vms
+        cli._ready_nodes = lambda *_a: ready
         self.addCleanup(setattr, cli, "_real_vms", orig_vms)
         self.addCleanup(setattr, cli, "_ready_nodes", orig_ready)
 
@@ -880,8 +919,9 @@ runs:
         self.addCleanup(setattr, cli.subprocess, "run", orig)
         hist = _tmp(self._EMPTY_HIST)
         self.addCleanup(os.unlink, hist)
+        # `up` (créer les VMs) n'existe qu'en lima (ADR 0084) → topo lima + target lima.
         code, out, _ = _capture(
-            ["next", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist, "--yes"]
+            ["next", "-f", _example_as_lima(self), "--target", "atlas", "--history", hist, "--yes"]
         )
         self.assertEqual(code, 0)
         # un appel `run-phases.sh up` (VMs seules), PAS `socle` (tout le socle)
@@ -968,7 +1008,9 @@ workers:
         # via ansible-runner (le chemin gardé).
         for name, val in (("_real_vms", ["node1", "node2"]), ("_ready_nodes", ["node1"])):
             orig = getattr(cli, name)
-            setattr(cli, name, lambda _v=val: _v)
+            # ADR 0084 : les sondes prennent désormais `target_kind` → la lambda doit
+            # l'accepter (et l'ignorer), sinon l'arg positionnel écrase la valeur stubée.
+            setattr(cli, name, lambda *_a, _v=val: _v)
             self.addCleanup(setattr, cli, name, orig)
         # ADR 0083 : `expected_phase_sequence` shelle le graphe atomique — laisser tourner
         # le graphe pour de vrai (sinon la queue serait vide et `next` ne viserait aucune
@@ -1073,8 +1115,8 @@ runs:
     def setUp(self):
         # Socle réellement présent (toutes VMs + un nœud Ready) → up/bootstrap faits.
         orig_vms, orig_ready = cli._real_vms, cli._ready_nodes
-        cli._real_vms = lambda: ["cp1", "node1", "node2"]
-        cli._ready_nodes = lambda: ["cp1"]
+        cli._real_vms = lambda *_a: ["cp1", "node1", "node2"]
+        cli._ready_nodes = lambda *_a: ["cp1"]
         self.addCleanup(setattr, cli, "_real_vms", orig_vms)
         self.addCleanup(setattr, cli, "_ready_nodes", orig_ready)
         # ADR 0083 : `expected_phase_sequence` shelle le graphe atomique. Laisser tourner
@@ -1787,7 +1829,10 @@ class UpCommand(unittest.TestCase):
         self.assertIn("run-phases.sh", " ".join(calls[0]))
         self.assertEqual(calls[0][-2], "layers")  # arm générique, pas un preset nommé
         seq = calls[0][-1].split(",")  # séquence complète passée à `layers`
-        self.assertEqual(seq[0], "up")
+        # _EXAMPLE est `target_kind: prod` → PAS de phase `up` (nœuds baremetal
+        # préexistants, ADR 0084) : le socle prod commence à `bootstrap`.
+        self.assertNotIn("up", seq)
+        self.assertEqual(seq[0], "bootstrap")
         self.assertIn("ceph", seq)  # backend ceph → socle ceph dans la séquence
         self.assertIn("datalake", seq)
 
@@ -1855,7 +1900,7 @@ class Destroy(unittest.TestCase):
 
     def _stub_vms(self, vms):
         orig = cli._real_vms
-        cli._real_vms = lambda: vms
+        cli._real_vms = lambda *_a: vms
         self.addCleanup(setattr, cli, "_real_vms", orig)
 
     def _stub_down(self, rc=0):
@@ -2005,6 +2050,44 @@ class BenchTargetGuard(unittest.TestCase):
             cli._assert_bench_target("nestor up")
 
 
+class EnvCommand(unittest.TestCase):
+    """`env` : pose le kubeconfig du banc — mais PAS pour une stack active prod (ADR 0084)."""
+
+    def _stub_active(self, target_kind):
+        # Topo active factice avec le target_kind voulu (sans toucher au symlink réel).
+        backend = "ceph" if target_kind == "prod" else "local-path"
+        topo_yaml = (
+            "catalog: {topology: fake-active, profile: base}\n"
+            "nodes:\n  - {name: n1, roles: [control, worker]}\n"
+            f"storage: {{backend: {backend}}}\ntarget_kind: {target_kind}\n"
+        )
+        path = _tmp(topo_yaml)
+        self.addCleanup(os.unlink, path)
+        topo = load_topology(path)
+        orig = cli._active_topology_safe
+        cli._active_topology_safe = lambda: topo
+        self.addCleanup(setattr, cli, "_active_topology_safe", orig)
+
+    def test_prod_active_does_not_export_bench(self):
+        # Stack active prod → `env` ne pose PAS le banc (commentaire eval-safe, pas d'export).
+        self._stub_active("prod")
+        code, out, _ = _capture(["env"])
+        self.assertEqual(code, 0)
+        self.assertNotIn("export KUBECONFIG", out)
+        self.assertIn("target_kind=prod", out)
+
+    def test_lima_active_still_exports_bench(self):
+        # Stack active lima → comportement inchangé : `env` pose le banc (si présent).
+        self._stub_active("lima")
+        orig_exists = cli.os.path.exists
+        cli.os.path.exists = lambda p: True if p == cli._BENCH_KUBECONFIG else orig_exists(p)
+        self.addCleanup(setattr, cli.os.path, "exists", orig_exists)
+        os.environ.pop("KUBECONFIG", None)
+        code, out, _ = _capture(["env"])
+        self.assertEqual(code, 0)
+        self.assertIn("export KUBECONFIG", out)
+
+
 class ModuleGuard(unittest.TestCase):
     """Le filet anti-provisionnement (setUpModule) interdit tout run-phases/limactl réel."""
 
@@ -2057,7 +2140,7 @@ class Scale(unittest.TestCase):
     def _stub(self, *, ready, argocd=False, scale_rc=0):
         import subprocess as sp
 
-        cli._ready_nodes = lambda: ready
+        cli._ready_nodes = lambda *_a: ready
         self.addCleanup(setattr, cli, "_ready_nodes", cli._ready_nodes)
 
         def _fake_kubectl(*args, **k):
@@ -2106,7 +2189,7 @@ class Discover(unittest.TestCase):
     (test_discover). Ici on couvre le dispatch, l'émission YAML, l'inconnu, les codes."""
 
     def _stub_cluster(self):
-        cli._ready_nodes = lambda: ["node1"]
+        cli._ready_nodes = lambda *_a: ["node1"]
         cli._discover_node_roles = lambda: [{"name": "node1", "roles": ["control", "worker"]}]
         cli._discover_namespaces = lambda: ["kube-system", "argocd", "gitea", "squat-ns"]
         cli._discover_crd_groups = lambda: ["applications.argoproj.io"]
@@ -2125,7 +2208,7 @@ class Discover(unittest.TestCase):
             self.addCleanup(setattr, cli, name, getattr(cli, name))
 
     def test_refuses_unreachable_bench(self):
-        cli._ready_nodes = lambda: []
+        cli._ready_nodes = lambda *_a: []
         self.addCleanup(setattr, cli, "_ready_nodes", cli._ready_nodes)
         code, _, err = _capture(["discover"])
         self.assertEqual(code, 2)  # _UsageError
