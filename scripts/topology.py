@@ -251,6 +251,20 @@ def _active_stack_name(file_arg: str | None) -> str | None:
         return None
 
 
+def _active_topology_safe() -> Topology | None:
+    """La topologie de la stack ACTIVE (`topology.yaml`), ou None si absente/illisible.
+
+    Sert aux gardes d'isolation (ADR 0084) qui doivent connaître `target_kind` sans `-f`
+    (ex. `env`, appelé par le wrapper sans argument). Robuste : toute erreur → None
+    (l'appelant retombe sur le comportement banc par défaut)."""
+    if not os.path.exists(_DEFAULT_TOPOLOGY):
+        return None
+    try:
+        return load_topology(_DEFAULT_TOPOLOGY)
+    except (TopologyError, FileNotFoundError, OSError):
+        return None
+
+
 def _render_inventory(topo, kind: str, lima_home: str | None) -> str:
     """Rend l'inventaire selon le `kind` (prod ou lima). Façade sur le paquet."""
     if kind == "lima":
@@ -1232,6 +1246,20 @@ def cmd_env(args: argparse.Namespace) -> int:
     Sans `--force`, on respecte un KUBECONFIG déjà exporté (intention explicite) : on
     n'imprime rien d'écrasant, juste un rappel commenté sur stderr. Si le banc n'a pas
     de kubeconfig (pas encore monté), erreur d'usage."""
+    # Garde d'isolation (ADR 0084) : `env` pose le kubeconfig du BANC — sans objet pour
+    # une stack active `target_kind: prod`. L'exporter polluerait le shell prod avec le
+    # banc (et DÉSARMERAIT `_assert_bench_target` qui voit alors un KUBECONFIG « explicite »
+    # → `up`/`next` croiraient pouvoir muter, créant des VMs Lima sur une cible prod).
+    # Le wrapper `nestor` appelle `env --force` après up/next : on refuse en prod.
+    active = _active_topology_safe()
+    if active is not None and active.target_kind != "lima":
+        print(
+            f"# stack active `{active.catalog.get('topology', '?')}` est "
+            f"target_kind={active.target_kind} — `nestor env` ne pose PAS le kubeconfig "
+            "du banc (ADR 0084). Pour la prod, exporter le KUBECONFIG prod explicitement "
+            "ou `nestor discover --cp <nœud>`."
+        )
+        return 0
     if not os.path.exists(_BENCH_KUBECONFIG):
         raise _UsageError(
             f"kubeconfig du banc absent ({_BENCH_KUBECONFIG}) — monter le socle d'abord "

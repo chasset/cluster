@@ -2029,6 +2029,44 @@ class BenchTargetGuard(unittest.TestCase):
             cli._assert_bench_target("nestor up")
 
 
+class EnvCommand(unittest.TestCase):
+    """`env` : pose le kubeconfig du banc — mais PAS pour une stack active prod (ADR 0084)."""
+
+    def _stub_active(self, target_kind):
+        # Topo active factice avec le target_kind voulu (sans toucher au symlink réel).
+        backend = "ceph" if target_kind == "prod" else "local-path"
+        topo_yaml = (
+            "catalog: {topology: fake-active, profile: base}\n"
+            "nodes:\n  - {name: n1, roles: [control, worker]}\n"
+            f"storage: {{backend: {backend}}}\ntarget_kind: {target_kind}\n"
+        )
+        path = _tmp(topo_yaml)
+        self.addCleanup(os.unlink, path)
+        topo = load_topology(path)
+        orig = cli._active_topology_safe
+        cli._active_topology_safe = lambda: topo
+        self.addCleanup(setattr, cli, "_active_topology_safe", orig)
+
+    def test_prod_active_does_not_export_bench(self):
+        # Stack active prod → `env` ne pose PAS le banc (commentaire eval-safe, pas d'export).
+        self._stub_active("prod")
+        code, out, _ = _capture(["env"])
+        self.assertEqual(code, 0)
+        self.assertNotIn("export KUBECONFIG", out)
+        self.assertIn("target_kind=prod", out)
+
+    def test_lima_active_still_exports_bench(self):
+        # Stack active lima → comportement inchangé : `env` pose le banc (si présent).
+        self._stub_active("lima")
+        orig_exists = cli.os.path.exists
+        cli.os.path.exists = lambda p: True if p == cli._BENCH_KUBECONFIG else orig_exists(p)
+        self.addCleanup(setattr, cli.os.path, "exists", orig_exists)
+        os.environ.pop("KUBECONFIG", None)
+        code, out, _ = _capture(["env"])
+        self.assertEqual(code, 0)
+        self.assertIn("export KUBECONFIG", out)
+
+
 class ModuleGuard(unittest.TestCase):
     """Le filet anti-provisionnement (setUpModule) interdit tout run-phases/limactl réel."""
 
