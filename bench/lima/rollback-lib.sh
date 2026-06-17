@@ -407,12 +407,12 @@ component_deps() {
         cnpg-cluster-pg)  printf 'cnpg-operator barman-plugin cnpg-secrets s3-backing-cnpg %s\n' "$SC" ;;
         dagster)          printf 'cnpg-cluster-pg registry build-images\n' ;;
         marquez)          printf 'cnpg-cluster-pg registry build-images\n' ;;
-        # MLflow (layer autonome ADR 0082) : jumeau de marquez (base CNPG `mlflow`)
-        # MAIS image multi-arch officielle → PAS d'image maison (pas de registry/
-        # build-images), et un artefact store S3 (arête → s3-backing-mlflow codée en
-        # dur dans les deux backends, qui résout $S3 = datalake|seaweedfs). Le ns mlflow
-        # n'expose pas d'UI Gateway TLS dans le graphe banc (cert-manager via le socle).
-        mlflow)           printf 'cnpg-cluster-pg s3-backing-mlflow\n' ;;
+        # MLflow (layer autonome ADR 0082, amendé) : base CNPG `mlflow` (cnpg-cluster-pg)
+        # + artefact store S3 (s3-backing-mlflow, résout $S3 = datalake|seaweedfs) + une
+        # IMAGE MAISON (officielle + psycopg2, le driver PostgreSQL manque à l'officielle)
+        # → registry + build-images requis AVANT mlflow (push/pull registry:80/mlflow),
+        # comme dagster/marquez. Le ns mlflow n'expose pas d'UI Gateway TLS dans le graphe banc.
+        mlflow)           printf 'cnpg-cluster-pg s3-backing-mlflow registry build-images\n' ;;
         gitea)            printf 'cert-manager gateway-api %s\n' "$SC" ;;
         argocd)           printf 'cert-manager gateway-api gitea\n' ;;
         gitops-seed)      printf 'argocd gitea build-images\n' ;;

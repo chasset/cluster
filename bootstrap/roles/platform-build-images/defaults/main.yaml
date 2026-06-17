@@ -17,6 +17,7 @@ build_workdir: /tmp/dataops-build
 # Versions figées (ADR 0006) — verrou chart↔image 1:1.
 dagster_version: '1.13.7'
 marquez_version: '0.51.1'
+mlflow_version: 'v3.4.0'
 
 # Source upstream Marquez (clone pour build API Java + UI React, sur le nœud).
 marquez_git_repo: https://github.com/MarquezProject/marquez.git
@@ -59,3 +60,18 @@ build_images:
     src_dockerfile: '{{ platform_repo_dir }}/platform/marquez/image-web/Dockerfile'
     build_context: '{{ marquez_src_dir }}/web'
     dockerfile: '{{ build_workdir }}/marquez-web/Dockerfile'
+
+# Image maison MLflow (ADR 0082 amendé) : officielle + psycopg2. Liste SÉPARÉE de
+# build_images — consommée UNIQUEMENT par la layer autonome bootstrap/mlflow.yaml
+# (override `build_images` au niveau import_role), JAMAIS par dataops (mlflow ≠ dataops,
+# ADR 0083). `build_all_arch: true` : on AJOUTE un paquet (psycopg2-binary) à
+# l'officielle → BUILD sur les 2 arches (le retag x86 de l'officielle ramènerait
+# l'image SANS psycopg2 → CrashLoopBackOff). Contexte local (modèle Dagster).
+mlflow_build_images:
+  - name: mlflow
+    tag: '{{ mlflow_version }}'
+    official_image: 'ghcr.io/mlflow/mlflow:{{ mlflow_version }}'
+    src_context: '{{ platform_repo_dir }}/platform/mlflow/image/'
+    build_context: '{{ build_workdir }}/mlflow'
+    dockerfile: '{{ build_workdir }}/mlflow/Dockerfile'
+    build_all_arch: true

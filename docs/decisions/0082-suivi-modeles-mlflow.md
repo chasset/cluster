@@ -15,10 +15,10 @@ déploie le **serveur seul**, comme Dagster est livré vide (ADR 0026).
 
 ## Décision
 
-**MLflow tracking server** sur Kubernetes (image officielle multi-arch
-`ghcr.io/mlflow/mlflow`), dans `platform/mlflow/`, appliqué par le rôle Ansible
-`platform-mlflow` comme les autres addons plateforme (manifeste figé appliqué
-via `kubernetes.core.k8s`, ADR
+**MLflow tracking server** sur Kubernetes (image maison `registry:80/mlflow` =
+officielle + psycopg2, cf. § Image amendé), dans `platform/mlflow/`, appliqué
+par le rôle Ansible `platform-mlflow` comme les autres addons plateforme
+(manifeste figé appliqué via `kubernetes.core.k8s`, ADR
 [0033](0033-orchestration-ansible-platform-dataops.md)/[0049](0049-doctrine-choix-outil-par-action.md)
 — pas Argo CD pour l'infra, frontière anti-bootstrap-circulaire ADR 0022).
 
@@ -62,24 +62,46 @@ via `kubernetes.core.k8s`, ADR
   logue ses runs et enregistre ses modèles (précédent « orchestrateur vide »
   Dagster, ADR 0026).
 
-### Image : multi-arch officielle (pas de build maison)
+### Image : maison multi-arch (officielle + psycopg2) — AMENDÉ (2026-06-17)
 
-Contrairement à Marquez/Dagster (amd64-only en amont → build arm64 interne, ADR
-0028), l'image `ghcr.io/mlflow/mlflow` est publiée en **index multi-arch**
-(`MediaType: …image.index…`, `linux/amd64` **et** `linux/arm64` — vérifié sur
-`v3.4.0`). On l'épingle donc **directement par digest d'index** (ADR 0006), sans
-image maison ni Play de build : le banc arm64 et la prod x86 tirent la bonne
-variante. C'est plus simple que ses jumeaux DataOps.
+> **Décision initiale (caduque)** : « image officielle multi-arch, pas de build
+> maison ». L'index `ghcr.io/mlflow/mlflow` est bien multi-arch (amd64+arm64,
+> `v3.4.0`) et embarque `boto3` (S3) — mais **PAS `psycopg2`** (driver
+> PostgreSQL). Or le backend store est une base CNPG
+> (`--backend-store-uri postgresql://`) : `mlflow server` crashe au démarrage en
+> `ModuleNotFoundError: No module named 'psycopg2'` (CrashLoopBackOff vécu, logs
+> du 2026-06-17).
+
+On **dérive donc une image maison**
+`FROM ghcr.io/mlflow/mlflow:v3.4.0@<digest> + pip install psycopg2-binary`
+([`platform/mlflow/image/Dockerfile`](../../platform/mlflow/image/Dockerfile)),
+publiée dans le registry interne (`registry:80/mlflow:v3.4.0`) comme
+Marquez/Dagster. Deux différences avec eux :
+
+- on **ajoute** un paquet à une image déjà multi-arch (≠ rebuild d'une
+  amd64-only) : l'image dérivée reste **multi-arch** (`psycopg2-binary` a des
+  wheels manylinux + aarch64) → **pas de Play de build arm64-spécifique** ;
+- mais elle doit être **buildée sur les DEUX arches** (et non retaguée de
+  l'officielle en x86, sinon l'image x86 n'aurait pas psycopg2) → un flag
+  **`build_all_arch: true`** dans `platform-build-images` force le build en x86
+  comme en arm64.
+
+La layer autonome `bootstrap/mlflow.yaml` gagne donc un play `hosts: cloud`
+(containerd registry + `platform-build-images` sur `mlflow_build_images`) AVANT
+le play k8s qui applique le manifeste tirant `registry:80/mlflow`. Référence par
+TAG (pas digest), comme dagster/marquez — image buildée localement, pas un
+upstream mutable.
 
 ## Statut
 
 Proposed (2026-06-17). **Validation banc différée** : le banc Ceph a été détruit
-; la convergence réelle (`bootstrap/dataops.yaml --tags mlflow`) sera prouvée au
-prochain montage Ceph multi-node — base `mlflow` créée, OBC RGW produisant le
-bucket + creds, pod MLflow Ready, un run loggué depuis atlas persistant
-params/métriques en base et artefacts en S3, UI répondant sur
-`mlflow.cluster.lan` — à consigner dans l'historique des runs (honnêteté des
-preuves, ADR 0052).
+; la convergence réelle (`bootstrap/mlflow.yaml` — play build image maison puis
+play k8s) sera prouvée au prochain montage Ceph multi-node — image
+`registry:80/mlflow` buildée (les 2 arches), base `mlflow` créée, OBC RGW
+produisant le bucket + creds, pod MLflow Ready (PLUS de CrashLoopBackOff
+psycopg2), un run loggué depuis atlas persistant params/métriques en base et
+artefacts en S3, UI répondant sur `mlflow.cluster.lan` — à consigner dans
+l'historique des runs (honnêteté des preuves, ADR 0052).
 
 ## Conséquences
 
@@ -91,8 +113,10 @@ preuves, ADR 0052).
   stateful supplémentaire (réutilise le cluster `pg` et le RGW datalake).
 - Socle DataOps complet : orchestration (Dagster) + lineage (Marquez) + suivi de
   modèles (MLflow), les trois backés CNPG, le même pattern d'addon.
-- **Pas d'image maison à maintenir** (multi-arch officielle) — contrairement à
-  Marquez/Dagster ; un bump = repin du digest, sans rebuild arm64.
+- **Image maison MINIMALE** (officielle + psycopg2, cf. § Image amendé) : plus
+  légère à maintenir que Marquez/Dagster (on ajoute un paquet, pas de rebuild
+  d'arch) — mais un build interne est désormais requis (registry interne,
+  `build_all_arch`).
 
 **Coûts assumés.**
 
@@ -116,8 +140,13 @@ preuves, ADR 0052).
 - **Artefact store sur PVC (filesystem)** plutôt que S3 : ne survivrait pas à un
   reschedule sans RWX, et heurterait le pattern S3 factorisé (ADR 0036). S3
   (OBC) retenu, cohérent avec les backings du socle.
-- **Image maison arm64 (comme Marquez)** : inutile — l'image officielle est
-  multi-arch. On évite le build et la maintenance.
+- **Rester sur l'image officielle sans build** (décision initiale) : impossible
+  — l'officielle n'a pas `psycopg2`, le serveur crashe sur backend PostgreSQL.
+  Une image maison minimale (officielle + psycopg2, multi-arch) est requise (cf.
+  § Image amendé).
+- **`pip install psycopg2` au démarrage du conteneur** (au lieu d'une image
+  maison) : tire PyPI au boot (incompatible air-gap/prod) et réinstalle à chaque
+  restart. Rejeté au profit de l'image maison reproductible (registry interne).
 
 ## À revoir
 
