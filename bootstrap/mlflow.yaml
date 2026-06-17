@@ -2,18 +2,49 @@
 # Layer MLflow (ADR 0082) — serveur de suivi de modèles, layer AUTONOME (nestor
 # `up --layers mlflow` / arm générique `layers`), DÉCOUPLÉE de dataops.yaml.
 #
-# MLflow est le jumeau de Marquez (backend store CNPG + artefact store S3) mais
-# avec une image MULTI-ARCH officielle (pas de build maison) → un SEUL play k8s
-# suffit (≠ dataops : pas d'étape nœuds/build). Ses PRÉREQUIS (déclarés au graphe
-# atomique rollback-lib.sh) sont montés AVANT par le chemin `layers` :
-#   - dataops (base CNPG `mlflow` + le cluster `pg`) — backend store ;
-#   - le backing S3 (SeaweedFS de monitoring en local-path / RGW datalake en Ceph)
-#     — artefact store ; le bucket `mlflow-artifacts` est créé par platform-s3-bucket.
+# MLflow est le jumeau de Marquez (backend store CNPG + artefact store S3). DEUX plays :
+#   1. étape NŒUDS (`hosts: cloud`) : build de l'image MAISON (officielle + psycopg2,
+#      l'officielle n'a pas le driver PostgreSQL, ADR 0082 amendé) vers le registry
+#      interne — comme dataops/Dagster (containerd registry + platform-build-images) ;
+#   2. étape k8s (`localhost`) : applique le manifeste figé qui tire registry:80/mlflow.
+# Ses PRÉREQUIS (déclarés au graphe atomique rollback-lib.sh) sont montés AVANT par le
+# chemin `layers` : dataops (base CNPG `mlflow` + cluster `pg` + REGISTRY interne) et le
+# backing S3 (SeaweedFS de monitoring en local-path / RGW datalake en Ceph ; bucket
+# `mlflow-artifacts` créé par platform-s3-bucket).
 #
 # HÔTE D'EXÉCUTION k8s (`dataops_k8s_host`, défaut localhost) : pilote l'API via le
 # KUBECONFIG de l'exécuteur, comme dataops/monitoring (pré-tâches identiques). Les
 # valeurs de backing S3 sont DÉRIVÉES par nestor (derive_run_params) et passées en
 # `-e` (mlflow_s3_backing/mlflow_s3_endpoint) — jamais codées en dur (ADR 0036).
+
+- name: Layer MLflow — étape nœuds (containerd registry + build image maison)
+  hosts: cloud
+  # GARDE D'ISOLATION (ADR 0053, #359) : ce play SSH sur les nœuds (`cloud`) et
+  # build/pousse dans le registry → il DOIT vérifier EXPECTED_TARGET_KIND via audit-log
+  # AVANT toute tâche distante (comme dataops.yaml Play 2). gather_facts requis :
+  # platform-build-images teste ansible_architecture.
+  pre_tasks:
+    - name: Audit-log — record playbook execution (+ garde target_kind)
+      ansible.builtin.import_role:
+        name: audit-log
+      vars:
+        audit_log_playbook: mlflow.yaml
+  tasks:
+    # Config containerd pour le registry interne AVANT le build (push vers registry:80).
+    - name: Configuration containerd pour le registry interne
+      ansible.builtin.import_role:
+        name: platform-registry
+        tasks_from: node
+      tags: registry-node
+
+    # Build (les 2 arches, build_all_arch) de l'image maison MLflow → registry:80.
+    # build_images RESTREINTE à mlflow (override) — ne touche pas la liste dataops.
+    - name: Build de l'image maison MLflow (officielle + psycopg2)
+      ansible.builtin.import_role:
+        name: platform-build-images
+      vars:
+        build_images: '{{ mlflow_build_images }}'
+      tags: build-images
 
 - name: Layer MLflow — suivi de modèles (backend CNPG + artefacts S3)
   hosts: "{{ dataops_k8s_host | default('localhost') }}"

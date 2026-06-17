@@ -3,6 +3,11 @@
 # saute si le tag existe déjà ; sinon build (arm64) ou re-tag officiel (x86).
 # Contexte et Dockerfile sont des chemins SUR LE NŒUD (copiés/clonés par
 # main.yaml — drift L27).
+#
+# `img.build_all_arch: true` (ex. mlflow, ADR 0082 amendé) : l'image n'est PAS un
+# rebuild arm64 d'une officielle amd64-only (Dagster/Marquez), mais une DÉRIVÉE qui
+# AJOUTE un paquet (`FROM officielle + pip install psycopg2`) → elle doit être BUILDÉE
+# sur LES DEUX arches (le retag de l'officielle x86 ramènerait l'image SANS le paquet).
 
 - name: 'Check if image already present in the registry — {{ img.name }}'
   ansible.builtin.command: >-
@@ -15,34 +20,42 @@
 - name: 'Build (arm64) or retag (x86) image — {{ img.name }}'
   when: img_present.rc != 0
   block:
-    # arm64 : build interne via nerdctl/buildkit, depuis les sources sur le nœud.
-    - name: 'Build arm64 image — {{ img.name }}'
+    # BUILD interne via nerdctl/buildkit, depuis les sources sur le nœud, pour l'arch
+    # courante. arm64 TOUJOURS ; x86 seulement si `build_all_arch` (image dérivée à
+    # provisionner sur toutes les arches, ex. mlflow) — sinon x86 retage l'officielle.
+    - name: 'Build image for this arch — {{ img.name }}'
       ansible.builtin.command:
         argv:
           - nerdctl
           - build
           - --platform
-          - linux/arm64
+          - "{{ 'linux/arm64' if ansible_facts.architecture == 'aarch64' else 'linux/amd64' }}"
           - -t
           - '{{ build_registry_host }}/{{ img.name }}:{{ img.tag }}'
           - -f
           - '{{ img.dockerfile }}'
           - '{{ img.build_context }}'
       changed_when: true
-      when: ansible_facts.architecture == 'aarch64'
+      when: >-
+        ansible_facts.architecture == 'aarch64'
+        or (img.build_all_arch | default(false) | bool)
 
-    # x86 : pas de build — pull de l'image officielle amd64 + re-tag vers le
-    # registry interne (mêmes références que les manifestes).
+    # x86 SANS build_all_arch : pas de build — pull de l'image officielle amd64 +
+    # re-tag vers le registry interne (mêmes références que les manifestes).
     - name: 'Pull official amd64 image on x86 — {{ img.name }}'
       ansible.builtin.command: 'nerdctl pull --platform linux/amd64 {{ img.official_image }}'
       changed_when: true
-      when: ansible_facts.architecture == 'x86_64'
+      when:
+        - ansible_facts.architecture == 'x86_64'
+        - not (img.build_all_arch | default(false) | bool)
 
     - name: 'Retag official image to internal registry on x86 — {{ img.name }}'
       ansible.builtin.command: >-
         nerdctl tag {{ img.official_image }} {{ build_registry_host }}/{{ img.name }}:{{ img.tag }}
       changed_when: true
-      when: ansible_facts.architecture == 'x86_64'
+      when:
+        - ansible_facts.architecture == 'x86_64'
+        - not (img.build_all_arch | default(false) | bool)
 
     # Push vers le registry interne (les deux arch).
     - name: 'Push to the internal registry — {{ img.name }}'

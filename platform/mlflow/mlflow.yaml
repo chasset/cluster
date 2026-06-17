@@ -8,8 +8,9 @@
 # `mlflow` (`--backend-store-uri`). Artefact store = S3 (`--default-artifact-root`,
 # `MLFLOW_S3_ENDPOINT_URL`) ; le bucket OBC est résolu au runtime et injecté par le
 # rôle (env `MLFLOW_DEFAULT_ARTIFACT_ROOT`/`MLFLOW_S3_ENDPOINT_URL` patchés à l'apply,
-# comme Loki templise son endpoint S3). Image multi-arch officielle épinglée par
-# digest d'index (ADR 0006) — pas d'image maison (≠ Marquez/Dagster).
+# comme Loki templise son endpoint S3). Image MAISON (officielle + psycopg2, driver
+# PostgreSQL absent de l'officielle) du registry interne, buildée sur les 2 arches
+# (ADR 0082 amendé) — comme Marquez/Dagster, par registry:80/<name>:<tag>.
 ---
 apiVersion: v1
 kind: Service
@@ -82,8 +83,13 @@ spec:
             - 'until pg_isready -h "pg-rw.postgres.svc.cluster.local" -p 5432 -U mlflow; do echo waiting for database; sleep 2; done;'
       containers:
         - name: mlflow
-          # Image officielle MULTI-ARCH (amd64+arm64) épinglée par digest d'INDEX (ADR 0006).
-          image: 'ghcr.io/mlflow/mlflow:v3.4.0@sha256:9c9e24a3fc24a0e9dcc5ba1daa9ebfc59e01b0a23b6eb89a4fdf25b84ad5347c'
+          # Image MAISON (officielle + psycopg2, ADR 0082 amendé) du registry interne.
+          # L'officielle n'embarque pas le driver PostgreSQL → on dérive `FROM officielle
+          # + psycopg2-binary` (platform/mlflow/image/Dockerfile), buildée sur les 2 arches
+          # (build_all_arch) et publiée en registry:80/mlflow:<tag>. Référence par TAG (pas
+          # de digest) comme dagster/marquez — image buildée localement, pas un upstream
+          # mutable (ADR 0006 ne vise que les images tirées d'un registre tiers).
+          image: 'registry:80/mlflow:v3.4.0'
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false

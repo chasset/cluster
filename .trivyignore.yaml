@@ -211,6 +211,11 @@ misconfigurations:
       # Émetteur OpenLineage jetable (validation e2e #148) : même base/posture que
       # l'image Dagster maison ci-dessus (root, fidèle à l'officielle).
       - 'platform/dagster/image-openlineage/Dockerfile'
+      # Image MLflow maison (ADR 0082 amendé) : `FROM ghcr.io/mlflow/mlflow + psycopg2`.
+      # L'officielle tourne en root (pas de USER) ; on en hérite — y ajouter un USER
+      # non-root divergerait de l'amont. Le pod pose déjà un securityContext non-root
+      # (runAsNonRoot/runAsUser 1000, KSV-0118 dans platform/mlflow/mlflow.yaml).
+      - 'platform/mlflow/image/Dockerfile'
 
   # ── Marquez vendored (chart 0.51.1, helm template figé) — posture amont ────
   # Le chart Marquez ne durcit pas ses workloads en amont (API Java + UI React,
