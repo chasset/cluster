@@ -1881,28 +1881,32 @@ def cmd_preview(args: argparse.Namespace) -> int:
 
     Read-only : ne LANCE ni ne DÉTRUIT rien (`next` applique ; `destroy` détruit). Code 0
     (informatif) ; chemin incohérent avec le backend → usage (2)."""
-    # Lecture seule : on ne BLOQUE pas. Quand aucun banc n'est monté, la sonde vise
-    # /dev/null (jamais la prod, ADR 0053) → la section RÉEL est VIDE. On le DIT
-    # simplement plutôt que de laisser croire à un cluster éteint.
-    if _active_kubeconfig() is None and not _context_targets_bench():
-        _warn(
-            "cluster non installé — pas de connexion possible pour l'instant "
-            "(le monter : `nestor up`). L'état réel ci-dessous est vide."
-        )
-    # MISMATCH SHELL ↔ preview (ADR 0053) : `_default_kubeconfig_to_bench` a posé le banc
-    # pour CE process (l'opérateur n'avait pas exporté KUBECONFIG) — mais le shell, lui,
-    # reste sans KUBECONFIG (process ≠ parent). preview lit donc le BANC pendant qu'un
-    # `kubectl` nu dans le shell vise ~/.kube/config (souvent la PROD). On AVERTIT (non
-    # bloquant) d'aligner le shell. Seulement si le banc est JOIGNABLE (sinon le 1er
-    # warning « cluster non installé » suffit).
-    elif _KUBECONFIG_AUTO_BENCH and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
-        _warn(
-            "preview lit le BANC, mais ton shell n'a pas KUBECONFIG exporté — un `kubectl` "
-            "direct vise ~/.kube/config (souvent la PROD). Aligne le shell : "
-            'eval "$(nestor env)".'
-        )
     path = _resolve(args.file)
     topo = load_topology(path)
+    # Avertissements d'ALIGNEMENT SHELL — propres au BANC (ADR 0053). Une stack
+    # `target_kind: prod` ne lit PAS le banc (gating ADR 0084) : ces messages, pensés
+    # pour le banc, seraient TROMPEURS en prod (ils invitent à `nestor env` qui, en prod,
+    # ne pose rien). On ne les émet donc que pour une stack lima.
+    if topo.target_kind == "lima":
+        # Lecture seule : on ne BLOQUE pas. Quand aucun banc n'est monté, la sonde vise
+        # /dev/null (jamais la prod, ADR 0053) → la section RÉEL est VIDE. On le DIT
+        # simplement plutôt que de laisser croire à un cluster éteint.
+        if _active_kubeconfig() is None and not _context_targets_bench():
+            _warn(
+                "cluster non installé — pas de connexion possible pour l'instant "
+                "(le monter : `nestor up`). L'état réel ci-dessous est vide."
+            )
+        # MISMATCH SHELL ↔ preview : `_default_kubeconfig_to_bench` a posé le banc pour CE
+        # process (l'opérateur n'avait pas exporté KUBECONFIG) — mais le shell reste sans
+        # KUBECONFIG (process ≠ parent). preview lit le BANC pendant qu'un `kubectl` nu du
+        # shell vise ~/.kube/config (souvent la PROD). On AVERTIT (non bloquant) d'aligner
+        # le shell. Seulement si le banc est JOIGNABLE (sinon le 1er warning suffit).
+        elif _KUBECONFIG_AUTO_BENCH and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
+            _warn(
+                "preview lit le BANC, mais ton shell n'a pas KUBECONFIG exporté — un "
+                "`kubectl` direct vise ~/.kube/config (souvent la PROD). Aligne le shell : "
+                'eval "$(nestor env)".'
+            )
     runs = load_runs(args.history or _RUNS_HISTORY)
     now = int(dt.datetime.now(tz=dt.UTC).timestamp())
     target = args.target  # None → default_target le déduit

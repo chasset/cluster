@@ -123,6 +123,20 @@ from nestor import (  # noqa: E402
 
 _EXAMPLE = os.path.join(_ROOT, "topologies", "socle.example.yaml")
 
+
+def _example_as_lima(test):
+    """Copie temporaire de _EXAMPLE forcée en `target_kind: lima` (nettoyée en cleanup).
+
+    Les tests du comportement BANC (créer les VMs `up`, warning d'alignement shell,
+    délégation `run-phases.sh up`) doivent viser une topo lima : depuis ADR 0084, une
+    topo prod n'a plus la phase `up` ni le warning banc. _EXAMPLE est prod → on en dérive
+    une variante lima pour ces cas."""
+    with open(_EXAMPLE, encoding="utf-8") as f:
+        body = f.read().replace("target_kind: prod", "target_kind: lima")
+    path = _tmp(body)
+    test.addCleanup(os.unlink, path)
+    return path
+
 _INVALID_TOPO = """\
 catalog:
   topology: bancal
@@ -550,8 +564,9 @@ runs:
         cli._ready_nodes = lambda *_a: ["cp1"]
         hist = _tmp(self._SOCLE_FRESH)
         self.addCleanup(os.unlink, hist)
+        # `up` (créer les VMs) n'existe qu'en lima (ADR 0084) → topo lima pour ce test banc.
         code, out, _ = _capture(
-            ["preview", "-f", _EXAMPLE, "--target", "atlas-ceph", "--history", hist]
+            ["preview", "-f", _example_as_lima(self), "--target", "atlas-ceph", "--history", hist]
         )
         self.assertEqual(code, 0)
         self.assertIn("créer les VMs", out)  # libellé métier de `up`
@@ -682,7 +697,8 @@ runs:
         orig_flag = cli._KUBECONFIG_AUTO_BENCH
         self.addCleanup(setattr, cli, "_KUBECONFIG_AUTO_BENCH", orig_flag)
         os.environ.pop("KUBECONFIG", None)  # _capture restaure l'env ensuite
-        code, _, err = _capture(["preview", "-f", _EXAMPLE])
+        # Warning d'alignement shell = comportement BANC (ADR 0084) → topo lima.
+        code, _, err = _capture(["preview", "-f", _example_as_lima(self)])
         self.assertEqual(code, 0)
         self.assertIn("nestor env", err)  # avertit d'aligner le shell
         self.assertIn("PROD", err)
@@ -902,8 +918,9 @@ runs:
         self.addCleanup(setattr, cli.subprocess, "run", orig)
         hist = _tmp(self._EMPTY_HIST)
         self.addCleanup(os.unlink, hist)
+        # `up` (créer les VMs) n'existe qu'en lima (ADR 0084) → topo lima + target lima.
         code, out, _ = _capture(
-            ["next", "-f", _EXAMPLE, "--target", "cluster-dataops", "--history", hist, "--yes"]
+            ["next", "-f", _example_as_lima(self), "--target", "atlas", "--history", hist, "--yes"]
         )
         self.assertEqual(code, 0)
         # un appel `run-phases.sh up` (VMs seules), PAS `socle` (tout le socle)
@@ -1811,7 +1828,10 @@ class UpCommand(unittest.TestCase):
         self.assertIn("run-phases.sh", " ".join(calls[0]))
         self.assertEqual(calls[0][-2], "layers")  # arm générique, pas un preset nommé
         seq = calls[0][-1].split(",")  # séquence complète passée à `layers`
-        self.assertEqual(seq[0], "up")
+        # _EXAMPLE est `target_kind: prod` → PAS de phase `up` (nœuds baremetal
+        # préexistants, ADR 0084) : le socle prod commence à `bootstrap`.
+        self.assertNotIn("up", seq)
+        self.assertEqual(seq[0], "bootstrap")
         self.assertIn("ceph", seq)  # backend ceph → socle ceph dans la séquence
         self.assertIn("datalake", seq)
 

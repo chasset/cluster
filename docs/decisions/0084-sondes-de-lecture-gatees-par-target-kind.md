@@ -57,11 +57,32 @@ l'[ADR 0053](0053-isolation-multi-cible-banc-prod.md).
      implicite — un `preview` prod sans cible nommée affiche un RÉEL honnêtement
      vide, pas le banc.
 
-3. **Aucune mutation touchée** : `_assert_bench_target` (0053 (e)) reste
+3. **`cmd_env` n'exporte pas le banc pour une stack prod.** Le wrapper `nestor`
+   appelle `env --force` après `up`/`next`, qui posait TOUJOURS
+   `KUBECONFIG=banc`. Sur une stack active `target_kind: prod`, cet auto-export
+   polluait le shell : (a) les `preview` suivants lisaient `lima-*` (KUBECONFIG
+   « explicite »), (b) pire, `_assert_bench_target` voyait ce KUBECONFIG et **ne
+   bloquait plus** `up`/`next` → `next` proposait de créer des VMs Lima sur une
+   cible prod. `cmd_env` lit désormais la topo active (`_active_topology_safe`)
+   : si `target_kind != lima`, il n'exporte pas le banc (invite à exporter le
+   KUBECONFIG prod / `discover --cp`).
+
+4. **La phase `up` est sautée en prod.** `up` = provisionner les VMs via
+   `limactl`, propre au banc Lima. En prod, les nœuds baremetal PRÉEXISTENT →
+   `expected_phase_sequence` ne pose pas `up` (le socle commence à `bootstrap`,
+   k8s sur les nœuds existants). `next`/`preview` d'une stack prod ne proposent
+   donc plus « créer les VMs ».
+
+5. **Les avertissements d'alignement shell sont gatés sur lima.** Les messages «
+   preview lit le banc » / « cluster non installé » (pensés pour le banc,
+   ADR 0053) ne s'affichent que pour `target_kind: lima` — en prod ils seraient
+   trompeurs (ils invitent à `nestor env` qui, en prod, ne pose rien).
+
+6. **Aucune mutation touchée** : `_assert_bench_target` (0053 (e)) reste
    inchangé — il garde les mutations BANC. La prod ne se mute pas via
    `cmd_up`/`cmd_next` Python (voie playbooks/`discover --cp`,
    [ADR 0074](0074-cluster-discover-reconstruire-topologie.md)). Cet ADR ne
-   concerne que la **lecture**.
+   concerne que la **lecture** et l'**alignement d'environnement**.
 
 ## Conséquences
 

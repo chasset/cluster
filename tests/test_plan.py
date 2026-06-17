@@ -109,6 +109,21 @@ class ExpectedSequence(unittest.TestCase):
         seq = expected_phase_sequence(_topo(backend="local-path"), "atlas")
         self.assertEqual(seq[:3], ["up", "bootstrap", "storage-simple"])
 
+    def test_prod_target_skips_up(self):
+        # ADR 0084 : en `target_kind: prod`, les nœuds baremetal PRÉEXISTENT → pas de
+        # phase `up` (provisioning VM limactl) ; le socle commence à `bootstrap`.
+        prod = topology_from_dict(
+            {
+                "catalog": {"topology": "p", "profile": "base"},
+                "nodes": [{"name": "n1", "roles": ["control", "worker"]}],
+                "storage": {"backend": "ceph"},
+                "target_kind": "prod",
+            }
+        )
+        seq = expected_phase_sequence(prod, "socle")
+        self.assertNotIn("up", seq)
+        self.assertEqual(seq[0], "bootstrap")
+
     def test_hardening_inserted_after_socle(self):
         seq = expected_phase_sequence(
             _topo(backend="ceph", hardening={"enabled": True}), "atlas-ceph"
