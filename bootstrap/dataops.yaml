@@ -4,7 +4,7 @@
 #   Play 1 (k8s) : registry + cert-manager + CNPG (manifestes figés platform/
 #     appliqués via kubernetes.core).
 #   Play 2 (nœuds) : config containerd registry interne + build des images.
-#   Play 3 (k8s) : Dagster + Marquez (pull des images buildées au play 2).
+#   Play 3 (k8s) : Dagster + Marquez (pull des images buildées au play 2) + MLflow.
 #
 # Ordre inter-briques : registry → cert-manager → CNPG → (build) → Dagster/Marquez.
 #
@@ -110,7 +110,7 @@
         name: platform-build-images
       tags: build-images
 
-- name: Plateforme DataOps — étape applicative (Dagster + Marquez)
+- name: Plateforme DataOps — étape applicative (Dagster + Marquez + MLflow)
   hosts: "{{ dataops_k8s_host | default('localhost') }}"
   gather_facts: false
   tasks:
@@ -125,3 +125,10 @@
       ansible.builtin.import_role:
         name: platform-marquez
       tags: marquez
+
+    # MLflow (suivi de modèles, ADR 0082) : image officielle multi-arch (pas de
+    # build), backend store CNPG `mlflow`, artefact store S3 (OBC RGW / SeaweedFS).
+    - name: Serveur de suivi de modèles MLflow (storage CNPG + artefacts S3)
+      ansible.builtin.import_role:
+        name: platform-mlflow
+      tags: mlflow
