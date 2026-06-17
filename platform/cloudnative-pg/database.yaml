@@ -47,3 +47,14 @@ spec:
   owner: marquez
   cluster:
     name: pg
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: mlflow
+  namespace: postgres
+spec:
+  name: mlflow
+  owner: mlflow
+  cluster:
+    name: pg

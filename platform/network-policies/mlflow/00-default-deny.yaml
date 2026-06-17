@@ -1,0 +1,12 @@
+# Politique par défaut du namespace mlflow : tout refuser (Ingress + Egress).
+# Les flux légitimes sont ré-ouverts un à un par les allow-* (modèle marquez/dagster).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: mlflow
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress

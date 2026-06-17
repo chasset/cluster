@@ -64,6 +64,11 @@ spec:
         ensure: present
         passwordSecret:
           name: pg-role-marquez
+      - name: mlflow
+        login: true
+        ensure: present
+        passwordSecret:
+          name: pg-role-mlflow
   # Sauvegardes/WAL archivés via le plugin Barman Cloud (TLS plugin<->operator par
   # cert-manager). L'ObjectStore S3 est défini dans objectstore.yaml.
   plugins:
