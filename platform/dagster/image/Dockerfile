@@ -13,7 +13,7 @@
 # Build (depuis ce dossier) :
 #   docker buildx build --platform linux/arm64 \
 #     -t <registry-interne>/dagster-celery-k8s:1.13.7-arm64 --push .
-FROM python:3.10-slim
+FROM python:3.10-slim@sha256:fa184fce49c170a8b1032a4f752f9fe1a7e463e7f5795a3952ca275e166fa913
 
 ARG DAGSTER_VERSION=1.13.7
 
