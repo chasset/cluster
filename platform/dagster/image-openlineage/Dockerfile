@@ -15,7 +15,7 @@
 # Build (depuis ce dossier) :
 #   docker buildx build --platform linux/arm64 \
 #     -t registry:80/dagster-openlineage-emit:dev --push platform/dagster/image-openlineage/
-FROM python:3.10-slim
+FROM python:3.10-slim@sha256:fa184fce49c170a8b1032a4f752f9fe1a7e463e7f5795a3952ca275e166fa913
 
 ARG DAGSTER_VERSION=1.13.7
 
