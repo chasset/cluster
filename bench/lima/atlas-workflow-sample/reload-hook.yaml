@@ -83,14 +83,22 @@ spec:
           type: RuntimeDefault
       containers:
         - name: reload
-          image: bitnami/kubectl:1.34
-          command:
-            - sh
-            - -c
-            - >-
-              kubectl -n dagster rollout restart deploy/dagster-dagster-webserver deploy/dagster-daemon &&
-              kubectl -n dagster rollout status deploy/dagster-dagster-webserver --timeout=120s &&
-              kubectl -n dagster rollout status deploy/dagster-daemon --timeout=120s
+          # kubectl OFFICIEL k8s (registry.k8s.io) épinglé par digest d'index multi-arch
+          # (ADR 0006) — version alignée sur le banc. `bitnami/kubectl:1.34` n'existe pas
+          # (Bitnami a refondu son catalogue Docker Hub) → ImagePullBackOff (vécu au banc).
+          image: registry.k8s.io/kubectl:v1.34.9@sha256:06a7ce6adc8e89486cedf0afe1e818c10e1f4da2d45493bf2ee87336838e3187
+          # Image kubectl distroless (entrypoint /bin/kubectl, PAS de shell) → on passe
+          # les arguments directement, sans `sh -c`. Une seule commande `rollout restart`
+          # sur les deux deployments suffit : le hook déclenche le redémarrage (le
+          # webserver/daemon relisent alors le workspace) ; on n'attend pas la fin du
+          # rollout ici — le scénario 29 attend déjà que la location soit saine.
+          args:
+            - -n
+            - dagster
+            - rollout
+            - restart
+            - deploy/dagster-dagster-webserver
+            - deploy/dagster-daemon
           securityContext:
             allowPrivilegeEscalation: false
             runAsNonRoot: true

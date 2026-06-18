@@ -18,9 +18,17 @@ FROM python:3.10-slim
 
 ARG DAGSTER_VERSION=1.13.7
 
+# dagster-postgres + dagster-k8s : REQUIS quand la code-location est lancée par le
+# webserver via le K8sRunLauncher (chemin réel, scénario 29) — le pod de run se connecte
+# au PostgresRunStorage de l'instance Dagster. Sans eux : « Couldn't import module
+# dagster_postgres.run_storage » → run FAILURE (vécu au banc). L'ancien usage CLI
+# (`dagster asset materialize`, local) ne les exigeait pas. Non épinglés : sous-packages
+# au schéma de version distinct, résolus depuis `dagster==X` (modèle platform/dagster/image).
 RUN pip install --no-cache-dir -U uv
 RUN python -m uv pip install --system \
     dagster==${DAGSTER_VERSION} \
+    dagster-postgres \
+    dagster-k8s \
     openlineage-python \
     mlflow-skinny==2.17.2
 
