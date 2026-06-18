@@ -105,7 +105,12 @@ API_PORT=6443
 # sous le seuil ~2 GiB ; 125 pods Evicted constatés en local-path le 2026-06-17, #391).
 # 40 GiB partout (qcow2 thin-provisionné : n'occupe le disque hôte qu'à l'usage réel,
 # donc gratuit pour un banc léger). Surchargeable via VM_DISK.
-VM_CPUS=2
+# CPU par VM. Surchargeable via VM_CPUS (comme VM_MEMORY/VM_DISK). Défaut 4 : un nœud
+# qui porte la chaîne MLOps complète (Dagster webserver+daemon + monitoring + CNPG +
+# MLflow…) sature 2 vCPU — la somme des requests.cpu dépasse l'allouable et le
+# scheduler laisse des pods Pending (`Insufficient cpu`, vécu au banc mono-nœud :
+# dagster-webserver non plaçable). 4 vCPU donne la marge.
+VM_CPUS=${VM_CPUS:-4}
 # Mémorise si VM_MEMORY a été FOURNI par l'opérateur (vs défaut dérivé) : un chemin
 # peut alors imposer son propre plancher SANS écraser un choix explicite (ha-3cp).
 VM_MEMORY_SET=${VM_MEMORY:+1}
