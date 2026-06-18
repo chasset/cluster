@@ -70,6 +70,8 @@ référentiel écarté (DORA, ISO) n'a pas de badge — c'est un choix tracé. -
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/univ-lehavre/cluster/badge)](https://scorecard.dev/viewer/?uri=github.com/univ-lehavre/cluster)
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13301/badge)](https://www.bestpractices.dev/projects/13301)
+
 Manifests, playbooks et runbooks pour déployer et opérer un cluster Kubernetes
 de recherche : installation, stockage distribué, applications de calcul et
 services transverses. Pour le **récit complet** (néophyte, de bout en bout),
