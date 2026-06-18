@@ -17,6 +17,11 @@ NS=${NAMESPACE:-test-scenarios}
 PVC=pvc-01-block
 POD=pod-01-block
 KEEP=${KEEP:-0}
+# Scénario Ceph (PVC RBD sur rook-ceph-block-replicated). SKIP NEUTRE (exit 0) sur
+# un banc SANS Ceph (profil local-path, ADR 0085 : preuves applicatives sur
+# local-path, Ceph testé sur installation seule) — sauf STRICT_CEPH=1 qui fait
+# alors ÉCHOUER (calque STRICT_OL du scénario 23 ; utile en CI sur un banc Ceph).
+STRICT_CEPH=${STRICT_CEPH:-0}
 # En YAML inline, le label s'écrit `clé: "valeur"` (le format `clé=valeur` n'est
 # valable que pour `kubectl label` / les sélecteurs `-l`).
 SC_KEY="test.cluster.dev/scenario"
@@ -39,8 +44,16 @@ kubectl create ns "$NS" 2>/dev/null || true
 
 log "Vérifier StorageClass par défaut"
 default_sc=$(kubectl get sc -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
-[ "$default_sc" = "rook-ceph-block-replicated" ] \
-    || { log "FAIL : default SC = '$default_sc' (attendu rook-ceph-block-replicated)"; exit 1; }
+if [ "$default_sc" != "rook-ceph-block-replicated" ]; then
+    if [ "$STRICT_CEPH" = "1" ]; then
+        log "✗ STRICT_CEPH=1 et default SC = '$default_sc' (attendu rook-ceph-block-replicated)."
+        log "  Attendu sur un banc Ceph (run-phases.sh storage-real)."
+        exit 1
+    fi
+    log "skip — default SC = '$default_sc' (pas de Ceph ; ce scénario teste le PVC RBD)."
+    log "  Banc Ceph requis : run-phases.sh storage-real (puis STRICT_CEPH=1 en CI)."
+    exit 0
+fi
 
 log "Créer PVC $PVC"
 kubectl -n "$NS" apply -f - <<EOF
