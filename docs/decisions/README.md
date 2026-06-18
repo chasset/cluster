@@ -104,3 +104,4 @@ Format léger inspiré de Michael Nygard :
 | 0082 | [Suivi de modèles via MLflow](0082-suivi-modeles-mlflow.md)                                                                          | Proposed           |
 | 0083 | [`layers` source unique de l'ordre : presets en alias, plus de chemins nommés par défaut](0083-layers-source-unique-de-l-ordre.md)   | Proposed           |
 | 0084 | [Sondes de lecture gatées par `target_kind` (isolation banc/prod, suite de 0053)](0084-sondes-de-lecture-gatees-par-target-kind.md)  | Proposed           |
+| 0085 | [Preuves applicatives sur local-path par défaut ; Ceph validé sur installation seule](0085-preuves-applicatives-local-path.md)       | Proposed           |
