@@ -11,6 +11,46 @@ quotidien dépose (ou met à jour) une PR `chore(main): release vX.Y.Z` qui agr�
 les commits depuis la dernière release. Merger cette PR publie la version (bump +
 tag + entrée de changelog). Rien à lancer en local.
 
+## [2.38.0](https://github.com/univ-lehavre/cluster/compare/v2.37.0...v2.38.0) (2026-06-18)
+
+
+### Features
+
+* **mlflow:** épopée MLflow complète — ADR + briques + contrat ([#341](https://github.com/univ-lehavre/cluster/issues/341)-346) ([058309b](https://github.com/univ-lehavre/cluster/commit/058309b8de096f5f687227a6add4d7681a7b68be))
+* **mlflow:** layer autonome (next/up/remove/discover) + backing S3 dérivé ([2a227aa](https://github.com/univ-lehavre/cluster/commit/2a227aa180a40f4e3732214a7f166a7dbf52375c))
+* **mlflow:** manifestes platform/mlflow + ancrages CNPG/AppProject/netpol ([#342](https://github.com/univ-lehavre/cluster/issues/342)-344) ([3c98acc](https://github.com/univ-lehavre/cluster/commit/3c98acc09146407972180d4180c324df476975be))
+* **mlflow:** rôle Ansible platform-mlflow + câblage couche dataops ([#345](https://github.com/univ-lehavre/cluster/issues/345)) ([e6ba108](https://github.com/univ-lehavre/cluster/commit/e6ba1085d40960676dfbe0065a5faf41586602bd))
+
+
+### Bug Fixes
+
+* **bench:** disque VM banc à 40 GiB par défaut ([#391](https://github.com/univ-lehavre/cluster/issues/391)) ([d2d478a](https://github.com/univ-lehavre/cluster/commit/d2d478a4dcd69a954a74f21e840a9deb649f018d))
+* **bench:** disque VM par défaut à 40 GiB (les deux backends, [#391](https://github.com/univ-lehavre/cluster/issues/391)) ([5d2d157](https://github.com/univ-lehavre/cluster/commit/5d2d157ca1513b925942405bfd36b13a8e166215))
+* **dagster:** egress dagster→mlflow + exclure redcap du scan VitePress ([#407](https://github.com/univ-lehavre/cluster/issues/407)) ([ff67b91](https://github.com/univ-lehavre/cluster/commit/ff67b919c968570d7fc0703ecfccd50c686a0706))
+* **mlflow:** image maison (officielle + psycopg2) — corrige le crashloopbackoff ([10faf38](https://github.com/univ-lehavre/cluster/commit/10faf38234dfdbd027f8833ba185781a6c277ee4))
+* **mlflow:** image maison psycopg2 + egress dagster→mlflow (prod-ready) ([aa4840a](https://github.com/univ-lehavre/cluster/commit/aa4840a370dba3285ddf8ec34b12558c76d735f3))
+* **mlflow:** liens ADR, securityContext durci, trivy KSV-0014 acté (ci verte) ([418eff3](https://github.com/univ-lehavre/cluster/commit/418eff34402bada7e5b5fabf332805c606215eca))
+* **nestor:** `env` ne pose pas le kubeconfig banc pour une stack prod (ADR 0084) ([2e5f778](https://github.com/univ-lehavre/cluster/commit/2e5f77820822b3b7bb10cc05f8c868532d16a03c))
+* **nestor:** gater les sondes de lecture par target_kind (ADR 0084) ([f599ce8](https://github.com/univ-lehavre/cluster/commit/f599ce82555d3ea5651e84757d50b3a5caa2e892))
+* **nestor:** gater les sondes de lecture par target_kind (preview/next, ADR 0084) ([0b59b4b](https://github.com/univ-lehavre/cluster/commit/0b59b4b9c4cfd99fefe1c306e0d1a79efa2c58ef))
+* **nestor:** prod — sauter `up`, gater les avertissements banc (ADR 0084) ([591e3c4](https://github.com/univ-lehavre/cluster/commit/591e3c442f8c5be0f09696ee0051ca0805d1f3e5))
+* **next:** ancrer le run de référence sur la stack, pas un fallback global ([0baf804](https://github.com/univ-lehavre/cluster/commit/0baf804aa6e752626239f3868876684da673c6c8))
+* **trivy:** allowlister DS-0002 pour platform/mlflow/image/Dockerfile (root, comme dagster/marquez) ([1a99057](https://github.com/univ-lehavre/cluster/commit/1a99057378f01d7ff66b7491efece0ba93356b85))
+
+
+### Refactor
+
+* **plan:** layers source unique de l'ordre, presets en alias (ADR 0083) ([00cd9e7](https://github.com/univ-lehavre/cluster/commit/00cd9e71f22519513ff64a3ad3143e104dab04cb))
+* **plan:** layers source unique de l'ordre, presets en alias (ADR 0083) ([80accf0](https://github.com/univ-lehavre/cluster/commit/80accf08aac419692f0cbf3179fd743347a78687))
+
+
+### Documentation
+
+* **contrat:** tracer la chaîne MLOps drift+CT côté atlas ([e818e4a](https://github.com/univ-lehavre/cluster/commit/e818e4a97f7aaa063348150b6397ee407364ef3a))
+* **contrat:** tracer la chaîne MLOps drift+CT côté atlas (maturité 1→2) ([554c5b4](https://github.com/univ-lehavre/cluster/commit/554c5b46872dce5a64d9aff1588c317648456b9c))
+* documenter MLflow, layers (ADR 0083) et la chaîne MLOps drift+CT ([b6b5102](https://github.com/univ-lehavre/cluster/commit/b6b510217369590a48c4685f7a658e284c4726eb))
+* documenter MLflow, layers (ADR 0083) et la chaîne MLOps drift+CT ([4f94fa4](https://github.com/univ-lehavre/cluster/commit/4f94fa45047847b131a8d92828fe2201ebad6ead))
+
 ## [2.37.0](https://github.com/univ-lehavre/cluster/compare/v2.36.0...v2.37.0) (2026-06-17)
 
 
