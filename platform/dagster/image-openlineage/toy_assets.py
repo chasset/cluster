@@ -129,12 +129,30 @@ def toy_drift():
     }
 
 
+# Tag `dagster-k8s/config` : injecte les variables d'env dans le POD DE RUN créé par le
+# K8sRunLauncher (ADR 0086). CRUCIAL — les env du Deployment de la code-location gRPC
+# (toy-codeloc) ne se propagent PAS aux pods de run ; il faut les déclarer ici (vécu au
+# banc : run SUCCESS mais MLflow vide car MLFLOW_TRACKING_URI absent du pod de run).
+# Patron atlas (definitions.py _RUN_K8S_CONFIG). Valeurs génériques = endpoints du
+# contrat (ADR 0043) ; egress dagster→mlflow ouvert par allow-mlflow-egress (#407).
+_RUN_K8S_CONFIG = {
+    "dagster-k8s/config": {
+        "container_config": {
+            "env": [
+                {"name": "OPENLINEAGE_URL", "value": "http://marquez.marquez.svc.cluster.local:5000"},
+                {"name": "OPENLINEAGE_ENDPOINT", "value": "api/v1/lineage"},
+                {"name": "OPENLINEAGE_NAMESPACE", "value": "dagster"},
+                {"name": "MLFLOW_TRACKING_URI", "value": "http://mlflow.mlflow.svc.cluster.local:5000"},
+            ],
+        },
+    },
+}
+
 # Job nommé matérialisant les assets — lançable par `launchRun` (GraphQL) quand ce
 # module est chargé comme code-location gRPC (ADR 0086, `dagster api grpc -m toy_assets`).
 # Le scénario 29 lance `CODELOC_JOB=toy_job` ; `selection="*"` matérialise toy_dataset
-# (lineage Marquez) ET toy_drift (métrique MLflow). (Le harnais CLI `materialize -m
-# toy_assets` reste valable : il découvre les assets directement.)
-toy_job = define_asset_job(name="toy_job", selection="*")
+# (lineage Marquez) ET toy_drift (métrique MLflow). `tags` injecte l'env dans le pod de run.
+toy_job = define_asset_job(name="toy_job", selection="*", tags=_RUN_K8S_CONFIG)
 
 # `Definitions` : point d'entrée que `dagster api grpc -m toy_assets` charge pour exposer
 # la code-location. Sans lui, le module n'expose pas de job nommé au workspace.
