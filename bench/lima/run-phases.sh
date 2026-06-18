@@ -105,7 +105,12 @@ API_PORT=6443
 # sous le seuil ~2 GiB ; 125 pods Evicted constatés en local-path le 2026-06-17, #391).
 # 40 GiB partout (qcow2 thin-provisionné : n'occupe le disque hôte qu'à l'usage réel,
 # donc gratuit pour un banc léger). Surchargeable via VM_DISK.
-VM_CPUS=2
+# CPU par VM. Surchargeable via VM_CPUS (comme VM_MEMORY/VM_DISK). Défaut 4 : un nœud
+# qui porte la chaîne MLOps complète (Dagster webserver+daemon + monitoring + CNPG +
+# MLflow…) sature 2 vCPU — la somme des requests.cpu dépasse l'allouable et le
+# scheduler laisse des pods Pending (`Insufficient cpu`, vécu au banc mono-nœud :
+# dagster-webserver non plaçable). 4 vCPU donne la marge.
+VM_CPUS=${VM_CPUS:-4}
 # Mémorise si VM_MEMORY a été FOURNI par l'opérateur (vs défaut dérivé) : un chemin
 # peut alors imposer son propre plancher SANS écraser un choix explicite (ha-3cp).
 VM_MEMORY_SET=${VM_MEMORY:+1}
@@ -1157,6 +1162,32 @@ phase_monitoring() {
     ok "🎉 observabilité déployée — Prometheus + Grafana + Loki (S3/${STORAGE_BACKING}) Ready"
 }
 
+# ── Phase mlflow — suivi de modèles (ADR 0082, layer autonome) ───────────────
+# Jumeau de monitoring/dataops : déploie via bootstrap/mlflow.yaml (build image
+# maison node-side + serveur MLflow k8s). Backend store = base CNPG `mlflow` (posée
+# par dataops, prérequis du graphe) ; artefact store S3 dont le BACKING est DÉTECTÉ
+# du cluster (ADR 0036/0065) — SeaweedFS en banc léger, RGW Ceph en mode Ceph,
+# parité avec loki_s3_backing. Sans cette fonction, l'arm `layers` appelait
+# `phase_mlflow` inexistant → rc=127 (le montage `layers [...,mlflow]` échouait, alors
+# que `nestor next` passait car il route mlflow vers son playbook autonome côté Python).
+phase_mlflow() {
+    preflight
+    [ -f "${KUBECONFIG_LOCAL}" ] || die "kubeconfig absent — lancer 'bootstrap' d'abord"
+    [ -f "${INVENTORY}" ] || die "inventaire absent — lancer 'bootstrap' d'abord"
+    log "Phase mlflow — serveur de suivi de modèles (backend CNPG + artefacts S3, via Ansible)"
+
+    # Profil de backing S3 DÉTECTÉ du cluster (ADR 0065), comme monitoring/dataops.
+    detect_storage_profile
+
+    KUBECONFIG="${KUBECONFIG_LOCAL}" ansible-playbook -i "${INVENTORY}" \
+        "${REPO}/bootstrap/mlflow.yaml" \
+        -e dataops_k8s_host=localhost \
+        -e "mlflow_s3_backing=${STORAGE_BACKING}" \
+        -e "mlflow_s3_endpoint=${STORAGE_ENDPOINT}" \
+        || die "mlflow.yaml : échec du déploiement du suivi de modèles"
+    ok "🎉 MLflow déployé — suivi de modèles (S3/${STORAGE_BACKING}) Ready"
+}
+
 # Prédicats CNPG réutilisés par la phase (purs côté décision via dataops-assert.sh).
 cnpg_operator_ready() { [ "$("${KUBECTL[@]}" -n cnpg-system get deploy cnpg-controller-manager -o jsonpath='{.status.readyReplicas}' 2>/dev/null)" = "1" ]; }
 cnpg_cluster_healthy() {
@@ -1683,6 +1714,7 @@ case "${1:-}" in
     gitops) time_phase gitops phase_gitops ;;
     gitops-seed) time_phase gitops-seed phase_gitops_seed ;;
     monitoring) time_phase monitoring phase_monitoring ;;
+    mlflow) time_phase mlflow phase_mlflow ;;
     access) phase_access "${@:2}" ;;
     ceph) time_phase ceph phase_ceph ;;
     sc) time_phase sc phase_sc ;;
