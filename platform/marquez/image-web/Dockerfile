@@ -15,7 +15,9 @@
 #   docker buildx build --platform linux/arm64 \
 #     -t registry:80/marquez-web:0.51.1 --push \
 #     -f platform/marquez/image-web/Dockerfile marquez/web/   # contexte = web/ du source
-FROM node:18-alpine
+# Épinglé par digest d'index multi-arch (ADR 0006 ; le banc est arm64) —
+# MediaType image.index vérifié. Renovate suit le tag (pinDigests).
+FROM node:18-alpine@sha256:8d6421d663b4c28fd3ebc498332f249011d118945588d0a35cb9bc4b8ca09d9e
 WORKDIR /usr/src/app
 
 ARG REACT_APP_ADVANCED_SEARCH
