@@ -11,6 +11,56 @@ quotidien dépose (ou met à jour) une PR `chore(main): release vX.Y.Z` qui agr�
 les commits depuis la dernière release. Merger cette PR publie la version (bump +
 tag + entrée de changelog). Rien à lancer en local.
 
+## [2.39.0](https://github.com/univ-lehavre/cluster/compare/v2.38.0...v2.39.0) (2026-06-19)
+
+
+### Features
+
+* **banc:** scénario 31 — vérifier le contrat d'interface cluster→atlas ([a12ef7b](https://github.com/univ-lehavre/cluster/commit/a12ef7b43183a9cf49eccae0713dda3f26122917))
+* **banc:** scénario 31 — vérifier le contrat d'interface cluster→atlas ([5b65d1d](https://github.com/univ-lehavre/cluster/commit/5b65d1d1aaaa6d77d1f15fa3b7d0eb85c9661f80))
+* **dataops:** code-location jouet gRPC déployée par gitops (adr 0086) ([3dadf26](https://github.com/univ-lehavre/cluster/commit/3dadf26363df617bfed3ebe946e1b3b25a07f330))
+* **dataops:** code-location jouet gRPC déployée par gitops (ADR 0086) ([807b30f](https://github.com/univ-lehavre/cluster/commit/807b30f3273018578d16697b97a9a838d779260b))
+* **dataops:** toy_drift logge un drift_score jouet dans mlflow (adr 0086, étape 1) ([6268e92](https://github.com/univ-lehavre/cluster/commit/6268e925be0f70085e452e321bab0887a5191223))
+* **dataops:** toy_drift logge un drift_score jouet dans MLflow (ADR 0086, étape 1) ([5e51c8b](https://github.com/univ-lehavre/cluster/commit/5e51c8b08c3e224cb4a2fcb4ceeac22f6e66ba7c))
+* **dataops:** toy_drift utilise le vrai evidently (EmbeddingsDriftMetric) — [#428](https://github.com/univ-lehavre/cluster/issues/428) ([10d0eeb](https://github.com/univ-lehavre/cluster/commit/10d0eebdfd70323fad8dc2b0caac1f0165bdc44b))
+* **dataops:** toy_drift utilise le vrai Evidently (EmbeddingsDriftMetric) — closes [#428](https://github.com/univ-lehavre/cluster/issues/428) ([50804e6](https://github.com/univ-lehavre/cluster/commit/50804e6a790adc20035e5d22c595628d6e69cf15))
+* **redcap:** ajouter l'app redcap (php/apache + mariadb autonome) ([3c36304](https://github.com/univ-lehavre/cluster/commit/3c36304fd2938a92a9022466e51993cea347b084))
+* **redcap:** ajouter l'app redcap (php/apache + mariadb autonome) ([8f523d7](https://github.com/univ-lehavre/cluster/commit/8f523d77618892ea99a8aa8b1268257432fa57ce))
+* **redcap:** mode désinstallation (redcap_state=absent), pvc conservé par défaut ([53d5c43](https://github.com/univ-lehavre/cluster/commit/53d5c43a5f0824de5a1ffdcfec02180356523b37))
+* **redcap:** mode désinstallation (redcap_state=absent), pvc conservé par défaut ([c556912](https://github.com/univ-lehavre/cluster/commit/c55691295d15f2d42b6030b59d98797bb596e59b))
+
+
+### Bug Fixes
+
+* **banc:** ajouter phase_mlflow (montage layers échouait en rc=127) ([713cde4](https://github.com/univ-lehavre/cluster/commit/713cde4a195690e9ae1a5c654b600bf5101a7e1f))
+* **banc:** ajouter phase_mlflow (montage layers échouait en rc=127) ([ee33e05](https://github.com/univ-lehavre/cluster/commit/ee33e056ea8c204ac12b8aca0416f8b6843ac351))
+* **banc:** rendre vm_cpus surchargeable (défaut 4, débloque la chaîne mlops) ([60c5158](https://github.com/univ-lehavre/cluster/commit/60c51583dcb93e92871c0c5b7f58e55a824f357b))
+* **banc:** rendre vm_cpus surchargeable (défaut 4, débloque la chaîne mlops) ([1df7aec](https://github.com/univ-lehavre/cluster/commit/1df7aec2e1da14c402f153b88834701240c2cb26))
+* **banc:** run-all refuse un VAR=val placé après le script (échec silencieux) ([3a2c33b](https://github.com/univ-lehavre/cluster/commit/3a2c33b7162d24a3b50cce903bbece263d7bf777))
+* **banc:** run-all refuse un VAR=val placé après le script (échec silencieux) ([bbc07e3](https://github.com/univ-lehavre/cluster/commit/bbc07e3aad44cc70ad94ff4601d769192db75961))
+* **banc:** scénario 01 skip neutre sur banc sans ceph (local-path) ([5dffc64](https://github.com/univ-lehavre/cluster/commit/5dffc6436ba019257a22a21106a4facc422bbbe1))
+* **banc:** scénario 01 skip neutre sur banc sans ceph (local-path) ([d58ff39](https://github.com/univ-lehavre/cluster/commit/d58ff390ee5915287c5c44f9f9cd544a8b82409f))
+* **dataops:** code-location jouet visible au banc — reload workspace + image fraîche (adr 0086) ([3ffd3bd](https://github.com/univ-lehavre/cluster/commit/3ffd3bd9144cc58b5db3402e35ddce2858cfec25))
+* **dataops:** code-location jouet visible au banc — reload workspace + image fraîche (ADR 0086) ([05dd0d1](https://github.com/univ-lehavre/cluster/commit/05dd0d156d633a1970ea34ec1543ef30c50d4689))
+* **dataops:** injecter MLFLOW/OPENLINEAGE dans le pod de run (tag dagster-k8s/config) ([c6789e0](https://github.com/univ-lehavre/cluster/commit/c6789e02d743cff0d5c788ea72e1855ff3ce3e5e))
+* **dataops:** injecter MLFLOW/OPENLINEAGE dans le pod de run (tag dagster-k8s/config) ([6952b31](https://github.com/univ-lehavre/cluster/commit/6952b317aad7ff014ecdf956e30e280ea688fa3a))
+* **dataops:** run via code-location jouet — dagster-postgres + hook kubectl valide ([04b2fa6](https://github.com/univ-lehavre/cluster/commit/04b2fa6ed257be71c1185ca114556fbe3ddcb1d4))
+* **dataops:** run via code-location jouet — dagster-postgres dans l'image + hook kubectl valide ([d01f623](https://github.com/univ-lehavre/cluster/commit/d01f6234ad0b1bab4b67b582199cf79e145e2233))
+* **épreuves:** enregistrer le scénario 31 au catalogue (test python vert) ([51132e1](https://github.com/univ-lehavre/cluster/commit/51132e1619d1e9024c9bbeae733abed9db62d337))
+* **épreuves:** enregistrer le scénario 31 au catalogue (test python vert) ([3d74d25](https://github.com/univ-lehavre/cluster/commit/3d74d25abd711fc23be5791723d2bfd63481ed17))
+* **trivy:** allowlister code-location.yaml (KSV-0014/0118, remplace l'ancien job jouet) ([61be173](https://github.com/univ-lehavre/cluster/commit/61be17309731c29c66f5476a4165c566ff1cb606))
+* **trivy:** durcir le hook reload (KSV-0014/0118) — securityContext pod + rootfs RO ([3751050](https://github.com/univ-lehavre/cluster/commit/37510503a27b77ae09d3357c400d17bc3d5f8f55))
+
+
+### Documentation
+
+* **adr:** 0085 — preuves applicatives sur local-path, ceph sur installation seule ([bb2b01d](https://github.com/univ-lehavre/cluster/commit/bb2b01d20040978f96f90180fd7707ba5946cd93))
+* **adr:** 0085 — preuves applicatives sur local-path, ceph sur installation seule ([c08b40b](https://github.com/univ-lehavre/cluster/commit/c08b40b186d8655c374cc9aefba38549878b3566))
+* **contrat:** injecter mlflow/openlineage dans les pods de run (tag dagster-k8s/config) ([5c676f5](https://github.com/univ-lehavre/cluster/commit/5c676f5e121ff5c26e5f32919eccfb3f70104921))
+* **contrat:** injecter mlflow/openlineage dans les pods de run (tag dagster-k8s/config) — [#427](https://github.com/univ-lehavre/cluster/issues/427) ([92d2ef6](https://github.com/univ-lehavre/cluster/commit/92d2ef6d67b7fc4a78f2f9f7b6e1b29b06af93a4))
+* raccorder la doc aux ajouts récents (redcap, code-location jouet, scénarios 28-31) ([4baaf5d](https://github.com/univ-lehavre/cluster/commit/4baaf5d34e5f15f7a08f32cc07dabc7ac9866727))
+* raccorder la doc aux ajouts récents (REDCap, code-location jouet, scénarios 28-31) ([95eef1d](https://github.com/univ-lehavre/cluster/commit/95eef1da946b70879a4348fe0279778343ace028))
+
 ## [2.38.0](https://github.com/univ-lehavre/cluster/compare/v2.37.0...v2.38.0) (2026-06-18)
 
 
