@@ -56,7 +56,7 @@ recherche tracé, citable » (DOI Zenodo, `CITATION.cff`).
 | `License`                | **vert**           | `LICENSE` + `NOTICE`                                                                                                                                                                                                                                                             |
 | `Token-Permissions`      | **corrigé**        | tous les workflows ont `permissions:` top-level ; le seul `Warn` (`release.yml` `contents: write` top-level) est **confiné au job** `release-please` (#435). `ci.yml` a bien `contents: read`                                                                                    |
 | `Code-Review`            | **rouge (assumé)** | `required_approving_review_count:0`, mono-mainteneur — choix tenu (SAFEGUARDS.md), pas corrigeable sans 2ᵉ relecteur                                                                                                                                                             |
-| `Signed-Releases`        | **rouge**          | tags non signés (`git tag -v v2.9.0` → « cannot verify a non-tag object ») ; release-please ne signe pas                                                                                                                                                                         |
+| `Signed-Releases`        | **en cours**       | tags non signés à l'origine ; **archive source signée cosign keyless + provenance SLSA** attachée à chaque release ([ADR 0088](../decisions/0088-signature-releases-cosign-slsa.md), `release.yml`, #366) — vérif. consommateur documentée (`bootstrap/RUNBOOK.md`)              |
 | `SAST`                   | **en cours**       | Trivy fait l'IaC ; **CodeQL (Python) câblé** (`codeql.yml`, #367) sur le seul code applicatif réel (nestor/, scripts/ ; suite `security-and-quality`, `tests/` exclus — shell déjà shellcheck, manifestes trivy/kubeconform). Non bloquant d'abord (alertes onglet Security)     |
 | `Fuzzing`                | **en cours**       | property-based testing (Hypothesis) sur les fonctions pures de `nestor` qui parsent une entrée externe ([ADR 0087](../decisions/0087-property-based-testing-nestor.md), #367) — N/A levé : ce n'est pas du fuzzing binaire mais de la génération d'entrées ciblée sur invariants |
 
@@ -72,14 +72,17 @@ README.
 - `SAST` rouge→en cours : CodeQL (Python) câblé (#367).
 - `Fuzzing` N/A→en cours : property-based testing Hypothesis sur les fonctions
   pures de `nestor` (ADR 0087, #367).
+- `Signed-Releases` rouge→en cours : archive source signée cosign keyless +
+  provenance SLSA attachée à chaque release (ADR 0088, #366).
 - `Branch-Protection` (−1) identifié comme **faux négatif** : la protection EST
   configurée (required_status_checks, reviews, signatures, enforce_admins,
   linear_history) mais le token Scorecard ne peut pas la lire.
 
 **Restent assumés/différés** : `Code-Review` (mono-mainteneur, SAFEGUARDS.md),
-`Maintained` (dépôt < 90 j, se résout seul), `Signed-Releases`/`Packaging` (non
-pertinents pour de l'IaC, ou nécessitent un prérequis — #366). `Fuzzing` est
-sorti de cette liste : property-based testing en cours (ADR 0087, ci-dessus).
+`Maintained` (dépôt < 90 j, se résout seul), `Packaging` (non pertinent pour de
+l'IaC qu'on clone, pas un paquet publié). `Fuzzing` et `Signed-Releases` sont
+sortis de cette liste : property-based testing et signature de release en cours
+(ADR 0087/0088, ci-dessus).
 
 ### 2. CIS Benchmarks — posture de durcissement (PASS/WARN/FAIL par contrôle)
 
