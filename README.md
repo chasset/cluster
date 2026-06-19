@@ -12,21 +12,15 @@ Un référentiel noté non encore câblé reste au plan de remédiation du passa
 d'audit, PAS affiché à vide. Un référentiel écarté (DORA, ISO) ou auto-déclaratif
 non vérifié (Best Practices, retiré le 2026-06-19 — cf. ADR 0080 §Mise à jour)
 n'a pas de badge — c'est un choix tracé. Le badge le plus structurant (OpenSSF
-Scorecard, recalculé en continu) est mis en avant SOUS LE TITRE. -->
-
-**Identité & licence**
+Scorecard, recalculé en continu) est mis en avant SOUS LE TITRE ; les autres
+sont regroupés par famille, chacune présentée dans la section « Conformité &
+badges » plus bas. -->
 
 [![DOI](https://zenodo.org/badge/1243564575.svg)](https://doi.org/10.5281/zenodo.20287209)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/univ-lehavre/cluster/blob/main/LICENSE)
-
-**Conventions & versionnement**
-
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://www.conventionalcommits.org)
 [![SemVer](https://img.shields.io/badge/SemVer-2.0.0-blue.svg)](https://semver.org)
 [![Keep a Changelog](https://img.shields.io/badge/changelog-Keep%20a%20Changelog-orange.svg)](https://github.com/univ-lehavre/cluster/blob/main/CHANGELOG.md)
-
-**Qualité & CI**
-
 [![CI](https://github.com/univ-lehavre/cluster/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/univ-lehavre/cluster/actions/workflows/ci.yml)
 
 Manifests, playbooks et runbooks pour déployer et opérer un cluster Kubernetes
@@ -115,6 +109,48 @@ consolidée, pour juger en 5 min : [docs/preuves.md](docs/preuves.md).
 > Régénérer ce bloc : `pnpm check:gouvernance --stats`. Le respect des
 > conventions est vérifié chaque semaine (workflow `conventions-freshness`, non
 > bloquant).
+
+## Conformité & badges
+
+Les badges sous le titre ne sont pas décoratifs : chacun reflète un état **vrai
+et vérifiable** (recalculé en continu, ou fait stable), groupé par famille pour
+dire **quelles cultures** le dépôt revendique
+([ADR 0080](docs/decisions/0080-notations-et-badges-readme.md)). Le plus
+structurant —
+[OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/univ-lehavre/cluster),
+santé supply-chain notée /10 — est mis en avant seul, en tête.
+
+### Identité & licence
+
+Le projet est **citable et ouvert** : un DOI Zenodo fige et référence chaque
+version pour la citation académique, et le code est sous licence **MIT**
+(réutilisation libre, `LICENSE` + `NOTICE`).
+
+[![DOI](https://zenodo.org/badge/1243564575.svg)](https://doi.org/10.5281/zenodo.20287209)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/univ-lehavre/cluster/blob/main/LICENSE)
+
+### Conventions & versionnement
+
+L'historique est **lisible et outillé**, pas seulement par discipline. Chaque
+message de commit suit **Conventional Commits** (validé par commitlint sur toute
+la plage d'une PR), les versions suivent **SemVer** (bump dérivé des commits par
+release-please), et le **CHANGELOG** est tenu au format _Keep a Changelog_,
+généré automatiquement à chaque release.
+
+[![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://www.conventionalcommits.org)
+[![SemVer](https://img.shields.io/badge/SemVer-2.0.0-blue.svg)](https://semver.org)
+[![Keep a Changelog](https://img.shields.io/badge/changelog-Keep%20a%20Changelog-orange.svg)](https://github.com/univ-lehavre/cluster/blob/main/CHANGELOG.md)
+
+### Qualité & CI
+
+Aucune régression n'atteint `main` sans passer les contrôles : chaque PR doit
+satisfaire **13 checks requis** (formats, lint, `kubeconform`, `ansible-lint`,
+`trivy`, `jscpd`, build de la doc, tests…) avant merge. Le badge reflète l'état
+réel du workflow `ci.yml` sur `main`. Détail des garde-fous : section
+[« Qualité — garde-fous en place »](#qualité--garde-fous-en-place) ci-dessus et
+[SAFEGUARDS.md](SAFEGUARDS.md).
+
+[![CI](https://github.com/univ-lehavre/cluster/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/univ-lehavre/cluster/actions/workflows/ci.yml)
 
 ## Trademarks
 
