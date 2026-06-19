@@ -20,7 +20,9 @@
 #
 # (En pratique : `-f marquez/Dockerfile marquez/` suffit — ce fichier en est la copie
 #  versionnée, pour tracer la provenance et l'invariant arm64 côté dépôt.)
-FROM eclipse-temurin:17 AS base
+# Épinglé par digest d'index multi-arch (ADR 0006 ; banc arm64) — MediaType
+# image.index vérifié. Renovate suit le tag (pinDigests).
+FROM eclipse-temurin:17@sha256:91b6210cce02091f6f0798a83ec51aa223828242c5a21a85793bb8c28dc891c4 AS base
 WORKDIR /usr/src/app
 COPY gradle gradle
 COPY gradle.properties gradle.properties
@@ -35,7 +37,8 @@ COPY api ./api
 COPY clients/java ./clients/java
 RUN ./gradlew --no-daemon clean :api:shadowJar
 
-FROM eclipse-temurin:17
+# Idem (ADR 0006) — stage runtime, même image de base digestée.
+FROM eclipse-temurin:17@sha256:91b6210cce02091f6f0798a83ec51aa223828242c5a21a85793bb8c28dc891c4
 RUN apt-get update && apt-get install -y postgresql-client bash coreutils
 WORKDIR /usr/src/app
 COPY --from=build /usr/src/app/api/build/libs/marquez-*.jar /usr/src/app
