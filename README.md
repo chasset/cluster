@@ -1,76 +1,33 @@
----
-layout: home
-hero:
-  name: Cluster
-  tagline: >-
-    Un cluster Kubernetes de recherche hyperconvergé — installation, stockage
-    distribué, chaîne DataOps et services transverses, racontés de bout en bout.
-  actions:
-    - theme: brand
-      text: Lire le manifeste
-      link: /docs/manifeste
-    - theme: alt
-      text: Le guide
-      link: /docs/demarrage
-features:
-  - icon: 📖
-    title: Le manifeste
-    details: >-
-      Le récit du projet pour néophyte — contexte, objectif, méthode, voyage,
-      résultats. Les mots-clés renvoient au glossaire et aux décisions.
-    link: /docs/manifeste
-  - icon: 🚀
-    title: Démarrer
-    details: Public visé, prérequis, parcours d'installation pas à pas.
-    link: /docs/demarrage
-  - icon: 🧱
-    title: Les composants
-    details: La pile technologique brique par brique — rôle et raison d'être.
-    link: /docs/composants
-  - icon: 🧭
-    title: Décisions (ADR)
-    details:
-      Pourquoi chaque choix de conception, au format Nygard, daté et immuable.
-    link: /docs/decisions/
-  - icon: 🔬
-    title: Preuves de qualité
-    details:
-      La vitrine consolidée — gouvernance tracée, reproductibilité prouvée,
-      drifts indexés, couverture E2E.
-    link: /docs/preuves
-  - icon: 🧪
-    title: Banc de test
-    details: Topologies reproductibles sur Lima, preuves opérationnelles.
-    link: /bench/
----
+# Cluster
+
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/univ-lehavre/cluster/badge)](https://scorecard.dev/viewer/?uri=github.com/univ-lehavre/cluster)
+
+> Un cluster Kubernetes de recherche hyperconvergé — installation, stockage
+> distribué, chaîne DataOps et services transverses, racontés de bout en bout.
 
 <!-- Badges — doctrine ADR 0080 (docs/decisions/0080-notations-et-badges-readme.md) :
 n'afficher QUE ce qui mesure un état VRAI (dynamique câblé, ou statique factuel
-stable) ; GROUPER par thématique (identité · conventions · qualité/CI · sécurité)
-pour rendre visibles les familles revendiquées. Un référentiel noté non encore
-câblé reste au plan de remédiation du passage d'audit, PAS affiché à vide. Un
-référentiel écarté (DORA, ISO) n'a pas de badge — c'est un choix tracé. -->
+stable) ; GROUPER par thématique pour rendre visibles les familles revendiquées.
+Un référentiel noté non encore câblé reste au plan de remédiation du passage
+d'audit, PAS affiché à vide. Un référentiel écarté (DORA, ISO) ou auto-déclaratif
+non vérifié (Best Practices, retiré le 2026-06-19 — cf. ADR 0080 §Mise à jour)
+n'a pas de badge — c'est un choix tracé. Le badge le plus structurant (OpenSSF
+Scorecard, recalculé en continu) est mis en avant SOUS LE TITRE. -->
 
-<!-- Identité & licence -->
+**Identité & licence**
 
 [![DOI](https://zenodo.org/badge/1243564575.svg)](https://doi.org/10.5281/zenodo.20287209)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/univ-lehavre/cluster/blob/main/LICENSE)
 
-<!-- Conventions & versionnement -->
+**Conventions & versionnement**
 
 [![Conventional Commits](https://img.shields.io/badge/Conventional%20Commits-1.0.0-yellow.svg)](https://www.conventionalcommits.org)
 [![SemVer](https://img.shields.io/badge/SemVer-2.0.0-blue.svg)](https://semver.org)
 [![Keep a Changelog](https://img.shields.io/badge/changelog-Keep%20a%20Changelog-orange.svg)](https://github.com/univ-lehavre/cluster/blob/main/CHANGELOG.md)
 
-<!-- Qualité & CI -->
+**Qualité & CI**
 
 [![CI](https://github.com/univ-lehavre/cluster/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/univ-lehavre/cluster/actions/workflows/ci.yml)
-
-<!-- Sécurité & supply-chain -->
-
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/univ-lehavre/cluster/badge)](https://scorecard.dev/viewer/?uri=github.com/univ-lehavre/cluster)
-
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/13301/badge)](https://www.bestpractices.dev/projects/13301)
 
 Manifests, playbooks et runbooks pour déployer et opérer un cluster Kubernetes
 de recherche : installation, stockage distribué, applications de calcul et
