@@ -14,6 +14,11 @@ on:
   schedule:
     - cron: '0 1 * * *'
   workflow_dispatch:
+  # Signature des assets de release (ADR 0088) : déclenché QUAND la release est
+  # publiée par release-please ci-dessous — la release doit exister pour qu'on y
+  # attache une archive signée + sa provenance.
+  release:
+    types: [published]
 
 # Permissions minimales du GITHUB_TOKEN au niveau TOP (lecture seule), élargies
 # UNIQUEMENT sur le job qui en a besoin (principe du moindre privilège, OpenSSF
@@ -26,6 +31,10 @@ permissions:
 
 jobs:
   release-please:
+    # Ne tourne QUE sur le cron nocturne / le dispatch manuel — pas quand
+    # l'événement déclencheur est la publication d'une release (qui ne sert qu'à
+    # déclencher la signature des assets ci-dessous).
+    if: ${{ github.event_name != 'release' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write # release-please : tag + release GitHub (via PAT en pratique)
@@ -81,3 +90,80 @@ jobs:
         run: |
           PR_NUMBER=$(echo "$RELEASE_PR" | jq -r '.number')
           gh pr merge "$PR_NUMBER" --auto --merge --repo "$GITHUB_REPOSITORY"
+
+  # Signe les assets de release (ADR 0088, scorecard Signed-Releases). Déclenché
+  # à la PUBLICATION de la release : crée une archive source `.tar.gz`, la signe
+  # en cosign KEYLESS (OIDC GitHub, aucune clé à gérer), attache l'archive + sa
+  # signature + son certificat à la release, et expose le hash pour la provenance
+  # SLSA (job suivant). Vérification côté consommateur : voir bootstrap/RUNBOOK.md.
+  sign-release:
+    if: ${{ github.event_name == 'release' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # uploader les assets sur la release
+      id-token: write # jeton OIDC pour la signature keyless (Fulcio/Rekor)
+    outputs:
+      hashes: ${{ steps.hash.outputs.hashes }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          persist-credentials: false
+
+      - name: Construire l'archive source de la version
+        id: archive
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          NAME="cluster-${TAG}.tar.gz"
+          # Archive du code au tag, sans le .git (équivalent stable de l'archive
+          # GitHub, mais publiée comme asset signé — fige la version citée DOI).
+          git archive --format=tar.gz --prefix="cluster-${TAG}/" -o "$NAME" HEAD
+          echo "name=$NAME" >>"$GITHUB_OUTPUT"
+
+      - name: Empreinte SHA-256 (base64) pour la provenance SLSA
+        id: hash
+        env:
+          ARCHIVE: ${{ steps.archive.outputs.name }}
+        run: |
+          # Le générateur SLSA attend les hashes en base64 (sortie de sha256sum).
+          echo "hashes=$(sha256sum "$ARCHIVE" | base64 -w0)" >>"$GITHUB_OUTPUT"
+
+      - name: Installer cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Signer l'archive (cosign keyless)
+        env:
+          ARCHIVE: ${{ steps.archive.outputs.name }}
+          COSIGN_YES: 'true' # non interactif : accepte le transparency log Rekor
+        run: |
+          cosign sign-blob \
+            --output-signature "${ARCHIVE}.sig" \
+            --output-certificate "${ARCHIVE}.pem" \
+            "$ARCHIVE"
+
+      - name: Attacher l'archive signée à la release
+        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: |
+            ${{ steps.archive.outputs.name }}
+            ${{ steps.archive.outputs.name }}.sig
+            ${{ steps.archive.outputs.name }}.pem
+
+  # Provenance SLSA (build L3) de l'archive : attestation `.intoto.jsonl` liant
+  # l'artefact au commit/workflow/déclencheur, attachée à la release. EXCEPTION
+  # SHA-pin (ADR 0006) : le générateur SLSA REFUSE d'être appelé par SHA — il
+  # vérifie sa propre intégrité et exige un tag sémantique versionné. Pin par
+  # `@v2.1.0` (commit f7dd8c5) assumé pour cette seule action.
+  provenance:
+    if: ${{ github.event_name == 'release' }}
+    needs: sign-release
+    permissions:
+      actions: read # lire le run pour la provenance
+      id-token: write # OIDC keyless
+      contents: write # attacher l'attestation à la release
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.1.0
+    with:
+      base64-subjects: ${{ needs.sign-release.outputs.hashes }}
+      upload-assets: true # joindre le .intoto.jsonl aux assets de la release

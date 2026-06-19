@@ -39,6 +39,10 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ruff==0.15.16",
+    # Property-based testing des fonctions pures de nestor (ADR 0087) — génère
+    # des entrées variées + réduit les contre-exemples. Intégré à unittest via
+    # @given (pas de bascule pytest). Dev seulement : zéro impact runtime.
+    "hypothesis>=6,<7",
 ]
 
 [tool.ruff]

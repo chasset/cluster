@@ -775,3 +775,36 @@ via `etcdctl` — c'est ce que fait le scénario
 [`bench/scenarios/15-etcd-encryption-audit.sh`](../bench/scenarios/15-etcd-encryption-audit.sh)
 (`ROTATE=1` déroule et vérifie toute la rotation, témoin inclus). **Tester sur
 le banc avant la prod.**
+
+### Vérifier une release signée (cosign / SLSA — ADR 0088)
+
+Si vous installez à partir d'une **version figée** (et non du HEAD), chaque
+release publie une archive source signée — vérifiez son **intégrité** et sa
+**provenance** avant usage. Les assets de la release (onglet _Releases_) :
+`cluster-<TAG>.tar.gz`, sa signature `.sig` + son certificat `.pem` (cosign), et
+l'attestation de provenance `*.intoto.jsonl` (SLSA). Signature **keyless** :
+aucune clé publique à récupérer, l'identité est le workflow GitHub lui-même.
+
+```bash
+TAG=v2.38.0   # la version visée
+gh release download "$TAG" --repo univ-lehavre/cluster   # archive + .sig + .pem + provenance
+
+# 1. Intégrité + identité du signataire (cosign keyless) :
+cosign verify-blob \
+  --certificate "cluster-${TAG}.pem" \
+  --signature   "cluster-${TAG}.tar.gz.sig" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp '^https://github.com/univ-lehavre/cluster/\.github/workflows/release\.yml@.*' \
+  "cluster-${TAG}.tar.gz"
+
+# 2. Provenance SLSA (l'archive vient bien de CE dépôt, à CE commit) :
+slsa-verifier verify-artifact "cluster-${TAG}.tar.gz" \
+  --provenance-path *.intoto.jsonl \
+  --source-uri github.com/univ-lehavre/cluster
+```
+
+Une vérification qui échoue (signature invalide, identité inattendue, source
+divergente) = **archive non fiable** : ne pas l'utiliser. La signature ne vit
+**que** dans le code versionné
+([`.github/workflows/release.yml`](../.github/workflows/release.yml)),
+re-prouvée à chaque release — pas d'étape manuelle (ADR 0088).

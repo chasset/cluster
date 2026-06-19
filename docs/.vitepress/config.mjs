@@ -29,6 +29,10 @@ export default defineConfig({
     // Dossiers de code liés depuis la doc (VitePress les résout en /index) :
     /\/(roles|lib|templates|files|examples)\//,
     /\/bench\/unit\//,
+    // Le README racine est exclu du site (Markdown GitHub pur, srcExclude) mais
+    // reste lié depuis quelques pages (apps/, platform/, preuves) — liens
+    // valides sur GitHub. Tolérés comme les liens vers fichiers de code.
+    /\.\.\/README(\.md)?(#.*)?$/,
   ],
 
   srcExclude: [
@@ -38,6 +42,11 @@ export default defineConfig({
     '**/CHANGELOG.md',
     '**/LICENSE.md',
     'docs/.vitepress/**',
+    // Le README racine est du Markdown GitHub PUR (titre + badges + prose, pas
+    // de frontmatter VitePress incompris par GitHub). L'accueil du site vit
+    // désormais dans docs/index.md (hero + features). On exclut donc le README
+    // racine du site pour ne pas le servir en doublon de la home.
+    'README.md',
     // Code source vendoré (gitignoré) : ses .md (CONTRIBUTING, vendor PHP…) ne sont pas
     // de la doc et cassent le parse Vue de VitePress (srcDir='..' scanne le filesystem,
     // pas git). Exclus comme node_modules.
@@ -45,10 +54,14 @@ export default defineConfig({
     'platform/redcap/image/source/**',
   ],
 
-  // Map every README.md to its directory's index.md so URLs like /bench/,
-  // /bootstrap/, /storage/ceph/ resolve cleanly.
+  // Map every directory README.md to its index.md so URLs like /bench/,
+  // /bootstrap/, /storage/ceph/ resolve cleanly. Le README RACINE n'est plus
+  // mappé (exclu du site, srcExclude). L'accueil du site vit dans docs/index.md
+  // (frontmatter `layout: home`), réécrit en `index.md` pour être servi à `/`
+  // (srcDir='..' fait que `/` = <racine>/index.md, qu'on ne veut PAS créer en
+  // vrai à la racine — GitHub l'afficherait en doublon du README).
   rewrites: (id) => {
-    if (id === 'README.md') return 'index.md'
+    if (id === 'docs/index.md') return 'index.md'
     if (id.endsWith('/README.md')) return id.replace(/README\.md$/, 'index.md')
     return id
   },

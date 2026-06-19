@@ -109,6 +109,29 @@ commentaire HTML dans le README rappelle la règle au point d'insertion.
   dynamique ou stable ? quelle famille ? écarté ou en attente ? »). La règle
   cadre, elle n'automatise pas — comme l'ADR 0061 dont elle dérive.
 
+## Mise à jour 2026-06-19 — retrait du badge Best Practices
+
+Le badge **OpenSSF Best Practices** (rangé en règle 3 §4, « Sécurité &
+supply-chain — à venir ») est **retiré** du README, et la famille n'expose plus
+qu'**OpenSSF Scorecard**, mis en avant **sous le titre** (badge le plus
+structurant, recalculé en continu par `scorecard.yml`).
+
+Motif — **application de la règle 1 (honnêteté)**, pas un revirement : le Best
+Practices Badge n'est pas un état mesuré par un outil branché, c'est un
+**questionnaire d'auto-déclaration** (le mainteneur répond lui-même au
+formulaire `bestpractices.dev`). Il « note » des affirmations, pas une vérité
+vérifiable du dépôt — exactement le **badge décoratif** que la règle 1 borne. La
+règle 1 le citait comme « dynamique & câblé » par assimilation ; ce passage
+**corrige cette lecture** : un score auto-déclaré n'est pas un état dynamique au
+sens où l'est un workflow ou Scorecard. Le retirer **renforce** la doctrine
+(n'afficher que ce qui mesure du vrai), il ne la contredit pas.
+
+Conséquence : en sécurité, la rangée ne porte plus que des signaux **recalculés
+en continu**. La page d'accueil du **site** vit désormais dans
+[`docs/index.md`](../index.md) ; le README racine est du Markdown GitHub pur
+(plus de frontmatter VitePress) — la rangée de badges y reste **ordonnée par
+thématique** (règle 3 inchangée).
+
 ## Alternatives écartées
 
 - **Tout badge sans condition d'honnêteté** (« si un badge existe upstream, on
