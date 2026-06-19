@@ -106,3 +106,4 @@ Format léger inspiré de Michael Nygard :
 | 0084 | [Sondes de lecture gatées par `target_kind` (isolation banc/prod, suite de 0053)](0084-sondes-de-lecture-gatees-par-target-kind.md)  | Proposed           |
 | 0085 | [Preuves applicatives sur local-path par défaut ; Ceph validé sur installation seule](0085-preuves-applicatives-local-path.md)       | Proposed           |
 | 0086 | [Code-location jouet du socle : pipeline Dagster minimal branché en permanence](0086-code-location-jouet-du-socle.md)                | Proposed           |
+| 0087 | [Property-based testing des fonctions pures de `nestor` (Hypothesis)](0087-property-based-testing-nestor.md)                         | Proposed           |
