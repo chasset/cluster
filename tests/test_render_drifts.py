@@ -63,6 +63,25 @@ class RenderMarkdown(unittest.TestCase):
         self.assertIn("✅ corrige", self.md)
         self.assertIn("🔴 ouvert", self.md)
 
+    def test_urls_neutralised_for_link_checker(self):
+        # Une URL citée dans un symptôme est mise en code inline (sinon lychee
+        # tente de la résoudre et échoue). Pas de double backtick.
+        md = render_markdown(
+            [
+                {
+                    "id": "L9",
+                    "campagne": "x",
+                    "portee": "code",
+                    "symptome": "clone http://gitea-http/atlas.git échoue",
+                    "cause": "y",
+                    "correctif": "fix",
+                    "statut": "corrige",
+                }
+            ]
+        )
+        self.assertIn("`http://gitea-http/atlas.git`", md)
+        self.assertNotIn("``", md)
+
 
 if __name__ == "__main__":
     unittest.main()

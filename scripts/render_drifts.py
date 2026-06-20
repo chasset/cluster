@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import sys
 
 import yaml
@@ -93,8 +94,19 @@ def render_markdown(drifts: list[dict]) -> str:
 
 
 def _clean(s: str) -> str:
-    """Aplatit un champ multi-lignes en une cellule de tableau (pas de `|` ni saut)."""
-    return " ".join(str(s).split()).replace("|", "\\|")
+    """Aplatit un champ multi-lignes en une cellule de tableau.
+
+    - effondre les espaces (pas de saut de ligne dans une cellule) ;
+    - échappe `|` (séparateur de colonne) ;
+    - **neutralise les URL** `http(s)://…` en les mettant en code inline : sans
+      ça, le vérificateur de liens (lychee) tenterait de résoudre un fragment
+      d'URL cité dans le SYMPTÔME d'un drift (ex. `gitea-http…/atlas.git`) comme
+      un vrai lien et échouerait. En backticks, c'est du texte inerte.
+    """
+    flat = " ".join(str(s).split()).replace("|", "\\|")
+    # N'envelopper que les URL PAS déjà en code inline (le texte source en met
+    # parfois déjà entre backticks → éviter le double backtick qui rouvre l'URL).
+    return re.sub(r"(?<!`)(https?://\S+?)(?!`)(?=[\s)\]]|\\\||$)", r"`\1`", flat)
 
 
 def load_drifts() -> list[dict]:
