@@ -22,8 +22,7 @@ bench/lima/access.sh
 ```
 
 Puis travaillez dans `atlas` et `git push` (le webhook Gitea → Argo CD
-réconcilie). Détail pas à pas :
-[guide du développeur data](guide-dev-data.md#travailler-en-local-sur-le-banc-multi-node-3-chemin-atlas).
+réconcilie). Détail pas à pas : [guide du développeur data](guide-dev-data.md).
 
 ## Comprendre la plateforme
 

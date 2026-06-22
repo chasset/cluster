@@ -33,18 +33,19 @@ cluster **mono-tenant de recherche sur réseau privé isolé** — ce ne sont pa
 failles :
 
 - Registry interne en HTTP sans authentification
-  ([ADR 0011](docs/decisions/0011-registry-http-sans-auth.md)).
+  ([ADR 0011](/cluster/docs/decisions/0011-registry-http-sans-auth/)).
 - RStudio sans authentification
-  ([ADR 0012](docs/decisions/0012-rstudio-disable-auth.md)).
+  ([ADR 0012](/cluster/docs/decisions/0012-rstudio-disable-auth/)).
 - Pas de chiffrement Ceph in-transit/at-rest
-  ([ADR 0003](docs/decisions/0003-pas-de-chiffrement-ceph-tailscale.md)).
+  ([ADR 0003](/cluster/docs/decisions/0003-pas-de-chiffrement-ceph-tailscale/)).
 - Secrets etcd non chiffrés / audit-policy API non posée — dette tracée
-  ([ADR 0014](docs/decisions/0014-durcissement-kubeadm-init.md)).
+  ([ADR 0014](/cluster/docs/decisions/0014-durcissement-kubeadm-init/)).
 
 Ces choix reposent sur l'**isolation réseau**. Un signalement utile est donc
 plutôt : « telle hypothèse d'isolation est fausse dans tel cas » ou « tel point
-n'est pas couvert par un ADR ». Voir [SAFEGUARDS.md](SAFEGUARDS.md) pour les
-contrôles en place et [docs/decisions/](docs/decisions/) pour les décisions.
+n'est pas couvert par un ADR ». Voir [SAFEGUARDS.md](/cluster/SAFEGUARDS/) pour
+les contrôles en place et [docs/decisions/](/cluster/docs/decisions/) pour les
+décisions.
 
 ## Versions supportées
 

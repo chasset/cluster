@@ -6,7 +6,8 @@ Rook-Ceph et le CNI Cilium se comportent comme attendu en nominal et en panne.
 
 ## Pré-requis
 
-- Banc Lima up (cf. [`bench/lima/`](../lima/)) ou cluster prod opérationnel.
+- Banc Lima up (cf. [`bench/lima/`](/cluster/bench/lima/)) ou cluster prod
+  opérationnel.
 - `kubectl` configuré (au banc : `KUBECONFIG=bench/lima/.work/kubeconfig`), ou
   accès node-side via `limactl shell <instance>`.
 - Phase 1-3 du PLAN appliquées (cluster K8s + Rook-Ceph HEALTH_OK).
@@ -131,7 +132,8 @@ Chaque script :
 > Les « réparer » dans le scénario = **sur-adaptation au banc** (sans valeur
 > prod) : on s'en abstient délibérément. Le restore réel se teste **en prod**,
 > au rebuild des serveurs, où ces artefacts n'existent pas. Déroulé et analyse
-> complète : [../RESULTS.md](../RESULTS.md) (section déroulé scénarios + #7).
+> complète : [../RESULTS.md](/cluster/bench/RESULTS/) (section déroulé
+> scénarios + #7).
 
 ### Groupe durcissement (10-13)
 
@@ -139,26 +141,28 @@ Chaque script :
 > teste la **sécurité**, pas la résilience. Les **10/11/12** sont des assertions
 > 100 % transposables en prod (admission API, application des NetworkPolicy par
 > le CNI, contrainte runtime du conteneur — aucune dépendance arm64/Vagrant). Le
-> **13** réutilise [`bootstrap/state.sh`](../../bootstrap/state.sh) (source de
-> vérité du dépôt) et n'échoue que sur un drift host `✗` — une couche opt-in non
-> activée reste un `skip` (cf.
-> [IMPLICATIONS.md](../../bootstrap/security/IMPLICATIONS.md)). Sur le banc, le
+> **13** réutilise
+> [`bootstrap/state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
+> (source de vérité du dépôt) et n'échoue que sur un drift host `✗` — une couche
+> opt-in non activée reste un `skip` (cf.
+> [IMPLICATIONS.md](/cluster/bootstrap/security/IMPLICATIONS/)). Sur le banc, le
 > 13 sort **FAIL attendu** tant que `first-access.sh` n'y a pas posé le
 > durcissement sshd (le banc utilise le compte Vagrant) ; en prod (sshd durci +
 > couches `secure.yml` actives) il passe. Il a besoin de l'accès SSH aux nœuds
 > (`SSH_OPTS`/`HOSTS`), pas de `kubectl`.
 >
 > Le **14** (durcissement réseau Cilium,
-> [ADR 0019](../../docs/decisions/0019-durcissement-reseau-cilium.md)) vérifie
+> [ADR 0019](/cluster/docs/decisions/0019-durcissement-reseau-cilium/)) vérifie
 > que le chiffrement **WireGuard** est réellement actif dans le datapath
 > (`cilium_wg0` + peers, pas seulement la config) et que **Hubble** retourne des
-> flux. Pré-requis : Cilium installé par [`cni.sh`](../../bootstrap/cni.sh) avec
-> `encryption.enabled` + `hubble.enabled`. `kubectl`-only.
+> flux. Pré-requis : Cilium installé par
+> [`cni.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/cni.sh)
+> avec `encryption.enabled` + `hubble.enabled`. `kubectl`-only.
 >
 > Le **15** (durcissement plan de contrôle,
-> [ADR 0014](../../docs/decisions/0014-durcissement-kubeadm-init.md)) prouve via
-> `etcdctl`, **sur le control plane (SSH)**, qu'un Secret est chiffré at-rest
-> dans etcd (`k8s:enc:secretbox:`) et que l'audit-log API est produit.
+> [ADR 0014](/cluster/docs/decisions/0014-durcissement-kubeadm-init/)) prouve
+> via `etcdctl`, **sur le control plane (SSH)**, qu'un Secret est chiffré
+> at-rest dans etcd (`k8s:enc:secretbox:`) et que l'audit-log API est produit.
 > `ROTATE=1` déroule en plus la rotation de clé et vérifie qu'un Secret témoin
 > survit (réversible). Variables `CP_IP`/`CP_PORT`/`SSH_KEY` (comme le scénario
 > 09). Pré-requis : `kubeadm init --config` avec `EncryptionConfiguration`
@@ -167,7 +171,7 @@ Chaque script :
 ### Groupe sécurité active (16-22)
 
 > 🚨 **16-22 — sécurité ACTIVE (chaos + attaques contrôlées), cadrée par
-> [ADR 0025](../../docs/decisions/0025-securite-active-chaos-attaques-controlees.md).**
+> [ADR 0025](/cluster/docs/decisions/0025-securite-active-chaos-attaques-controlees/).**
 > Contrairement aux 10-15 (défense **passive** : on vérifie qu'une contrainte
 > _est en place_), ce groupe **passe à l'acte** et asserte la chaîne **Détection
 > → Alerte → Réaction (D/A/R)**, ou dégrade l'infra pour vérifier qu'elle
@@ -201,7 +205,7 @@ Chaque script :
 >   `STRICT_ALERT=1` le fait échouer si la chaîne est absente (CI post-#131).
 >
 > **Détection runtime différée** : aucun Falco/Tetragon (cf.
-> [note runtime/admission](../../docs/audit/2026-05-29/note-runtime-admission.md),
+> [note runtime/admission](/cluster/docs/audit/2026-05-29/note-runtime-admission/),
 > ADR 0025 §4) — l'alerte sur un comportement adverse _dans_ un pod n'est pas
 > couverte.
 >
@@ -250,7 +254,7 @@ Cf. scénarios 01, 02, 03 :
 ### Le stockage objet fonctionne-t-il ?
 
 Cf. scénario 06, qui réutilise
-[`storage/ceph/storageClass/datalake/smoke-test.sh`](../../storage/ceph/storageClass/datalake/smoke-test.sh)
+[`storage/ceph/storageClass/datalake/smoke-test.sh`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/storageClass/datalake/smoke-test.sh)
 : crée un bucket, écrit un fichier, le relit, le supprime. Verdict : ✅ si le
 `CephObjectStore datalake` est `Connected` et le `ObjectBucketClaim` provisionne
 le Secret.
@@ -262,12 +266,12 @@ Cf. scénario 04. Récap :
 - **API K8s injoignable** → impossible de scheduler de nouveaux pods, d'ouvrir
   une session `kubectl`, de redémarrer un workload tombé.
 - **etcd inaccessible** → la sauvegarde horaire (rôle
-  [`etcd-backup`](../../bootstrap/roles/etcd-backup/)) permet de restaurer
-  ailleurs.
+  [`etcd-backup`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/etcd-backup))
+  permet de restaurer ailleurs.
 - **Workloads en cours** : continuent tant que le kubelet local tourne. Cilium
   continue d'assurer le réseau Pod-to-Pod. Ceph reste opérationnel (mons en
   quorum sur les workers).
-- **Restauration** : voir [`bootstrap/RUNBOOK.md`](../../bootstrap/RUNBOOK.md)
+- **Restauration** : voir [`bootstrap/RUNBOOK.md`](/cluster/bootstrap/RUNBOOK/)
   section « Restauration etcd (procédure) ».
 
 ### Tests Cilium
@@ -277,7 +281,7 @@ Cf. scénarios 07 et 14 :
 - **07** — `cilium connectivity test` : suite officielle, 200+ checks (Pod ↔
   Pod, Pod ↔ Service, Pod ↔ World, NetworkPolicy, etc.).
 - **14** — durcissement réseau
-  ([ADR 0019](../../docs/decisions/0019-durcissement-reseau-cilium.md)) : le
+  ([ADR 0019](/cluster/docs/decisions/0019-durcissement-reseau-cilium/)) : le
   trafic pod-to-pod inter-nœuds est **chiffré par WireGuard**
   (`encryption.enabled`, interface `cilium_wg0`) et **Hubble** (relay + CLI,
   sans UI) est activé pour l'observabilité des flux (`hubble observe`). Le
@@ -300,7 +304,7 @@ Oui, par les scénarios 10-13 :
   `default-deny-all`, `securityContext` durci) et **vérifient le comportement
   réel** (rejet à l'admission, egress coupé, écriture rootfs refusée). Ce que
   PSA et `securityContext` couvrent est tracé dans
-  [ADR 0014](../../docs/decisions/0014-durcissement-kubeadm-init.md).
+  [ADR 0014](/cluster/docs/decisions/0014-durcissement-kubeadm-init/).
 
 - **Hôte (13)** — a besoin de l'**accès SSH** aux nœuds (pas de `kubectl`) :
 
@@ -311,17 +315,18 @@ Oui, par les scénarios 10-13 :
   # nœuds sont fournies par l'inventaire généré (bench/lima/.work/inventory.yaml).
   ```
 
-  Il **réutilise** [`bootstrap/state.sh`](../../bootstrap/state.sh) et échoue
-  sur tout drift des couches hôte (sshd durci, auditd, fail2ban, postfix, ufw,
-  smartd). `STRICT_OPTIN=1` fait en plus échouer si **aucune** couche
-  `secure.yml` n'est active (attendu en prod). Une couche opt-in non activée
-  reste un `skip` neutre (cf.
-  [IMPLICATIONS.md](../../bootstrap/security/IMPLICATIONS.md)).
+  Il **réutilise**
+  [`bootstrap/state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
+  et échoue sur tout drift des couches hôte (sshd durci, auditd, fail2ban,
+  postfix, ufw, smartd). `STRICT_OPTIN=1` fait en plus échouer si **aucune**
+  couche `secure.yml` n'est active (attendu en prod). Une couche opt-in non
+  activée reste un `skip` neutre (cf.
+  [IMPLICATIONS.md](/cluster/bootstrap/security/IMPLICATIONS/)).
 
 ### Le cluster survit-il au chaos (perte réseau, kill, saturation) ?
 
 Oui, c'est ce que prouvent les scénarios **chaos 19-21**
-([ADR 0025](../../docs/decisions/0025-securite-active-chaos-attaques-controlees.md))
+([ADR 0025](/cluster/docs/decisions/0025-securite-active-chaos-attaques-controlees/))
 — **sur banc jetable uniquement** :
 
 - **19 — perte/partition réseau** (`tc netem` sur 1 nœud) : pendant la
@@ -352,7 +357,7 @@ Mailpit/Mailgun) :
 La **détection comportementale runtime** (shell dans un pod, exec inattendu)
 n'est **pas** couverte : le choix Falco/Tetragon est **différé** (ADR 0025 §4,
 cf.
-[note runtime/admission](../../docs/audit/2026-05-29/note-runtime-admission.md)).
+[note runtime/admission](/cluster/docs/audit/2026-05-29/note-runtime-admission/)).
 
 ## Exécution
 
@@ -381,6 +386,7 @@ kubectl delete all,pvc -l 'test.cluster.dev/scenario' --all-namespaces
 
 L'état d'exécution des scénarios sur le banc **n'est pas figé ici** (il
 périmerait) : il vit dans le **journal des runs Lima**, source vivante et datée
-— [`bench/lima/RESULTS.md`](../lima/RESULTS.md). L'historique Vagrant (déprécié)
-reste dans [`bench/RESULTS.md`](../RESULTS.md), non réécrit (honnêteté des Runs,
-[ADR 0052](../../docs/decisions/0052-reproductibilite-des-resultats.md)).
+— [`bench/lima/RESULTS.md`](/cluster/bench/lima/RESULTS/). L'historique Vagrant
+(déprécié) reste dans [`bench/RESULTS.md`](/cluster/bench/RESULTS/), non réécrit
+(honnêteté des Runs,
+[ADR 0052](/cluster/docs/decisions/0052-reproductibilite-des-resultats/)).

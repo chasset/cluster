@@ -1,16 +1,16 @@
 # Marquez
 
 Store de lineage **OpenLineage** (étape 1.8,
-[ADR 0028](../../docs/decisions/0028-orchestration-openlineage-marquez.md)) :
+[ADR 0028](/cluster/docs/decisions/0028-orchestration-openlineage-marquez/)) :
 API de collecte/agrégation des métadonnées + UI web de visualisation du lineage.
-Le store persiste dans la base `marquez` de [CloudNativePG](../cloudnative-pg/)
-(étape 1.6) — migrations **Flyway** au démarrage, d'où une base **dédiée** (pas
-un schéma partagé).
+Le store persiste dans la base `marquez` de
+[CloudNativePG](/cluster/platform/cloudnative-pg/) (étape 1.6) — migrations
+**Flyway** au démarrage, d'où une base **dédiée** (pas un schéma partagé).
 
 Le lineage est **émis** par Dagster (sensor OpenLineage) et, en Phase 2+, par le
 code `atlas`. Marquez ne fait qu'**ingérer et visualiser**. Géré par
 `kubectl apply` (patron addon,
-[ADR 0022](../../docs/decisions/0022-argocd-gitops-applicatif.md)).
+[ADR 0022](/cluster/docs/decisions/0022-argocd-gitops-applicatif/)).
 
 ## Fichiers
 
@@ -36,7 +36,7 @@ tag, sans modification. Selon la topologie :
   `registry:80/marquez{,-web}:0.51.1`).
 - **Banc léger Lima (arm64)** : images **maison** construites + poussées dans le
   registry interne
-  ([ADR 0011](../../docs/decisions/0011-registry-http-sans-auth.md)).
+  ([ADR 0011](/cluster/docs/decisions/0011-registry-http-sans-auth/)).
 
 Le manifeste référence `registry:80/marquez:0.51.1` et
 `registry:80/marquez-web:0.51.1` ; on y pousse les images de l'arch voulue.
@@ -69,7 +69,7 @@ docker buildx build --platform linux/arm64 \
 > `bench/lima/run-phases.sh platform-prereqs`. La validation e2e assemblée
 > (chaîne `monitoring → CNPG → Dagster → Marquez` + lineage réel) est portée par
 > `bench/lima/run-phases.sh dataops-chain` — cf.
-> [`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md) (#148).
+> [`bench/lima/RESULTS.md`](/cluster/bench/lima/RESULTS/) (#148).
 
 ## Déploiement — ordre
 
@@ -112,7 +112,8 @@ kubectl apply -n marquez -f platform/marquez/gateway.yaml            # UI sur ma
 
 Sur le banc léger : API + web Ready, migration Flyway OK (tables dans la base
 `marquez`), un événement OpenLineage émis par un **vrai run Dagster** (sensor)
-visible dans l'UI Marquez. Cf. [`bootstrap/state.sh`](../../bootstrap/state.sh)
+visible dans l'UI Marquez. Cf.
+[`bootstrap/state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
 (section Marquez) et le harnais `dataops-chain` (#148).
 
 ## Régénérer le manifeste vendored

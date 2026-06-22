@@ -27,8 +27,9 @@ config:
 # Fichiers/dossiers ignorés.
 ignores:
   - 'node_modules/**'
-  - 'docs/.vitepress/dist/**'
-  - 'docs/.vitepress/cache/**'
+  - 'docs/dist/**' # build Astro (ADR 0089)
+  - 'docs/.astro/**'
+  - 'docs/src/content/docs/docs/**' # copie générée de docs/ par migrate_docs_to_astro
   - 'CHANGELOG.md' # généré par release-please
   - 'bootstrap/security/CHANGELOG.md' # subtree, historique
   - 'pnpm-lock.yaml'

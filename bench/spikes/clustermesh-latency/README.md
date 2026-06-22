@@ -3,16 +3,17 @@
 > **Spike jetable.** But : _prouver_ qu'on peut fédérer plusieurs clusters
 > Kubernetes (« un par site ») avec **Cilium Cluster Mesh**, et **observer le
 > comportement sous latence inter-site**. Le spike a conclu : il **réutilise**
-> désormais le banc léger Lima ([`bench/lima/`](../../lima/)) et le **vrai
-> bootstrap** `bootstrap/`, qui a été rendu paramétrable pour le multi-cluster
-> ([ADR 0027](../../../docs/decisions/0027-bootstrap-parametre-multi-cluster.md),
+> désormais le banc léger Lima ([`bench/lima/`](/cluster/bench/lima/)) et le
+> **vrai bootstrap** `bootstrap/`, qui a été rendu paramétrable pour le
+> multi-cluster
+> ([ADR 0027](/cluster/docs/decisions/0027-bootstrap-parametre-multi-cluster/),
 > défauts prod inchangés). Il ne touche **ni** le banc Vagrant
 > (`bench/multi-node/`), **ni** le comportement Cilium de prod (mono-cluster).
 
 ## Pourquoi
 
 Le dépôt est un **catalogue de topologies**
-([ADR 0023](../../../docs/decisions/0023-plateforme-exemple-generique.md)). On
+([ADR 0023](/cluster/docs/decisions/0023-plateforme-exemple-generique/)). On
 explore une topologie **multi-site** où :
 
 - **chaque site = son propre cluster Kubernetes autonome** (etcd local), **pas**
@@ -29,18 +30,18 @@ C'est le **premier usage de `tc`/`netem`** du dépôt, délibérément confiné 
 Initialement monté sur deux clusters [`kind`](https://kind.sigs.k8s.io/)
 (Kubernetes-in-Docker), ce spike a **migré vers Lima** (#128) : kind est
 abandonné
-([ADR 0006](../../../docs/decisions/0006-matrice-de-versions-et-politique-de-bump.md))
+([ADR 0006](/cluster/docs/decisions/0006-matrice-de-versions-et-politique-de-bump/))
 — son image figeait K8s en 1.31, et ce n'était pas le chemin de la prod. Chaque
 « site » est désormais une **vraie VM Lima** sur laquelle tourne le **VRAI
 bootstrap Ansible** (le même qu'en prod), avec une **identité de cluster
 distincte** posée par le bootstrap paramétré
-([ADR 0027](../../../docs/decisions/0027-bootstrap-parametre-multi-cluster.md)).
+([ADR 0027](/cluster/docs/decisions/0027-bootstrap-parametre-multi-cluster/)).
 
 La plomberie Lima ↔ Ansible (VMs, inventaire, bootstrap, kubeconfig) est
-**réutilisée du banc léger Lima** ([`bench/lima/`](../../lima/)) : ce spike
-source sa bibliothèque (`lib.sh`), il ne la duplique pas. `tc netem` se pose sur
-une **vraie interface** de la VM (réseau `user-v2`), plus réaliste que le
-`docker exec` des conteneurs kind.
+**réutilisée du banc léger Lima** ([`bench/lima/`](/cluster/bench/lima/)) : ce
+spike source sa bibliothèque (`lib.sh`), il ne la duplique pas. `tc netem` se
+pose sur une **vraie interface** de la VM (réseau `user-v2`), plus réaliste que
+le `docker exec` des conteneurs kind.
 
 ## Prérequis
 
@@ -118,8 +119,9 @@ contenant que le repo cilium — la config Helm personnelle reste intacte.
 > mêmes noms (`kubernetes` / `kubernetes-admin`) dans leur kubeconfig :
 > fusionnés (`KUBECONFIG=a:b`), ils s'écrasaient → `cilium clustermesh connect`
 > voyait deux fois le même cluster. Corrigé dans la lib du banc
-> ([`bench/lima/lib.sh`](../../lima/lib.sh), `fetch_kubeconfig_node`) : cluster
-> / user / contexte sont renommés sur des noms uniques par site.
+> ([`bench/lima/lib.sh`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/lib.sh),
+> `fetch_kubeconfig_node`) : cluster / user / contexte sont renommés sur des
+> noms uniques par site.
 
 ## Conclusion / décision
 
@@ -127,14 +129,14 @@ Cluster Mesh dégrade **gracieusement** sous latence → **bon candidat à
 l'industrialisation**. Le spike a depuis :
 
 - **migré de kind vers Lima** (#128) : il tourne sur le banc léger Lima
-  ([`bench/lima/`](../../lima/)) et exécute le **vrai bootstrap** ;
+  ([`bench/lima/`](/cluster/bench/lima/)) et exécute le **vrai bootstrap** ;
 - acté son paramétrage multi-cluster en **ADR** :
-  [ADR 0027](../../../docs/decisions/0027-bootstrap-parametre-multi-cluster.md)
+  [ADR 0027](/cluster/docs/decisions/0027-bootstrap-parametre-multi-cluster/)
   (identité `cluster.name`/`cluster.id` + CIDR pods/services disjoints, défauts
   prod inchangés), en lien avec
-  [ADR 0020](../../../docs/decisions/0020-exposition-reseau-tout-cilium.md)
+  [ADR 0020](/cluster/docs/decisions/0020-exposition-reseau-tout-cilium/)
   (tout-Cilium) et
-  [ADR 0023](../../../docs/decisions/0023-plateforme-exemple-generique.md)
+  [ADR 0023](/cluster/docs/decisions/0023-plateforme-exemple-generique/)
   (catalogue de topologies).
 
 Prochaine étape (hors spike) : industrialiser un **profil de catalogue

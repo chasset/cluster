@@ -4,17 +4,19 @@
 
 > **Ce contenu est fusionné dans le dépôt `cluster`** (via `git subtree`) sous
 > `bootstrap/security/`. Pour l'invocation à jour depuis ce répertoire, voir le
-> [RUNBOOK cluster](../RUNBOOK.md#durcissement-de-los-bootstrapsecurity). Les
-> sections « Installation / Lancement » ci-dessous décrivent l'usage **autonome
-> historique** (avant fusion) et sont conservées pour mémoire.
+> [RUNBOOK cluster](/cluster/bootstrap/RUNBOOK/#durcissement-de-los-bootstrapsecurity).
+> Les sections « Installation / Lancement » ci-dessous décrivent l'usage
+> **autonome historique** (avant fusion) et sont conservées pour mémoire.
 
-**👉 Avant d'activer une couche, lire les [implications](IMPLICATIONS.md)** —
-chaque couche est désormais opt-in explicite (sans `--tags`, le playbook ne
-touche à rien). Le menu des commandes y est aussi listé.
+**👉 Avant d'activer une couche, lire les
+[implications](/cluster/bootstrap/security/IMPLICATIONS/)** — chaque couche est
+désormais opt-in explicite (sans `--tags`, le playbook ne touche à rien). Le
+menu des commandes y est aussi listé.
 
 **👉 Pour voir ce qui est actuellement actif sur les nœuds :** lancer
-[`report.sh`](report.sh) — il agrège, par hôte, les preuves observables
-(services, sshd sondé, IPs bannies, dernier log unattended-upgrades, etc.).
+[`report.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/security/report.sh)
+— il agrège, par hôte, les preuves observables (services, sshd sondé, IPs
+bannies, dernier log unattended-upgrades, etc.).
 
 ## Objectif
 
@@ -75,8 +77,8 @@ bloquer automatiquement les IP malveillantes détectées dans les logs.
 Le rôle - dans le fichier `./roles/network` - applique les règles du pare-feu
 UFW (`ufw.yml`). C’est désormais sa **seule** responsabilité : le durcissement
 `sshd` et le dépôt de la clé publique sont assurés **uniquement** par
-[`bootstrap/first-access.sh`](../first-access.sh) (drop-in
-`/etc/ssh/sshd_config.d/`, clé via `ssh-copy-id`). Les anciennes tasks
+[`bootstrap/first-access.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/first-access.sh)
+(drop-in `/etc/ssh/sshd_config.d/`, clé via `ssh-copy-id`). Les anciennes tasks
 `sshd.yml`/`ssh.yml` faisaient doublon et ont été supprimées.
 
 ### os

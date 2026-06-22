@@ -12,7 +12,7 @@ contrôle d'accès au Service (réseau interne, accès à l'API Kubernetes restr
 aux postes autorisés).
 
 Voir
-[`docs/decisions/0012-rstudio-disable-auth.md`](../../docs/decisions/0012-rstudio-disable-auth.md)
+[`docs/decisions/0012-rstudio-disable-auth.md`](/cluster/docs/decisions/0012-rstudio-disable-auth/)
 pour le contexte complet et les garde-fous opérationnels.
 
 > ⚠️ Cette ADR devient caduque dès qu'on ouvre l'instance à plus d'une équipe de

@@ -17,8 +17,8 @@
 | `node3` | 10.0.0.14 | worker          |
 
 Rôles définis dans l'inventaire Ansible (modèle :
-[`bootstrap/hosts.example.yaml`](../bootstrap/hosts.example.yaml) ; le
-`hosts.yaml` réel n'est pas versionné — ADR 0023).
+[`bootstrap/hosts.example.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/hosts.example.yaml)
+; le `hosts.yaml` réel n'est pas versionné — ADR 0023).
 
 ## Spécifications par nœud
 
@@ -68,7 +68,7 @@ Rôles définis dans l'inventaire Ansible (modèle :
 
 > ⚠️ Ces 13 disques de données ne sont **ni partitionnés ni montés** : ils
 > constituent la réserve brute consommée par **Rook/Ceph** (voir
-> [`storage/ceph/cluster.yaml`](../storage/ceph/cluster.yaml)).
+> [`storage/ceph/cluster.yaml`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/cluster.yaml)).
 
 ## Totaux cluster (4 nœuds)
 

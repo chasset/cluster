@@ -130,16 +130,16 @@ toute autoconfiguration échoue : il faut configurer l’IP **manuellement**.
 > Ne concerne **que** le disque de démarrage (miroir NVMe HPE NS204i-p, ~447
 > GiB). Les **12 HDD SAS 5,5 TiB et le NVMe `nvme1n1` 2,9 TiB restent bruts, non
 > partitionnés** : ils sont consommés directement par Ceph (voir
-> [`storage/ceph/cluster.yaml`](../storage/ceph/cluster.yaml)). Ne jamais créer
-> de partition dessus.
+> [`storage/ceph/cluster.yaml`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/cluster.yaml)).
+> Ne jamais créer de partition dessus.
 
 Le défaut d’usine (`/home` = 404 G, `/var` = 9 G) étouffe `/var`, qui héberge
 `containerd`, les logs, `/var/lib/rook` et `/var/lib/etcd`. On repartitionne
 donc le disque de boot. **Tous les nœuds reçoivent le MÊME layout** (recette
 d’installation unique, moins d’erreurs manuelles ; un nœud peut être promu
 control plane sans repartitionner — cf. évolution HA,
-[ADR 0002](../docs/decisions/0002-control-plane-unique-avec-endpoint.md)). La
-seule LV dont l’usage diffère est `lv_etcd`, détaillée sous le tableau.
+[ADR 0002](/cluster/docs/decisions/0002-control-plane-unique-avec-endpoint/)).
+La seule LV dont l’usage diffère est `lv_etcd`, détaillée sous le tableau.
 
 | Partition / LV | Taille   | Montage         | FS    | Rôle                                                                  |
 | -------------- | -------- | --------------- | ----- | --------------------------------------------------------------------- |
@@ -240,9 +240,11 @@ laisser le **domaine** vide. Vérifier la passerelle et le DNS réels du `/22`
 
 ## Premier accès SSH
 
-Le script [`first-access.sh`](first-access.sh) automatise le **strict minimum**
-nécessaire pour qu'Ansible puisse ensuite piloter les nœuds sans mot de passe,
-**et** ferme immédiatement la fenêtre d'authentification par mot de passe :
+Le script
+[`first-access.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/first-access.sh)
+automatise le **strict minimum** nécessaire pour qu'Ansible puisse ensuite
+piloter les nœuds sans mot de passe, **et** ferme immédiatement la fenêtre
+d'authentification par mot de passe :
 
 - dépôt de la clé publique de l'opérateur (`ssh-copy-id`) ;
 - règle `sudo NOPASSWD` pour `debian` ;
@@ -288,9 +290,9 @@ avec le nombre de jours écoulés.
 ## Durcissement de l'OS (`bootstrap/security/`)
 
 Les rôles Ansible de durcissement complet sont fusionnés dans ce dépôt via
-`git subtree` sous [`bootstrap/security/`](security/) : `unattended-upgrades`,
-**UFW**, `fail2ban`, `auditd`, `postfix` (redirection des mails système),
-gestion du compte admin (expiration mot de passe). Origine :
+`git subtree` sous [`bootstrap/security/`](/cluster/bootstrap/security/) :
+`unattended-upgrades`, **UFW**, `fail2ban`, `auditd`, `postfix` (redirection des
+mails système), gestion du compte admin (expiration mot de passe). Origine :
 `univ-lehavre/server-security` (DOI
 [`10.5281/zenodo.16983614`](https://doi.org/10.5281/zenodo.16983614)).
 
@@ -302,9 +304,9 @@ variable risqué) ont été retirés. `first-access.sh` est la **source unique**
 
 Le playbook `secure.yml` est **entièrement opt-in** : sans `--tags`, il ne
 touche à rien (il charge juste les variables). Voir
-[`bootstrap/security/IMPLICATIONS.md`](security/IMPLICATIONS.md) pour, couche
-par couche, ce qui change, ce qui est protégé, le compromis assumé, et la
-commande pour s'en convaincre soi-même.
+[`bootstrap/security/IMPLICATIONS.md`](/cluster/bootstrap/security/IMPLICATIONS/)
+pour, couche par couche, ce qui change, ce qui est protégé, le compromis assumé,
+et la commande pour s'en convaincre soi-même.
 
 ```bash
 cd bootstrap/security
@@ -351,8 +353,10 @@ seule, ne modifie rien.
 >
 > **À n'activer qu'APRÈS le bootstrap K8s** (`secure.yml --tags ufw`) : activer
 > UFW avant que le cluster existe couperait l'init. L'état d'UFW est surveillé
-> par [`state.sh`](state.sh) (couche 2) — un UFW actif sans la règle
-> inter-nœuds, ou installé mais inactif, est signalé comme **drift**.
+> par
+> [`state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
+> (couche 2) — un UFW actif sans la règle inter-nœuds, ou installé mais inactif,
+> est signalé comme **drift**.
 
 La désactivation du swap n'apparaît plus ici : elle est gérée automatiquement
 par le rôle Ansible `k8s-pre-install` du présent dépôt (`checks.yaml`).
@@ -363,15 +367,17 @@ par le rôle Ansible `k8s-pre-install` du présent dépôt (`checks.yaml`).
 
 L'inventaire réel (`bootstrap/hosts.yaml`) n'est **pas versionné** : c'est une
 spécificité de déploiement
-([ADR 0023](../docs/decisions/0023-plateforme-exemple-generique.md)). Copiez le
-modèle générique versionné puis renseignez vos nœuds :
+([ADR 0023](/cluster/docs/decisions/0023-plateforme-exemple-generique/)). Copiez
+le modèle générique versionné puis renseignez vos nœuds :
 
 ```bash
 cp bootstrap/hosts.example.yaml bootstrap/hosts.yaml
 # puis éditer bootstrap/hosts.yaml avec les noms/IP réels
 ```
 
-Le modèle ([`hosts.example.yaml`](hosts.example.yaml)) a la forme :
+Le modèle
+([`hosts.example.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/hosts.example.yaml))
+a la forme :
 
 ```yaml
 cloud:
@@ -418,8 +424,9 @@ cilium connectivity test
 
 Cilium assure l'**exposition réseau** du cluster, en remplacement de MetalLB et
 d'ingress-nginx
-([ADR 0020](../docs/decisions/0020-exposition-reseau-tout-cilium.md)).
-[`cni.sh`](cni.sh) arme désormais, à l'install **et** à l'upgrade :
+([ADR 0020](/cluster/docs/decisions/0020-exposition-reseau-tout-cilium/)).
+[`cni.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/cni.sh)
+arme désormais, à l'install **et** à l'upgrade :
 
 - **`kubeProxyReplacement=true`** (datapath eBPF) + `k8sServiceHost=cluster-api`
   - `k8sServicePort=6443` (obligatoires sans kube-proxy : l'agent ne joint plus
@@ -431,8 +438,8 @@ d'ingress-nginx
   ingress-nginx.
 
 Les pools/policies/GatewayClass sont des CRs versionnés sous
-[`platform/cilium-expo/`](../platform/cilium-expo/) ; les **CRDs Gateway API
-v1.4.1 doivent être pré-installées** (voir le README de cet addon).
+[`platform/cilium-expo/`](/cluster/platform/cilium-expo/) ; les **CRDs Gateway
+API v1.4.1 doivent être pré-installées** (voir le README de cet addon).
 
 Retrait de `kube-proxy` : sur un cluster **neuf**, `kubeadm init` ne le déploie
 plus (`skipPhases: [addon/kube-proxy]` dans la config kubeadm). Sur un cluster
@@ -506,9 +513,9 @@ k get pods --all-namespaces
 L'accès distant aux services internes (dashboards, consoles, API d'opérateurs)
 passe par `kubectl port-forward` depuis un poste autorisé à joindre l'API
 Kubernetes — il n'y a **pas** de réseau d'overlay ni de VPN dédié
-([ADR 0003](../docs/decisions/0003-pas-de-chiffrement-ceph-tailscale.md)). Le
-poste de contrôle dispose déjà du kubeconfig fusionné (section précédente) ; le
-tunnel est local au poste et ne traverse que l'API server.
+([ADR 0003](/cluster/docs/decisions/0003-pas-de-chiffrement-ceph-tailscale/)).
+Le poste de contrôle dispose déjà du kubeconfig fusionné (section précédente) ;
+le tunnel est local au poste et ne traverse que l'API server.
 
 ```bash
 # Exposer localement un service ClusterIP (ex. un dashboard) :
@@ -521,15 +528,15 @@ l'accès. Aucun port supplémentaire n'est ouvert sur les nœuds.
 
 ### Installation de Ceph
 
-Voir [`storage/ceph/RUNBOOK.md`](../storage/ceph/RUNBOOK.md).
+Voir [`storage/ceph/RUNBOOK.md`](/cluster/storage/ceph/RUNBOOK/).
 
 ## Audit-log et rollback
 
 ### Audit-log : qui a fait quoi quand sur chaque nœud
 
 Chaque playbook bootstrap invoque en `pre_tasks` le rôle
-[`audit-log`](roles/audit-log/), qui pose une ligne dans
-`/var/log/cluster-bootstrap.log` du nœud cible :
+[`audit-log`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/audit-log),
+qui pose une ligne dans `/var/log/cluster-bootstrap.log` du nœud cible :
 
 ```text
 2026-05-28T14:32:01Z playbook=cri.yaml from=pierre@laptop ssh-as=debian
@@ -554,8 +561,8 @@ Lecture :
 ssh debian@cp1 'sudo tail -n 20 /var/log/cluster-bootstrap.log'
 ```
 
-[`bootstrap/state.sh`](state.sh) **couche 0** lit ce journal et affiche par nœud
-:
+[`bootstrap/state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
+**couche 0** lit ce journal et affiche par nœud :
 
 - le dernier playbook joué + son âge → suivi rapide.
 - l'absence totale de trace → drift potentiel : OS installé mais aucun bootstrap
@@ -573,15 +580,15 @@ cd bootstrap
 ansible-playbook -i hosts.yaml audit-log-baseline.yaml
 ```
 
-[`audit-log-baseline.yaml`](audit-log-baseline.yaml) appose une ligne « baseline
-» et débloque la couche 0. Les playbooks suivants ajouteront des lignes normales
-par-dessus.
+[`audit-log-baseline.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/audit-log-baseline.yaml)
+appose une ligne « baseline » et débloque la couche 0. Les playbooks suivants
+ajouteront des lignes normales par-dessus.
 
 ### Rollback du bootstrap K8s
 
-[`rollback.yaml`](rollback.yaml) ramène un nœud à un état "Debian 13 +
-utilisateur debian + first-access" — comme si aucun playbook K8s n'avait été
-joué :
+[`rollback.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/rollback.yaml)
+ramène un nœud à un état "Debian 13 + utilisateur debian + first-access" — comme
+si aucun playbook K8s n'avait été joué :
 
 ```bash
 # Sur le banc Lima, l'inventaire est généré par run-phases.sh dans son WORKDIR
@@ -607,13 +614,14 @@ Ce que le rollback fait :
 
 Ce que le rollback **ne** touche **pas** :
 
-- [`first-access.sh`](first-access.sh) (drop-in sshd + sudoers + clé SSH) ;
-- [`security/secure.yml`](security/) (hardening opt-in : auditd, fail2ban, mises
-  à jour automatiques) ;
+- [`first-access.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/first-access.sh)
+  (drop-in sshd + sudoers + clé SSH) ;
+- [`security/secure.yml`](/cluster/bootstrap/security/) (hardening opt-in :
+  auditd, fail2ban, mises à jour automatiques) ;
 - [le partitionnement et l'installation OS](#partitionnement-du-disque-de-démarrage)
   ;
 - les **disques Ceph** + `/var/lib/rook` → utiliser
-  [`storage/ceph/cleanup.sh`](../storage/ceph/cleanup.sh).
+  [`storage/ceph/cleanup.sh`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/cleanup.sh).
 
 Cas d'usage typique sur le banc :
 
@@ -645,7 +653,7 @@ ansible-playbook -i ./hosts.yaml ./os-upgrade.yaml
 Montée de version K8s **in-place**, séquencée (control plane d'abord, puis
 workers un par un). **Une mineure à la fois** ; vérifier la compat croisée
 Cilium/Rook/Ceph
-([ADR 0006](../docs/decisions/0006-matrice-de-versions-et-politique-de-bump.md))
+([ADR 0006](/cluster/docs/decisions/0006-matrice-de-versions-et-politique-de-bump/))
 **avant**, et **valider sur le banc multi-node** d'abord.
 
 ```bash
@@ -661,21 +669,24 @@ ansible-playbook -i ./hosts.yaml ./k8s-upgrade.yaml \
 Le playbook draine chaque nœud avant son upgrade et le `uncordon` ensuite ; un
 seul nœud est indisponible à la fois. L'API est brièvement coupée pendant
 l'`apply` sur le control plane (SPOF assumé,
-[ADR 0002](../docs/decisions/0002-control-plane-unique-avec-endpoint.md)).
+[ADR 0002](/cluster/docs/decisions/0002-control-plane-unique-avec-endpoint/)).
 Détails et compromis :
-[ADR 0015](../docs/decisions/0015-strategie-upgrade-kubernetes.md).
+[ADR 0015](/cluster/docs/decisions/0015-strategie-upgrade-kubernetes/).
 
 ### Sauvegarde etcd (SPOF assumé)
 
 Le cluster fonctionne avec **1 seul control plane** (`cp1`) — décision assumée
-(cf. [ADR 0002](../docs/decisions/0002-control-plane-unique-avec-endpoint.md)).
+(cf.
+[ADR 0002](/cluster/docs/decisions/0002-control-plane-unique-avec-endpoint/)).
 C'est un **SPOF** : la perte du nœud control plane → cluster inutilisable
 jusqu'à restauration. Mitigations :
 
 1. **`--control-plane-endpoint cluster-api:6443` posé dès `kubeadm init`** (rôle
    `k8s-initialization`) : l'API est référencée par un nom DNS stable, donc un
    futur ajout de control planes n'imposera pas de réinstaller les workers.
-2. **Sauvegarde etcd horaire** via le rôle [`etcd-backup`](roles/etcd-backup/) :
+2. **Sauvegarde etcd horaire** via le rôle
+   [`etcd-backup`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/etcd-backup)
+   :
 
    ```bash
    ansible-playbook -i ./hosts.yaml ./etcd-backup.yaml
@@ -691,10 +702,11 @@ jusqu'à restauration. Mitigations :
    ls -la /var/lib/etcd-backups/
    ```
 
-3. **Copie hors-nœud** via [`etcd-fetch.yaml`](etcd-fetch.yaml) (audit P1 #3) :
-   les snapshots du point 2 restent **sur le control plane** → perdus si `cp1`
-   meurt. Ce playbook rapatrie le snapshot le plus récent vers le **poste de
-   contrôle** (dossier `etcd-snapshots/`, gitignoré) :
+3. **Copie hors-nœud** via
+   [`etcd-fetch.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/etcd-fetch.yaml)
+   (audit P1 #3) : les snapshots du point 2 restent **sur le control plane** →
+   perdus si `cp1` meurt. Ce playbook rapatrie le snapshot le plus récent vers
+   le **poste de contrôle** (dossier `etcd-snapshots/`, gitignoré) :
 
    ```bash
    ansible-playbook -i ./hosts.yaml ./etcd-fetch.yaml
@@ -703,8 +715,8 @@ jusqu'à restauration. Mitigations :
    **RPO** = fréquence de ce fetch. Recommandé : le planifier côté admin (cron /
    launchd), p. ex. toutes les 6 h → RPO ≤ 6 h hors-nœud (et ≤ 1 h sur le nœud
    via le timer horaire). ⚠️ Le snapshot contient **tous les Secrets** (etcd non
-   chiffré, [ADR 0014](../docs/decisions/0014-durcissement-kubeadm-init.md)) :
-   garder `etcd-snapshots/` sur un poste de confiance.
+   chiffré, [ADR 0014](/cluster/docs/decisions/0014-durcissement-kubeadm-init/))
+   : garder `etcd-snapshots/` sur un poste de confiance.
 
 #### Restauration etcd (procédure)
 
@@ -736,7 +748,7 @@ kubectl get nodes      # attendre que les nœuds redeviennent Ready
 ```
 
 > Tester cette procédure **sur le banc Lima multi-nœuds** avant d'en avoir
-> besoin en prod (cf. [`bench/lima/`](../bench/lima/)).
+> besoin en prod (cf. [`bench/lima/`](/cluster/bench/lima/)).
 
 ### Rotation de la clé de chiffrement etcd (ADR 0014)
 
@@ -778,7 +790,7 @@ sudo touch /etc/kubernetes/manifests/kube-apiserver.yaml
 
 Vérifier qu'un Secret est bien chiffré après chaque étape (`k8s:enc:secretbox:`)
 via `etcdctl` — c'est ce que fait le scénario
-[`bench/scenarios/15-etcd-encryption-audit.sh`](../bench/scenarios/15-etcd-encryption-audit.sh)
+[`bench/scenarios/15-etcd-encryption-audit.sh`](https://github.com/univ-lehavre/cluster/blob/main/bench/scenarios/15-etcd-encryption-audit.sh)
 (`ROTATE=1` déroule et vérifie toute la rotation, témoin inclus). **Tester sur
 le banc avant la prod.**
 
@@ -812,5 +824,5 @@ slsa-verifier verify-artifact "cluster-${TAG}.tar.gz" \
 Une vérification qui échoue (signature invalide, identité inattendue, source
 divergente) = **archive non fiable** : ne pas l'utiliser. La signature ne vit
 **que** dans le code versionné
-([`.github/workflows/release.yml`](../.github/workflows/release.yml)),
+([`.github/workflows/release.yml`](https://github.com/univ-lehavre/cluster/blob/main/.github/workflows/release.yml)),
 re-prouvée à chaque release — pas d'étape manuelle (ADR 0088).

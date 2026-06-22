@@ -3,8 +3,9 @@
 Ce document explique **ce que chaque couche change concrètement** sur la
 machine, **ce qu'elle protège**, **le compromis assumé**, et **comment s'en
 convaincre soi-même** (preuve observable). Le _comment_ déclaratif est dans le
-[README sécurité](README.md) et dans [secure.yml](secure.yml) ; ici on parle des
-_conséquences_.
+[README sécurité](/cluster/bootstrap/security/) et dans
+[secure.yml](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/security/secure.yml)
+; ici on parle des _conséquences_.
 
 **Politique** : **toutes les couches sont opt-in**.
 `ansible-playbook secure.yml` sans `--tags` ne touche à rien (il se contente de
@@ -13,22 +14,23 @@ ses implications.
 
 Vue d'ensemble :
 
-| Couche       | Tag Ansible                 | Risque opérationnel | Ce qu'elle apporte                                              |
-| ------------ | --------------------------- | ------------------- | --------------------------------------------------------------- |
-| OS           | `os`, `unattended-upgrades` | 🟢 faible           | Mises à jour de sécurité automatiques + expiration mot de passe |
-| Alert        | `alert`, `mail`             | 🟢 faible           | Redirection des mails root vers une adresse opérée              |
-| Audit        | `audit`, `auditd`           | 🟢 faible           | Journalisation des appels système sensibles                     |
-| Detection    | `detection`, `fail2ban`     | 🟡 modéré           | Bannissement automatique des IP qui forcent SSH                 |
-| Smart        | `smart`, `smartd`           | 🟢 faible           | Surveillance SMART des disques (alerte sur le NVMe block.db)    |
-| Network SSHD | `sshd`                      | 🟡 modéré           | Déjà appliqué par [`first-access.sh`](../first-access.sh)       |
-| SSH keys     | `ssh-keys`                  | 🟢 faible           | Re-déploie la clé publique (déjà fait par `first-access.sh`)    |
-| OS upgrade   | `upgrade`                   | 🟠 reboot immédiat  | `apt full-upgrade` + reboot, un nœud à la fois                  |
-| Network UFW  | `ufw`                       | 🔴 tardif           | Pare-feu — **n'activer qu'après le bootstrap K8s**              |
+| Couche       | Tag Ansible                 | Risque opérationnel | Ce qu'elle apporte                                                                                                 |
+| ------------ | --------------------------- | ------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| OS           | `os`, `unattended-upgrades` | 🟢 faible           | Mises à jour de sécurité automatiques + expiration mot de passe                                                    |
+| Alert        | `alert`, `mail`             | 🟢 faible           | Redirection des mails root vers une adresse opérée                                                                 |
+| Audit        | `audit`, `auditd`           | 🟢 faible           | Journalisation des appels système sensibles                                                                        |
+| Detection    | `detection`, `fail2ban`     | 🟡 modéré           | Bannissement automatique des IP qui forcent SSH                                                                    |
+| Smart        | `smart`, `smartd`           | 🟢 faible           | Surveillance SMART des disques (alerte sur le NVMe block.db)                                                       |
+| Network SSHD | `sshd`                      | 🟡 modéré           | Déjà appliqué par [`first-access.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/first-access.sh) |
+| SSH keys     | `ssh-keys`                  | 🟢 faible           | Re-déploie la clé publique (déjà fait par `first-access.sh`)                                                       |
+| OS upgrade   | `upgrade`                   | 🟠 reboot immédiat  | `apt full-upgrade` + reboot, un nœud à la fois                                                                     |
+| Network UFW  | `ufw`                       | 🔴 tardif           | Pare-feu — **n'activer qu'après le bootstrap K8s**                                                                 |
 
 > **Lecture transversale** : aucun tag actif par défaut. C'est à l'utilisateur —
 > vous — d'activer chaque couche après avoir lu sa section ci-dessous, dans
-> l'ordre qui lui convient. Le script [`report.sh`](report.sh) donne à tout
-> moment l'état observable.
+> l'ordre qui lui convient. Le script
+> [`report.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/security/report.sh)
+> donne à tout moment l'état observable.
 
 ## Menu — commandes prêtes à copier-coller
 
@@ -238,11 +240,11 @@ sudo grep -i 'ban' /var/log/fail2ban.log | tail
 ## Durcissement sshd — posé par `first-access.sh` (source unique)
 
 > Le durcissement `sshd` est assuré **uniquement** par
-> [`first-access.sh`](../first-access.sh), qui dépose le drop-in
-> `00-hardening.conf` avant même que le cluster soit joignable par Ansible. Il
-> n'y a **plus** de tag `sshd` dans `secure.yml` : l'ancienne task
-> `network/sshd.yml` (doublon, avec un `AllowUsers` variable) a été supprimée.
-> Pour re-poser le réglage ou corriger une dérive, **relancer
+> [`first-access.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/first-access.sh),
+> qui dépose le drop-in `00-hardening.conf` avant même que le cluster soit
+> joignable par Ansible. Il n'y a **plus** de tag `sshd` dans `secure.yml` :
+> l'ancienne task `network/sshd.yml` (doublon, avec un `AllowUsers` variable) a
+> été supprimée. Pour re-poser le réglage ou corriger une dérive, **relancer
 > `first-access.sh`** (idempotent) ; `bootstrap/state.sh` détecte l'absence du
 > drop-in.
 
@@ -316,7 +318,8 @@ sudo sshd -T | grep -E 'passwordauth|permitroot|allowusers|maxauth|clientalive'
   - `3300`/`6789` (Ceph mon), `6800-7568` (OSDs / mgr / msgr2), `7480` (RGW).
 - C'est pourquoi cette couche est en `never` : il faut d'abord déployer K8s et
   Cilium, puis _lister_ les ports à autoriser, puis activer UFW.
-- Voir le [RUNBOOK bootstrap](../RUNBOOK.md) — section UFW à la fin.
+- Voir le [RUNBOOK bootstrap](/cluster/bootstrap/RUNBOOK/) — section UFW à la
+  fin.
 
 ### Comment vérifier
 
@@ -375,4 +378,6 @@ Le rapport remonte, par nœud, **les preuves observables** : services actifs,
 règles auditd chargées, IPs bannies par fail2ban, dernier
 `unattended-upgrades.log`, alias root, et — si elles existent — règles UFW.
 
-Référence : [report.sh](report.sh), [state.sh](../state.sh).
+Référence :
+[report.sh](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/security/report.sh),
+[state.sh](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh).

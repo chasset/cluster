@@ -2,8 +2,9 @@
 
 Stratégie de sauvegarde des **données applicatives** (PVC bloc/CephFS) par
 **VolumeSnapshots CSI** Ceph, en complément de la sauvegarde **etcd** (rôle
-[`etcd-backup`](../../../bootstrap/roles/etcd-backup/)). Décision et limites :
-[ADR 0013](../../../docs/decisions/0013-sauvegarde-donnees-applicatives.md).
+[`etcd-backup`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/etcd-backup)).
+Décision et limites :
+[ADR 0013](/cluster/docs/decisions/0013-sauvegarde-donnees-applicatives/).
 
 > ⚠️ **Couverture.** Les VolumeSnapshots protègent de la **suppression
 > accidentelle** et de la **corruption logique** — pas d'une **perte totale du
@@ -12,11 +13,11 @@ Stratégie de sauvegarde des **données applicatives** (PVC bloc/CephFS) par
 
 ## Contenu
 
-| Fichier                                                        | Rôle                                                                       |
-| -------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| [`volume-snapshot-class.yaml`](volume-snapshot-class.yaml)     | `VolumeSnapshotClass` RBD + CephFS (`deletionPolicy: Retain`)              |
-| [`snapshot-cronjob.yaml`](snapshot-cronjob.yaml)               | `CronJob` quotidien + RBAC : snapshote les PVC `backup=daily`, rétention 7 |
-| [`block-replicated-retain.yaml`](block-replicated-retain.yaml) | StorageClass bloc ×3 en `reclaimPolicy: Retain` (volumes précieux)         |
+| Fichier                                                                                                                              | Rôle                                                                       |
+| ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| [`volume-snapshot-class.yaml`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/backup/volume-snapshot-class.yaml)     | `VolumeSnapshotClass` RBD + CephFS (`deletionPolicy: Retain`)              |
+| [`snapshot-cronjob.yaml`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/backup/snapshot-cronjob.yaml)               | `CronJob` quotidien + RBAC : snapshote les PVC `backup=daily`, rétention 7 |
+| [`block-replicated-retain.yaml`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/backup/block-replicated-retain.yaml) | StorageClass bloc ×3 en `reclaimPolicy: Retain` (volumes précieux)         |
 
 ## Installation
 
@@ -88,6 +89,6 @@ Puis re-pointer l'application sur `<pvc>-restored` (ou copier les données).
 ## À valider sur le banc
 
 Scénario dédié à ajouter (esprit du
-[`09-etcd-restore.sh`](../../../bench/scenarios/09-etcd-restore.sh)) : écrire
-une donnée → snapshot → supprimer/corrompre → restaurer via `dataSource` →
-vérifier le retour de la donnée.
+[`09-etcd-restore.sh`](https://github.com/univ-lehavre/cluster/blob/main/bench/scenarios/09-etcd-restore.sh))
+: écrire une donnée → snapshot → supprimer/corrompre → restaurer via
+`dataSource` → vérifier le retour de la donnée.

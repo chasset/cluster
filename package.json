@@ -28,18 +28,24 @@
     "test:shell": "bats bench/unit/",
     "test:python": "uv run python -m unittest discover -s tests",
     "lint": "pnpm format:check && pnpm lint:yaml && pnpm lint:shell && pnpm lint:k8s && pnpm lint:ansible && pnpm lint:dup && pnpm lint:python && pnpm lint:docs-orphans && pnpm lint:stats && pnpm lint:drifts && pnpm lint:contract && pnpm lint:topology-drift && pnpm test:shell && pnpm test:python",
-    "docs:dev": "vitepress dev docs",
-    "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs",
+    "docs:prepare": "uv run python scripts/migrate_docs_to_astro.py --content-only",
+    "docs:dev": "pnpm docs:prepare && astro dev --root docs",
+    "docs:build": "pnpm docs:prepare && astro build --root docs",
+    "docs:preview": "astro preview --root docs",
     "prepare": "lefthook install"
   },
+  "dependencies": {
+    "@astrojs/starlight": "^0.40.0",
+    "astro": "^6.4.8"
+  },
   "devDependencies": {
+    "@astrojs/mdx": "^6.0.3",
     "@commitlint/cli": "^21.0.0",
     "@commitlint/config-conventional": "^21.0.0",
     "bats": "^1.13.0",
     "jscpd": "^4.2.4",
     "lefthook": "^2.0.0",
     "prettier": "^3.3.0",
-    "vitepress": "^1.6.4"
+    "starlight-links-validator": "^0.24.1"
   }
 }

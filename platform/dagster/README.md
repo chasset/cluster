@@ -1,15 +1,15 @@
 # Dagster
 
 Orchestrateur DataOps (étape 1.7,
-[ADR 0026](../../docs/decisions/0026-orchestration-dagster.md)) : webserver,
+[ADR 0026](/cluster/docs/decisions/0026-orchestration-dagster/)) : webserver,
 daemon et run workers (`K8sRunLauncher` — 1 run = 1 Job K8s).
 L'event/run/schedule storage est persisté dans la base `dagster` de
-[CloudNativePG](../cloudnative-pg/) (étape 1.6).
+[CloudNativePG](/cluster/platform/cloudnative-pg/) (étape 1.6).
 
 **Orchestrateur « vide »** : aucune code-location ici. Le code métier (assets,
 IO managers DuckDB↔S3) vit dans le dépôt `atlas` (Phase 2+). Géré par
 `kubectl apply` (patron addon,
-[ADR 0022](../../docs/decisions/0022-argocd-gitops-applicatif.md)).
+[ADR 0022](/cluster/docs/decisions/0022-argocd-gitops-applicatif/)).
 
 ## Fichiers
 
@@ -33,7 +33,7 @@ fidèle à l'officiel). Selon la topologie :
   `dagster/dagster-celery-k8s:1.13.7`.
 - **Banc léger Lima (arm64)** : image **maison** construite + poussée dans le
   registry interne
-  ([ADR 0011](../../docs/decisions/0011-registry-http-sans-auth.md)).
+  ([ADR 0011](/cluster/docs/decisions/0011-registry-http-sans-auth/)).
 
 Le manifeste référence `registry:80/dagster-celery-k8s:1.13.7` (registry
 interne) ; on y pousse l'image de l'arch voulue.
@@ -58,7 +58,7 @@ docker buildx build --platform linux/arm64 \
 > cert-manager, et containerd configuré pour tirer le registry HTTP
 > `registry:80`) sont posés par `bench/lima/run-phases.sh platform-prereqs`.
 > Validé e2e sur arm64 (run `K8sRunLauncher` → Job K8s, storage dans Postgres) —
-> cf. [`bench/lima/RESULTS.md`](../../bench/lima/RESULTS.md) (#144).
+> cf. [`bench/lima/RESULTS.md`](/cluster/bench/lima/RESULTS/) (#144).
 
 ## Déploiement — ordre
 
@@ -98,7 +98,8 @@ kubectl apply -n dagster -f platform/dagster/gateway.yaml            # UI sur da
 
 Sur le banc léger : webserver + daemon Ready, storage dans Postgres (pas
 SQLite), un run de test via `K8sRunLauncher` crée un Job et apparaît dans
-l'event log Postgres. Cf. [`bootstrap/state.sh`](../../bootstrap/state.sh)
+l'event log Postgres. Cf.
+[`bootstrap/state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
 (section Dagster).
 
 ## Régénérer le manifeste vendored

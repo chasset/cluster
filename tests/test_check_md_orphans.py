@@ -21,13 +21,20 @@ from check_md_orphans import (  # noqa: E402
 
 class SidebarLinkToFile(unittest.TestCase):
     def setUp(self):
-        self.files = {"README.md", "docs/demarrage.md", "bench/README.md", "bootstrap/RUNBOOK.md"}
+        self.files = {
+            "docs/index.md",
+            "docs/demarrage.md",
+            "bench/README.md",
+            "bootstrap/RUNBOOK.md",
+        }
 
-    def test_root_maps_to_readme(self):
-        self.assertEqual(sidebar_link_to_file("/", self.files), "README.md")
+    def test_root_maps_to_home(self):
+        # `/` = home Starlight = docs/index.md (ancienne home VitePress, ADR 0089)
+        self.assertEqual(sidebar_link_to_file("/", self.files), "docs/index.md")
 
     def test_page_link_adds_md(self):
-        self.assertEqual(sidebar_link_to_file("/docs/demarrage", self.files), "docs/demarrage.md")
+        # liens Starlight avec trailing slash : /docs/demarrage/ → docs/demarrage.md
+        self.assertEqual(sidebar_link_to_file("/docs/demarrage/", self.files), "docs/demarrage.md")
 
     def test_dir_link_maps_to_readme(self):
         self.assertEqual(sidebar_link_to_file("/bench/", self.files), "bench/README.md")
@@ -68,40 +75,53 @@ class ResolveMdLink(unittest.TestCase):
 
 
 class FindOrphans(unittest.TestCase):
+    # Racine sidebar `/` = docs/index.md (home Starlight, ADR 0089).
     def test_reachable_via_sidebar_and_transitive_link(self):
-        files = ["README.md", "docs/guide.md", "docs/deep.md"]
+        files = ["docs/index.md", "docs/guide.md", "docs/deep.md"]
         contents = {
-            "README.md": "voir [guide](docs/guide.md)",
+            "docs/index.md": "voir [guide](guide.md)",
             "docs/guide.md": "puis [deep](deep.md)",
             "docs/deep.md": "feuille",
         }
-        # README est racine sidebar ; guide et deep sont atteints par liens.
+        # docs/index.md est racine sidebar ; guide et deep sont atteints par liens.
         orphans = find_orphans(files, ["/"], lambda p: contents.get(p, ""))
         self.assertEqual(orphans, [])
 
     def test_detects_orphan(self):
-        files = ["README.md", "orphan.md"]
-        contents = {"README.md": "rien ne pointe vers l'orphelin"}
+        files = ["docs/index.md", "orphan.md"]
+        contents = {"docs/index.md": "rien ne pointe vers l'orphelin"}
         orphans = find_orphans(files, ["/"], lambda p: contents.get(p, ""))
         self.assertEqual(orphans, ["orphan.md"])
 
     def test_orphan_linked_only_from_other_orphan_stays_orphan(self):
         # b est lié depuis a, mais a lui-même n'est atteignable par personne.
-        files = ["README.md", "a.md", "b.md"]
-        contents = {"README.md": "seul", "a.md": "[b](b.md)", "b.md": "x"}
+        files = ["docs/index.md", "a.md", "b.md"]
+        contents = {"docs/index.md": "seul", "a.md": "[b](b.md)", "b.md": "x"}
         orphans = find_orphans(files, ["/"], lambda p: contents.get(p, ""))
         self.assertEqual(orphans, ["a.md", "b.md"])
 
     def test_cycle_does_not_loop_forever(self):
-        files = ["README.md", "a.md", "b.md"]
-        contents = {"README.md": "[a](a.md)", "a.md": "[b](b.md)", "b.md": "[a](a.md)"}
+        # a/b sous docs/ : les liens relatifs se résolvent depuis docs/index.md.
+        files = ["docs/index.md", "docs/a.md", "docs/b.md"]
+        contents = {
+            "docs/index.md": "[a](a.md)",
+            "docs/a.md": "[b](b.md)",
+            "docs/b.md": "[a](a.md)",
+        }
         orphans = find_orphans(files, ["/"], lambda p: contents.get(p, ""))
         self.assertEqual(orphans, [])
 
     def test_empty_sidebar_all_orphan(self):
-        files = ["README.md", "x.md"]
+        files = ["docs/index.md", "x.md"]
         orphans = find_orphans(files, [], lambda p: "")
-        self.assertEqual(orphans, ["README.md", "x.md"])
+        self.assertEqual(orphans, ["docs/index.md", "x.md"])
+
+    def test_resolves_cluster_site_url(self):
+        # Lien réécrit en URL du site Astro (/cluster/...) → re-mappé à la source.
+        files = ["docs/index.md", "CODE_OF_CONDUCT.md"]
+        contents = {"docs/index.md": "voir [CoC](/cluster/CODE_OF_CONDUCT/)"}
+        orphans = find_orphans(files, ["/"], lambda p: contents.get(p, ""))
+        self.assertEqual(orphans, [])
 
 
 if __name__ == "__main__":

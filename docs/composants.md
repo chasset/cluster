@@ -250,9 +250,9 @@ unique, qui est la façon canonique de déployer un workflow — on ne fait
 Argo CD déploie **vos workflows**, **jamais l'infra** : le socle (CNPG, Dagster,
 Marquez, Argo CD lui-même) est monté par Ansible. Vous poussez le _contenu_, le
 socle fournit le _contenant vide_. C'est cette boucle qu'un développeur rejoue
-en local (tutoriel [Monter le banc local](banc-local.md#pousser-sur-gitea)) et
+en local (tutoriel [Monter le banc local](banc-local.md#3-pousser-sur-gitea)) et
 qu'invoque le
-[mode d'emploi de branchement](se-brancher.md#déployer-la-boucle-gitops).
+[mode d'emploi de branchement](se-brancher.md#déployer--la-boucle-gitops).
 
 ## Chaîne DataOps
 

@@ -3,20 +3,20 @@
 Exposition réseau du cluster **sans MetalLB ni ingress-nginx** : Cilium fournit
 l'allocation d'IP LoadBalancer (LB-IPAM), l'annonce L2 (ARP) et la bordure L7
 (Gateway API). Décision et justifications :
-[ADR 0020](../../docs/decisions/0020-exposition-reseau-tout-cilium.md).
+[ADR 0020](/cluster/docs/decisions/0020-exposition-reseau-tout-cilium/).
 
 Les **features côté agent** (kube-proxy replacement, `l2announcements.enabled`,
 `gatewayAPI.enabled`, `k8sClientRateLimit`) sont armées par
-[`bootstrap/cni.sh`](../../bootstrap/cni.sh) — pas ici. Ce dossier ne contient
-que les **CRs déclaratifs** (pool, policy L2, GatewayClass) et un Gateway de
-test.
+[`bootstrap/cni.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/cni.sh)
+— pas ici. Ce dossier ne contient que les **CRs déclaratifs** (pool, policy L2,
+GatewayClass) et un Gateway de test.
 
-| Fichier                                                      | Rôle                                                     |
-| ------------------------------------------------------------ | -------------------------------------------------------- |
-| [`lb-ipam-pool.yaml`](lb-ipam-pool.yaml)                     | `CiliumLoadBalancerIPPool` (pool d'IP LoadBalancer)      |
-| [`l2-announcement-policy.yaml`](l2-announcement-policy.yaml) | `CiliumL2AnnouncementPolicy` (annonce ARP sur eth1)      |
-| [`gateway-class.yaml`](gateway-class.yaml)                   | `GatewayClass` `cilium` (`io.cilium/gateway-controller`) |
-| [`gateway-test.yaml`](gateway-test.yaml)                     | `Gateway` HTTP de **test** (validation banc — pas prod)  |
+| Fichier                                                                                                                             | Rôle                                                     |
+| ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| [`lb-ipam-pool.yaml`](https://github.com/univ-lehavre/cluster/blob/main/platform/cilium-expo/lb-ipam-pool.yaml)                     | `CiliumLoadBalancerIPPool` (pool d'IP LoadBalancer)      |
+| [`l2-announcement-policy.yaml`](https://github.com/univ-lehavre/cluster/blob/main/platform/cilium-expo/l2-announcement-policy.yaml) | `CiliumL2AnnouncementPolicy` (annonce ARP sur eth1)      |
+| [`gateway-class.yaml`](https://github.com/univ-lehavre/cluster/blob/main/platform/cilium-expo/gateway-class.yaml)                   | `GatewayClass` `cilium` (`io.cilium/gateway-controller`) |
+| [`gateway-test.yaml`](https://github.com/univ-lehavre/cluster/blob/main/platform/cilium-expo/gateway-test.yaml)                     | `Gateway` HTTP de **test** (validation banc — pas prod)  |
 
 ## Pré-requis : CRDs Gateway API (v1.4.1)
 
@@ -73,5 +73,6 @@ kubectl delete -f platform/cilium-expo/gateway-test.yaml   # nettoyage
 - **L2 Announcements = beta** en Cilium 1.19 ; Gateway API d'implémentation
   récente — d'où la validation banc obligatoire avant prod.
 - **Service LoadBalancer du Gateway = exception tracée** de la « Couche 7b » de
-  [`state.sh`](../../bootstrap/state.sh) (le principe « services applicatifs en
-  ClusterIP » reste, exposition uniquement par la bordure).
+  [`state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
+  (le principe « services applicatifs en ClusterIP » reste, exposition
+  uniquement par la bordure).

@@ -1,8 +1,9 @@
 # Loki
 
-Agrégation des **logs** ([ADR 0016](../../docs/decisions/0016-observabilite.md)
+Agrégation des **logs** ([ADR 0016](/cluster/docs/decisions/0016-observabilite/)
 palier 2). Loki stocke les logs, **Promtail** les collecte sur chaque nœud, et
-**Grafana** (cf. [kube-prometheus-stack](../kube-prometheus-stack/)) les explore
+**Grafana** (cf.
+[kube-prometheus-stack](/cluster/platform/kube-prometheus-stack/)) les explore
 via la datasource Loki.
 
 Géré par Ansible/kubectl (pas Argo CD), comme le reste du socle.
@@ -38,12 +39,12 @@ kubectl -n monitoring rollout status statefulset/loki
   (`seaweedfs.s3.svc.cluster.local:8333`, banc léger) ; en prod, surcharger vers
   le **RGW Ceph** (objectstore datalake), endpoint + creds dans un Secret non
   versionné
-  ([ADR 0023](../../docs/decisions/0023-plateforme-exemple-generique.md)).
+  ([ADR 0023](/cluster/docs/decisions/0023-plateforme-exemple-generique/)).
 - **Rétention 7 jours** (compactor + `retention_period: 168h`).
 - **PVC** `standard` (local-path) sur banc léger / `rook-ceph-block-replicated`
   en prod.
 - **Images épinglées par digest d'index multi-arch**
-  ([ADR 0006](../../docs/decisions/0006-matrice-de-versions-et-politique-de-bump.md)).
+  ([ADR 0006](/cluster/docs/decisions/0006-matrice-de-versions-et-politique-de-bump/)).
 
 ## Dette connue
 

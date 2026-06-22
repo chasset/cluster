@@ -1,9 +1,10 @@
 # Mailpit
 
 **Puits SMTP + UI web** : destination mail de **test** de la plateforme. Capture
-les mails d'alerte (Alertmanager du [monitoring](../kube-prometheus-stack/), et
-à terme la couche durcissement hôte) pour **valider la chaîne d'alerting de bout
-en bout** sur le banc, sans relais externe.
+les mails d'alerte (Alertmanager du
+[monitoring](/cluster/platform/kube-prometheus-stack/), et à terme la couche
+durcissement hôte) pour **valider la chaîne d'alerting de bout en bout** sur le
+banc, sans relais externe.
 
 Addon **autonome** (namespace `mail`) — transverse : sert le monitoring K8s
 **et**, plus tard, le hardening hôte (destination mail unifiée).
@@ -40,7 +41,7 @@ un **puits de test** :
 - **Prod** : le smarthost d'Alertmanager est surchargé vers un fournisseur SMTP
   externe (vendeur-neutre : Brevo, Mailgun, Amazon SES… `:587` + auth via
   Secret), config locale non versionnée
-  ([ADR 0023](../../docs/decisions/0023-plateforme-exemple-generique.md)).
+  ([ADR 0023](/cluster/docs/decisions/0023-plateforme-exemple-generique/)).
   Mailpit n'est pas déployé en prod, ou sert d'environnement de test.
 
 ## Accès depuis l'HÔTE (relais postfix du hardening, #131)
@@ -48,7 +49,7 @@ un **puits de test** :
 Le postfix des nœuds (alertes fail2ban/auditd/smartd) tourne **hors du réseau
 pods** : il ne peut joindre ni le Service ClusterIP `mailpit.mail.svc:1025` ni
 le DNS `*.svc.cluster.local`. D'où un **`hostPort: 1025`** sur le pod mailpit
-([ADR 0071](../../docs/decisions/0071-exposition-gateway-hostnetwork.md)) : le
+([ADR 0071](/cluster/docs/decisions/0071-exposition-gateway-hostnetwork/)) : le
 postfix, qui tourne **sur le nœud**, joint le SMTP sur `NodeIP:1025` — routé en
 eBPF par Cilium, **sans Service LoadBalancer ni LB-IPAM**.
 
@@ -67,7 +68,7 @@ ni LoadBalancer SMTP.
 ## Adaptations
 
 - Image épinglée par digest d'index multi-arch
-  ([ADR 0006](../../docs/decisions/0006-matrice-de-versions-et-politique-de-bump.md)).
+  ([ADR 0006](/cluster/docs/decisions/0006-matrice-de-versions-et-politique-de-bump/)).
 - Durci : `runAsNonRoot`, `readOnlyRootFilesystem` (base SQLite en `/tmp` via
   `emptyDir`), `drop ALL`, `seccompProfile: RuntimeDefault`.
 - Stockage **en mémoire/`/tmp`** (jetable) — aucun secret réel, jamais de vraies

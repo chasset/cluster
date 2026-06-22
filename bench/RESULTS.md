@@ -1,12 +1,12 @@
 # Résultats — banc multi-nœuds (historique, banc Vagrant déprécié)
 
 > **Banc Vagrant/VirtualBox déprécié**
-> ([ADR 0038](../docs/decisions/0038-lima-seul-banc-local.md)) — son code
+> ([ADR 0038](/cluster/docs/decisions/0038-lima-seul-banc-local/)) — son code
 > (`test/multi-node/`, `test/single-node/`) a été supprimé ; ce journal est
 > **conservé en l'état** (honnêteté des Runs, ADR 0023). Les liens vers les
 > fichiers du banc sont donc en texte brut, et les identifiants réels d'un
 > déploiement ont été génériqués (ADR 0023). Journal du banc **courant** (Lima)
-> : [`lima/RESULTS.md`](lima/RESULTS.md).
+> : [`lima/RESULTS.md`](/cluster/bench/lima/RESULTS/).
 >
 > Dernière exécution : **2026-05-28**, branche `chore/cluster-rebuild-debian13`,
 > banc `test/multi-node/` sur Mac Apple Silicon (M3 Max, 48 GiB) + VirtualBox
@@ -146,13 +146,13 @@ serveurs HPE ont un DNS interne joignable et `jq` provisionné par les rôles.
 
 - Nouvelle variable `control_plane_ip` (optionnelle, défaut = IP par défaut)
   utilisée par les 3 rôles :
-  - [`k8s-install`](../bootstrap/roles/k8s-install/tasks/main.yaml) :
-    `/etc/hosts cluster-api → <control_plane_ip>` ;
-  - [`k8s-initialization`](../bootstrap/roles/k8s-initialization/tasks/main.yaml)
+  - [`k8s-install`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/k8s-install/tasks/main.yaml)
+    : `/etc/hosts cluster-api → <control_plane_ip>` ;
+  - [`k8s-initialization`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/k8s-initialization/tasks/main.yaml)
     : `kubeadm init --apiserver-advertise-address=<control_plane_ip>` si la
     variable est posée ;
-  - [`k8s-join-cluster`](../bootstrap/roles/k8s-join-cluster/tasks/main.yaml) :
-    `wait_for host=<control_plane_ip>`.
+  - [`k8s-join-cluster`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/k8s-join-cluster/tasks/main.yaml)
+    : `wait_for host=<control_plane_ip>`.
 - `test/multi-node/inventory.yaml` (gitignoré) pose
   `control_plane_ip: 10.0.0.11` au niveau du groupe.
 - **En prod** : la variable reste vide → `ansible_default_ipv4.address` retourne
@@ -171,8 +171,8 @@ banc multi-VM.
 **Correctifs appliqués** :
 
 - Nouvelle variable `kubelet_node_ip` (optionnelle) ajoutée au rôle
-  [`k8s-install`](../bootstrap/roles/k8s-install/tasks/main.yaml). Pose
-  `/etc/default/kubelet KUBELET_EXTRA_ARGS=--node-ip=<ip>` + handler
+  [`k8s-install`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/k8s-install/tasks/main.yaml).
+  Pose `/etc/default/kubelet KUBELET_EXTRA_ARGS=--node-ip=<ip>` + handler
   `Restart kubelet`.
 - `test/multi-node/inventory.yaml` pose la variable par host (192.168.67.X).
 - Sans la variable (prod) → kubelet détecte l'IP de l'interface cluster unique.
@@ -334,8 +334,9 @@ Confirmé au Run #3 : PVC test **Bound**, plugins CSI Running.
 hôte). HEALTH_OK quand même car suffit pour réplicat ×3 + `failureDomain: host`.
 
 **Statut prod** : OK (251 GiB/nœud). À vérifier via le scénario
-[`08-resource-limits-audit.sh`](scenarios/08-resource-limits-audit.sh) que la
-réservation cumulée ne pose pas problème quand d'autres workloads cohabitent.
+[`08-resource-limits-audit.sh`](https://github.com/univ-lehavre/cluster/blob/main/bench/scenarios/08-resource-limits-audit.sh)
+que la réservation cumulée ne pose pas problème quand d'autres workloads
+cohabitent.
 
 ---
 
@@ -375,8 +376,8 @@ passe.
   était fausse. Le Run #2 avait d'ailleurs déjà observé `sd*` (cf. table
   topologie).
 - **À noter** : l'audit du 2026-05-29
-  ([02-tests.md](../docs/audit/2026-05-29/02-tests.md)) avait le diagnostic **à
-  l'envers** — il qualifiait les commentaires `sd*` de vestige obsolète «
+  ([02-tests.md](/cluster/docs/audit/2026-05-29/02-tests/)) avait le diagnostic
+  **à l'envers** — il qualifiait les commentaires `sd*` de vestige obsolète «
   contredit par le code VirtIO `vd*` ». C'est l'inverse : le code `vd*` était la
   régression, les commentaires `sd*` (et le drift 0b ligne 76, « `/dev/sde` »)
   avaient raison.
@@ -392,8 +393,8 @@ passe.
 ### 🟠 #12 — Smoke-test datalake : course RGW + endpoint non résolvable depuis le poste
 
 - **Fichiers** :
-  [`storage/ceph/storageClass/datalake/smoke-test.sh`](../storage/ceph/storageClass/datalake/smoke-test.sh),
-  [README datalake](../storage/ceph/storageClass/datalake/README.md).
+  [`storage/ceph/storageClass/datalake/smoke-test.sh`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/storageClass/datalake/smoke-test.sh),
+  [README datalake](/cluster/storage/ceph/storageClass/datalake/).
 - **Symptôme** : gate Phase 5 `smoke-test datalake échoué`. En le déroulant à la
   main, deux échecs successifs et distincts :
   1. `Secret smoke pas créé` — l'OBC ne convergeait pas dans les 60 s.
@@ -423,7 +424,8 @@ passe.
 
 ### 🔴 #13 — `crictl` jamais installé → backup etcd fantôme (impact PROD)
 
-- **Fichier** : [`k8s-install`](../bootstrap/roles/k8s-install/tasks/main.yaml).
+- **Fichier** :
+  [`k8s-install`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/k8s-install/tasks/main.yaml).
 - **Symptôme** : gate Phase 6
   `etcd-snapshot: crictl introuvable (containerd requis)`. Le timer
   `etcd-snapshot.timer` est pourtant posé et activé.
@@ -439,7 +441,7 @@ passe.
 ### 🔴 #14 — `etcd-snapshot.sh` : `env`/`sh` absents de l'image etcd distroless (impact PROD)
 
 - **Fichier** :
-  [`etcd-snapshot.sh.j2`](../bootstrap/roles/etcd-backup/templates/etcd-snapshot.sh.j2).
+  [`etcd-snapshot.sh.j2`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/etcd-backup/templates/etcd-snapshot.sh.j2).
 - **Symptôme** (révélé une fois #13 corrigé) :
   `OCI runtime exec failed: exec: "env": executable file not found in $PATH`,
   puis `etcdctl snapshot save a échoué`.
@@ -472,7 +474,7 @@ passe.
 ## Suite de scénarios reproductibles
 
 Suivant les questions opérationnelles posées, une
-[suite de 8 scénarios](scenarios/README.md) a été écrite — chacun
+[suite de 8 scénarios](/cluster/bench/scenarios/) a été écrite — chacun
 auto-documenté, idempotent, avec cleanup automatique :
 
 | #   | Scénario                        | Question opérationnelle adressée                   |
@@ -529,7 +531,8 @@ témoin réapparaît à l'identique**. Logs clés :
   **pas** installé par le bootstrap (seul `crictl` l'est, via `cri-tools`/#13),
   alors que la restauration en a besoin sur l'hôte (etcd arrêté → pas de
   `crictl exec`). En urgence, devoir `apt install etcd-client` était un risque.
-  **Corrigé** : le rôle [`etcd-backup`](../bootstrap/roles/etcd-backup/)
+  **Corrigé** : le rôle
+  [`etcd-backup`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/etcd-backup)
   installe désormais `etcd-client` (control-plane-only, même esprit que
   crictl/#13). Le scénario 09 vérifie sa présence et n'installe plus qu'en
   secours, avec un WARN si le rôle n'a pas tourné.
@@ -592,10 +595,11 @@ après `allow-dns` alors que `nslookup` remarche. L'`allow` est chirurgical.
 seulement déclaré) : `echo > /oops` → `Read-only file system`, `id -u` ≠ 0,
 écriture sur l'`emptyDir` monté OK. Complète le contrôle statique trivy.
 
-**Détail 13** — réutilise [`bootstrap/state.sh`](../bootstrap/state.sh) plutôt
-que de redupliquer les checks. Sur ce banc il sort **FAIL attendu** : 2 drifts
-hôte (`sshd drop-in absent`, `PasswordAuthentication` encore autorisé) car
-`first-access.sh` n'est jamais joué sur le banc (compte Vagrant + clé). Les
+**Détail 13** — réutilise
+[`bootstrap/state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
+plutôt que de redupliquer les checks. Sur ce banc il sort **FAIL attendu** : 2
+drifts hôte (`sshd drop-in absent`, `PasswordAuthentication` encore autorisé)
+car `first-access.sh` n'est jamais joué sur le banc (compte Vagrant + clé). Les
 couches `secure.yml` jouées au Run #4 (postfix/auditd/fail2ban) ressortent bien
 `✓ (couche …)`. La branche succès du parsing (bloc hôte sans `✗`, en excluant
 les `✗` des sections K8s) est vérifiée séparément → sortie 0. **En prod**, sshd
@@ -613,8 +617,9 @@ durci + couches actives → PASS. Le 13 a besoin de `SSH_OPTS`/`HOSTS` (pas
 ## Run #6 (2026-06-02) — durcissement réseau Cilium (WireGuard + Hubble)
 
 Activation du chiffrement transparent **WireGuard** (pod-to-pod) et de
-**Hubble** (relay + CLI, sans UI) dans [`bootstrap/cni.sh`](../bootstrap/cni.sh)
-— [ADR 0019](../docs/decisions/0019-durcissement-reseau-cilium.md). Banc
+**Hubble** (relay + CLI, sans UI) dans
+[`bootstrap/cni.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/cni.sh)
+— [ADR 0019](/cluster/docs/decisions/0019-durcissement-reseau-cilium/). Banc
 multi-node (3 nœuds, K8s 1.34.8, Cilium 1.19.4), kernel 6.12 (module `wireguard`
 présent).
 
@@ -751,8 +756,8 @@ en dernier recours (données jetables seulement) : retirer les finalizers des
 Implémentation du `kubeadm init --config` (au lieu des flags) pour poser, dès
 l'init, le **chiffrement des Secrets etcd** (provider `secretbox`) et la
 **politique d'audit** de l'API server. Rôle
-[`k8s-initialization`](../bootstrap/roles/k8s-initialization/) + ADR 0014
-(points 2 et 3 passés de « dette » à « implémenté »).
+[`k8s-initialization`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/k8s-initialization) +
+ADR 0014 (points 2 et 3 passés de « dette » à « implémenté »).
 
 | Vérification                           | Résultat banc                                                     |
 | -------------------------------------- | ----------------------------------------------------------------- |
@@ -784,7 +789,7 @@ sans objet en prod.
 > 🔑 **Rotation testée.** Le scénario 15 (`ROTATE=1`) déroule les 4 étapes de
 > rotation et prouve qu'un Secret témoin reste lisible **et** chiffré tout du
 > long, puis restaure l'état d'origine. Procédure manuelle documentée au
-> [bootstrap/RUNBOOK.md](../bootstrap/RUNBOOK.md) (§ Rotation de la clé de
+> [bootstrap/RUNBOOK.md](/cluster/bootstrap/RUNBOOK/) (§ Rotation de la clé de
 > chiffrement etcd). Pas de KMS (choix ADR 0003) — rotation sur
 > événement/échéance.
 

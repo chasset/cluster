@@ -1,0 +1,38 @@
+---
+// Rend les README/RUNBOOK COLOCALISÉS (collection `colocated`, lus en place) en
+// pages Starlight complètes (thème, sidebar), à leur URL VitePress exacte
+// (ADR 0089). Mapping d'ID → URL reproduisant l'ancien srcDir='..' VitePress :
+//   storage/ceph/README.md   → /storage/ceph/      (un README = index de dossier)
+//   bootstrap/RUNBOOK.md      → /bootstrap/RUNBOOK
+//   SECURITY.md (racine)      → /SECURITY
+//   platform/hardware.md      → /platform/hardware
+import { getCollection, render } from 'astro:content'
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro'
+
+export async function getStaticPaths() {
+  const entries = await getCollection('colocated')
+  return entries.map((entry) => {
+    // IMPORTANT : dériver le slug de `filePath` (casse EXACTE préservée :
+    // RUNBOOK, RESULTS, SECURITY, StorageClass…), PAS de `id` (lowercasé par
+    // le loader glob → casserait les URL VitePress).
+    // ../bootstrap/RUNBOOK.md → bootstrap/RUNBOOK ; ../storage/ceph/README.md →
+    // storage/ceph ; ../SECURITY.md → SECURITY
+    let slug = entry.filePath.replace(/^\.\.\//, '').replace(/\.md$/, '')
+    // Un "README" final = index du dossier (URL en /<dir>/).
+    slug = slug.replace(/\/?README$/, '')
+    return { params: { slug: slug || undefined }, props: { entry } }
+  })
+}
+
+const { entry } = Astro.props
+const { Content } = await render(entry)
+
+// Titre dérivé du premier H1 du fichier (pas de frontmatter sur ces README).
+const body = entry.body ?? ''
+const h1 = body.match(/^#\s+(.+?)\s*$/m)
+const title = h1 ? h1[1].replace(/`/g, '') : entry.id
+---
+
+<StarlightPage frontmatter={{ title }}>
+  <Content />
+</StarlightPage>
