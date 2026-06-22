@@ -27,7 +27,10 @@ marquez:
   replicaCount: 1
   # Storage Postgres EXTERNE = CloudNativePG (base marquez, étape 1.6).
   db:
-    host: pg-rw.postgres.svc.cluster.local
+    # host COURT (<svc>.<ns>) par cohérence avec marquez.yaml (le FQDN complet timeoute
+    # en prod, search domain externe + ndots:5 ; cf. drift L58). Le banc résout aussi
+    # la forme courte → sûr des deux côtés.
+    host: pg-rw.postgres
     port: 5432
     name: marquez
     user: marquez
