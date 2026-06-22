@@ -71,6 +71,42 @@
           data:
             postgresql-password: '{{ dagster_role_secret.resources[0].data.password }}'
 
+    # Secret dérivé pgvector : recopie username+password du rôle CNPG `pgvector` dans le
+    # ns `dagster`, pour que les code-locations atlas (transform_job/index_load) injectent
+    # POSTGRES_USER/PASSWORD dans leurs pods de run via secretKeyRef. Le Secret CNPG vit en
+    # ns `postgres` (inatteignable depuis un pod dagster) → on le dérive ici, même patron
+    # que dagster-pg-auth ci-dessus (source de vérité unique = le rôle CNPG ; atlas#429).
+    - name: Read the CNPG pgvector role credentials
+      kubernetes.core.k8s_info:
+        kind: Secret
+        name: '{{ pgvector_cnpg_role_secret }}'
+        namespace: '{{ cnpg_namespace }}'
+      register: pgvector_role_secret
+
+    - name: Assert the CNPG pgvector role credentials exist
+      ansible.builtin.assert:
+        that:
+          - pgvector_role_secret.resources | default([]) | length > 0
+          - pgvector_role_secret.resources[0].data.username is defined
+          - pgvector_role_secret.resources[0].data.password is defined
+        fail_msg: >-
+          Secret {{ cnpg_namespace }}/{{ pgvector_cnpg_role_secret }} introuvable —
+          déployer platform-cnpg (base pgvector) avant platform-dagster.
+
+    - name: Derive the pgvector Postgres Secret for atlas code-locations
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: '{{ pgvector_pg_auth_secret }}'
+            namespace: '{{ dagster_namespace }}'
+          type: Opaque
+          data:
+            username: '{{ pgvector_role_secret.resources[0].data.username }}'
+            password: '{{ pgvector_role_secret.resources[0].data.password }}'
+
     - name: Apply Dagster manifest
       kubernetes.core.k8s:
         state: present
