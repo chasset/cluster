@@ -148,7 +148,12 @@ spec:
         - name: wait-for-db
           image: "docker.io/library/postgres:14.6@sha256:f565573d74aedc9b218e1d191b04ec75bdd50c33b2d44d91bcd3db5f2fcea647"
           imagePullPolicy: IfNotPresent
-          command: ['sh', '-c', 'until pg_isready -h "pg-rw.postgres.svc.cluster.local" -p 5432 -U marquez; do echo waiting for database; sleep 2; done;']
+          # host COURT `pg-rw.postgres` (<svc>.<ns>) et NON le FQDN complet : en prod, un
+          # search domain externe (resolv.conf, ndots:5) fait timeouter la résolution du
+          # FQDN `…svc.cluster.local` → pg_isready boucle « waiting for database » alors que
+          # CNPG est sain (cf. univ-lehavre/cluster#458, drift L58). La forme <svc>.<ns>
+          # résout via le 1er search domain ; cross-ns (postgres ≠ marquez).
+          command: ['sh', '-c', 'until pg_isready -h "pg-rw.postgres" -p 5432 -U marquez; do echo waiting for database; sleep 2; done;']
       containers:
         - name: marquez
           image: registry:80/marquez:0.51.1
@@ -180,7 +185,9 @@ spec:
             - name: MARQUEZ_CONFIG
               value: /usr/src/app/config.yml
             - name: POSTGRES_HOST
-              value: "pg-rw.postgres.svc.cluster.local"
+              # host COURT (<svc>.<ns>) — même raison DNS que l'initContainer wait-for-db
+              # ci-dessus (FQDN complet timeoute en prod, search domain externe + ndots:5).
+              value: "pg-rw.postgres"
             - name: POSTGRES_PORT
               value: "5432"
             - name: POSTGRES_DB
