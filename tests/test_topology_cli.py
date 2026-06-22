@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 import yaml
 
@@ -536,6 +537,27 @@ runs:
         self.assertNotIn("VMs présentes", out)
         self.assertIn("dirqual1", out)  # nœuds K8s réels affichés
         self.assertIn("nœuds Ready", out)
+
+    def test_prod_without_kubeconfig_reorients_to_stack_select(self):
+        # ADR 0090 : preview prod SANS `kubeconfig:` déclaré ne plante pas et ne ment
+        # pas — il RÉORIENTE vers `stack select` (qui déclare/rapatrie la cible).
+        topo_yaml = (
+            "catalog: {topology: multi-node-4, profile: dataops}\n"
+            "nodes:\n  - {name: dirqual1, roles: [control, worker]}\n"
+            "storage: {backend: ceph}\ntarget_kind: prod\n"  # PAS de kubeconfig:
+        )
+        path = _tmp(topo_yaml)
+        self.addCleanup(os.unlink, path)
+        hist = _tmp(self._EMPTY_HIST)
+        self.addCleanup(os.unlink, hist)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("KUBECONFIG", None)
+            orig = cli._KUBECONFIG_AUTO_BENCH
+            cli._KUBECONFIG_AUTO_BENCH = False
+            self.addCleanup(setattr, cli, "_KUBECONFIG_AUTO_BENCH", orig)
+            code, _, err = _capture(["preview", "-f", path, "--history", hist, "--no-input"])
+        self.assertEqual(code, 0)  # ne plante pas
+        self.assertIn("stack select", err)  # réoriente
 
     def test_hyperconverged_node_annotated_in_voulu(self):
         # Section VOULU : un nœud control+worker s'affiche `<nom>+worker` (ex-status).
@@ -1823,6 +1845,32 @@ class Stack(unittest.TestCase):
         self.assertIn("export KUBECONFIG=", out)
         self.assertNotIn(os.devnull, out)  # le banc, pas /dev/null
 
+    def test_prod_select_no_input_warns_but_does_not_write_kubeconfig(self):
+        # ADR 0090 : `stack select` sur une stack PROD sans `kubeconfig:` SIGNALE de le
+        # déclarer mais N'ÉCRIT PAS le fichier sous --no-input (action opérateur, CI sûre).
+        name = "zz-test-prod-kc"
+        target = self._catalog(name)
+        self.addCleanup(lambda: os.path.exists(target) and os.unlink(target))
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(
+                "catalog: {topology: multi-node-4, profile: dataops}\n"
+                "nodes:\n  - {name: dirqual1, roles: [control, worker]}\n"
+                "storage: {backend: ceph}\ntarget_kind: prod\n"
+            )
+        # Pas de banc ET pas de KUBECONFIG hérité (sinon `_default_kubeconfig_to_bench`
+        # ou un env pollué sauterait la branche « topo sans kubeconfig »). On force les
+        # deux absents pour un test déterministe (indépendant de l'ordre des tests).
+        orig_exists = cli.os.path.exists
+        cli.os.path.exists = lambda p: False if p == cli._BENCH_KUBECONFIG else orig_exists(p)
+        self.addCleanup(setattr, cli.os.path, "exists", orig_exists)
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("KUBECONFIG", None)
+            code, _, err = _capture(["stack", "select", name, "--no-input"])
+        self.assertEqual(code, 0)
+        self.assertIn("kubeconfig", err)  # signale de le déclarer
+        with open(target, encoding="utf-8") as f:
+            self.assertNotIn("kubeconfig:", f.read())  # rien écrit en --no-input
+
     def test_activate_absent_is_business_error_with_catalog(self):
         code, _, err = _capture(["stack", "select", "zz-nexistepas"])
         self.assertEqual(code, 1)
@@ -1831,7 +1879,9 @@ class Stack(unittest.TestCase):
 
     def test_list_marks_active_and_derives(self):
         # Active une entrée connue, puis `stack ls` doit la marquer ★ + son chemin.
-        _capture(["stack", "select", "socle.example"])
+        # `--no-input` : socle.example est prod (ADR 0090) → ne pas prompter/écrire le
+        # kubeconfig de la topo en test (on ne teste ici que l'activation).
+        _capture(["stack", "select", "socle.example", "--no-input"])
         code, out, _ = _capture(["stack", "ls"])
         self.assertEqual(code, 0)
         self.assertIn("socle.example", out)

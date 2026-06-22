@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
 from nestor.prod_target import (  # noqa: E402
     TargetConfirmation,
+    add_kubeconfig_field,
     default_kubeconfig_path,
     is_affirmative,
     needs_repatriation,
@@ -73,6 +74,41 @@ class NeedsRepatriation(unittest.TestCase):
 
     def test_present_and_reachable_ok(self):
         self.assertFalse(needs_repatriation(kubeconfig_path=__file__, reaches_api=True))
+
+
+class AddKubeconfigField(unittest.TestCase):
+    def test_appends_when_absent(self):
+        src = "catalog:\n  topology: dirqual\ntarget_kind: prod\n"
+        out = add_kubeconfig_field(src, "~/.kube/dirqual.config")
+        self.assertIn("kubeconfig: ~/.kube/dirqual.config", out)
+        self.assertIn("target_kind: prod", out)  # le reste préservé
+
+    def test_replaces_commented_placeholder(self):
+        # un placeholder `# kubeconfig: …` (comme dans socle.example) est remplacé,
+        # pas dupliqué.
+        src = "target_kind: prod\n# kubeconfig: ~/.kube/socle.config\n"
+        out = add_kubeconfig_field(src, "~/.kube/dirqual.config")
+        self.assertEqual(out.count("kubeconfig:"), 1)
+        self.assertIn("kubeconfig: ~/.kube/dirqual.config", out)
+        self.assertNotIn("# kubeconfig:", out)
+
+    def test_replaces_active_line(self):
+        src = "target_kind: prod\nkubeconfig: ~/.kube/old.config\n"
+        out = add_kubeconfig_field(src, "~/.kube/new.config")
+        self.assertEqual(out.count("kubeconfig:"), 1)
+        self.assertIn("~/.kube/new.config", out)
+        self.assertNotIn("old.config", out)
+
+    def test_idempotent(self):
+        src = "target_kind: prod\n"
+        once = add_kubeconfig_field(src, "~/.kube/dirqual.config")
+        twice = add_kubeconfig_field(once, "~/.kube/dirqual.config")
+        self.assertEqual(once, twice)
+
+    def test_preserves_comments(self):
+        src = "# topo réelle (ADR 0023)\ncatalog:\n  topology: dirqual\ntarget_kind: prod\n"
+        out = add_kubeconfig_field(src, "~/.kube/dirqual.config")
+        self.assertIn("# topo réelle (ADR 0023)", out)
 
 
 class Affirmative(unittest.TestCase):

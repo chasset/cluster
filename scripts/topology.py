@@ -115,6 +115,7 @@ from nestor import bootstrap as _bootstrap  # noqa: E402
 from nestor import discover as _discover  # noqa: E402
 from nestor import ha as _ha  # noqa: E402
 from nestor import isolation as _isolation  # noqa: E402
+from nestor import prod_target as _prod_target  # noqa: E402
 from nestor import refresh_fuse as _refresh_fuse  # noqa: E402
 from nestor import refresh_plan as _refresh_plan  # noqa: E402
 from nestor import roundtrip as _roundtrip  # noqa: E402
@@ -509,6 +510,46 @@ def cmd_stack_new(args: argparse.Namespace) -> int:
     return 0
 
 
+def _select_prod_kubeconfig(topo: Topology, topo_path: str, stack: str, *, no_input: bool) -> str:
+    """Détermine (et complète si besoin) le kubeconfig d'une stack PROD à l'activation
+    (ADR 0090). Renvoie le chemin KUBECONFIG à poser (jamais `~/.kube/config` implicite).
+
+    1. résout la cible (`KUBECONFIG` exporté > `topo.kubeconfig` > `~/.kube/<stack>.config`) ;
+    2. si la topo ne DÉCLARE pas `kubeconfig:`, PROPOSE de l'ajouter au fichier
+       (`add_kubeconfig_field`, confirmé — c'est « nestor corrige la topologie ») ;
+    3. si la cible est absente/injoignable, PROPOSE le rapatriement (`_fetch_kubeconfig`).
+    Sous `--no-input` : aucune écriture/prompt (action opérateur) — on signale et on
+    renvoie la cible résolue (qui peut être injoignable : honnête)."""
+    target = os.path.expanduser(
+        _prod_target.resolve_kubeconfig(
+            env_kubeconfig=os.environ.get("KUBECONFIG"), declared=topo.kubeconfig, stack=stack
+        )
+    )
+    # (2) compléter la topo si le champ manque (et qu'on ne suit pas un KUBECONFIG exporté).
+    if not topo.kubeconfig and not os.environ.get("KUBECONFIG"):
+        default = _prod_target.default_kubeconfig_path(stack)
+        if no_input:
+            _warn(
+                f"topologie sans `kubeconfig:` — la déclarer (ex. `{default}`) pour que "
+                "`nestor preview` lise l'état réel du cluster prod (ADR 0090)."
+            )
+        elif _confirm(
+            f"Déclarer `kubeconfig: {default}` dans la topologie « {stack} » ?",
+            default=True,
+            no_input=no_input,
+        ):
+            with open(topo_path, encoding="utf-8") as f:
+                edited = _prod_target.add_kubeconfig_field(f.read(), default)
+            with open(topo_path, "w", encoding="utf-8") as f:
+                f.write(edited)
+            print(f"✓ `kubeconfig: {default}` ajouté à la topologie.", file=sys.stderr)
+            target = os.path.expanduser(default)
+    # (3) rapatrier si la cible est absente/injoignable.
+    if not no_input and not _kubeconfig_reaches_api(target):
+        _offer_kubeconfig_repatriation_to(topo, target, no_input=no_input)
+    return target
+
+
 def cmd_stack_select(args: argparse.Namespace) -> int:
     """`stack select` : active une topologie EXISTANTE et POSE le KUBECONFIG de la cible.
 
@@ -558,12 +599,21 @@ def cmd_stack_select(args: argparse.Namespace) -> int:
         file=sys.stderr,
     )
 
-    # KUBECONFIG cible : le banc s'il est monté ET JOIGNABLE, sinon /dev/null (jamais la
+    # PROD (ADR 0090) : la cible n'est pas le banc Lima mais le cluster déclaré. Si la
+    # topo ne déclare pas encore son `kubeconfig:`, c'est ICI (à l'activation — déjà une
+    # écriture, pas une lecture) qu'on COMPLÈTE la topologie : proposer le champ
+    # `~/.kube/<stack>.config` + le rapatriement, puis poser ce KUBECONFIG. Sous
+    # `--no-input` : on n'écrit rien (action opérateur), on signale.
+    if topo.target_kind != "lima":
+        cible = _select_prod_kubeconfig(
+            topo, target_abs, args.name, no_input=getattr(args, "no_input", False)
+        )
+    # BANC : le kubeconfig du banc s'il est monté ET JOIGNABLE, sinon /dev/null (jamais la
     # prod, ADR 0053). On NE supprime PAS le kubeconfig (le détruire casserait l'accès à
     # un banc vivant ; il sera de toute façon réécrit par le prochain up/bootstrap). On
     # vise /dev/null seulement s'il n'existe pas OU ne répond plus (banc d'une autre
     # stack, ou API tombée) — `_context_targets_bench` le sonde sans toucher au fichier.
-    if os.path.exists(_BENCH_KUBECONFIG) and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
+    elif os.path.exists(_BENCH_KUBECONFIG) and _kubeconfig_reaches_api(_BENCH_KUBECONFIG):
         cible = os.path.abspath(_BENCH_KUBECONFIG)
     else:
         cible = os.devnull
@@ -1875,15 +1925,14 @@ def cmd_refresh(args: argparse.Namespace) -> int:
     return 0
 
 
-def _offer_kubeconfig_repatriation(topo: Topology, topo_path: str, *, no_input: bool) -> None:
-    """ADR 0090 : si le kubeconfig prod DÉCLARÉ est absent/injoignable, PROPOSER de le
+def _offer_kubeconfig_repatriation_to(topo: Topology, target: str, *, no_input: bool) -> None:
+    """ADR 0090 : si le kubeconfig prod `target` est absent/injoignable, PROPOSER de le
     rapatrier depuis le control-plane (réutilise `_fetch_kubeconfig` de `discover`).
 
     Lecture seule vis-à-vis du cluster : rapatrier un kubeconfig n'est pas muter la prod
-    (ADR 0053). Sous `--no-input` (CI) : on NE prompte pas (le rapatriement est une action
-    opérateur) — preview affichera honnêtement « nœuds Ready : — ». Toute erreur de
-    rapatriement est non bloquante (preview reste informatif)."""
-    target = os.environ.get("KUBECONFIG", "")
+    (ADR 0053). Sous `--no-input` (CI) : on NE prompte pas (action opérateur) — l'appelant
+    affichera honnêtement « nœuds Ready : — ». Toute erreur de rapatriement est non
+    bloquante. `target` est le chemin déjà résolu/expansé."""
     if not target or _kubeconfig_reaches_api(target):
         return  # cible joignable → rien à faire
     if no_input:
@@ -1919,7 +1968,12 @@ def _offer_kubeconfig_repatriation(topo: Topology, topo_path: str, *, no_input: 
         )
         print(f"✓ kubeconfig rapatrié dans `{target}` (depuis `{cp}`).")
     except _UsageError as exc:
-        _warn(f"rapatriement échoué : {exc}. preview reste informatif (état réel vide).")
+        _warn(f"rapatriement échoué : {exc}. La commande reste informative (état réel vide).")
+
+
+def _offer_kubeconfig_repatriation(topo: Topology, topo_path: str, *, no_input: bool) -> None:
+    """Variante pour `preview` : cible = le `KUBECONFIG` posé (déjà résolu en amont)."""
+    _offer_kubeconfig_repatriation_to(topo, os.environ.get("KUBECONFIG", ""), no_input=no_input)
 
 
 def cmd_preview(args: argparse.Namespace) -> int:
@@ -1955,6 +2009,20 @@ def cmd_preview(args: argparse.Namespace) -> int:
         # rapatrier depuis le control-plane (réutilise _fetch_kubeconfig de discover) —
         # plutôt que d'afficher « nœuds Ready : — » sans explication.
         _offer_kubeconfig_repatriation(topo, path, no_input=getattr(args, "no_input", False))
+    elif (
+        topo.target_kind != "lima"
+        and not topo.kubeconfig
+        and (_KUBECONFIG_AUTO_BENCH or not os.environ.get("KUBECONFIG"))
+    ):
+        # Stack PROD sans cible déclarée NI KUBECONFIG exporté : `preview` reste lecture
+        # seule (il n'écrit pas la topo — c'est `stack select` qui complète, ADR 0090).
+        # On RÉORIENTE plutôt que d'afficher « nœuds Ready : — / 10 couches à installer »
+        # (faux et dangereux sur une prod existante).
+        _warn(
+            f"topologie prod « {topo.catalog.get('topology', '—')} » sans `kubeconfig:` "
+            "déclaré → l'état réel ne peut pas être lu. Active la stack pour le déclarer "
+            "et le rapatrier : `nestor stack select <stack>` (ADR 0090)."
+        )
     # Avertissements d'ALIGNEMENT SHELL — propres au BANC (ADR 0053). Une stack
     # `target_kind: prod` ne lit PAS le banc (gating ADR 0084) : ces messages, pensés
     # pour le banc, seraient TROMPEURS en prod (ils invitent à `nestor env` qui, en prod,
@@ -3271,6 +3339,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_stack_sel.add_argument(
         "name", help="nom de l'entrée du catalogue (ex : 3-nodes-1-cp, socle.example)"
+    )
+    p_stack_sel.add_argument(
+        "--no-input",
+        action="store_true",
+        help="mode non interactif (CI) : n'écrit pas le kubeconfig de la topo, ne prompte pas",
     )
 
     p_stack_val = stack_sub.add_parser(

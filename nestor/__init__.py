@@ -55,6 +55,7 @@ from nestor.plan import (
 )
 from nestor.prod_target import (
     TargetConfirmation,
+    add_kubeconfig_field,
     default_kubeconfig_path,
     is_affirmative,
     needs_repatriation,
@@ -142,6 +143,7 @@ __all__ = [
     "validate_name",
     # prod_target (ADR 0090) : ciblage/confirmation/rapatriement kubeconfig prod
     "TargetConfirmation",
+    "add_kubeconfig_field",
     "default_kubeconfig_path",
     "is_affirmative",
     "needs_repatriation",

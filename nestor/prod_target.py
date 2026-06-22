@@ -69,3 +69,31 @@ def is_affirmative(answer: str) -> bool:
     """Réponse utilisateur affirmative (confirmation). Strict : seul `y`/`yes`/`o`/`oui`
     (insensible à la casse, trim) vaut oui — défaut N (tout le reste = non)."""
     return answer.strip().lower() in {"y", "yes", "o", "oui"}
+
+
+def add_kubeconfig_field(source: str, kubeconfig: str) -> str:
+    """Ajoute (ou met à jour) la ligne top-level `kubeconfig: <chemin>` dans le TEXTE
+    d'une topologie, PUR (préserve le reste — commentaires, ordre, ADR 0076 §4).
+
+    - Une ligne `kubeconfig:` existante (même commentée `# kubeconfig:`) est REMPLACÉE
+      par la valeur active (idempotent : ré-appeler ne duplique pas).
+    - Sinon, la ligne est AJOUTÉE en fin de fichier (champ top-level, non imbriqué).
+    Rend le texte modifié (newline final garanti)."""
+    line = f"kubeconfig: {kubeconfig}"
+    out: list[str] = []
+    replaced = False
+    for raw in source.splitlines():
+        stripped = raw.lstrip()
+        # remplace une déclaration active OU un placeholder commenté `# kubeconfig:`
+        if not replaced and (
+            stripped.startswith("kubeconfig:") or stripped.startswith("# kubeconfig:")
+        ):
+            out.append(line)
+            replaced = True
+        else:
+            out.append(raw)
+    if not replaced:
+        if out and out[-1].strip():
+            out.append("")  # une ligne vide de séparation si le fichier ne finit pas par un blanc
+        out.append(line)
+    return "\n".join(out).rstrip("\n") + "\n"
