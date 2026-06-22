@@ -11,6 +11,17 @@
 # Tous les endpoints sont INTRA-CLUSTER (FQDN `*.svc.cluster.local`) : le code
 # `atlas` tourne dans un pod du cluster. Les UIs sont aussi exposées en bordure
 # via Gateway Cilium + cert-manager (hostnames d'exemple `*.cluster.lan`).
+#
+# ⚠️ RÉSOLUTION DNS — FQDN vs nom court (piège PROD). Le FQDN ci-dessous est la
+# référence CANONIQUE (stable, diff-able). MAIS pour une résolution INTRA-POD fiable,
+# préférer le NOM COURT : `<svc>` si le consommateur est dans le même namespace, sinon
+# `<svc>.<ns>`. En prod, le `resolv.conf` des pods peut porter un search domain EXTERNE
+# (DNS de l'organisation) avec `options ndots:5` : un FQDN complet (< 5 points) est
+# alors traité comme relatif et le résolveur tente le suffixe externe AVANT le bon →
+# TIMEOUT, surtout côté gRPC/c-ares (Dagster) et curl/glibc. Le nom court résout via le
+# 1er search domain (`<ns>.svc.cluster.local`). Constaté sur dirqual (2026-06-22) :
+# Dagster « gRPC UNAVAILABLE » sur FQDN, OK sur nom court (drift L58,
+# univ-lehavre/cluster#458). Le banc Lima n'a pas ce search domain → le bug ne s'y voit pas.
 
 contract_version: '1.0'
 

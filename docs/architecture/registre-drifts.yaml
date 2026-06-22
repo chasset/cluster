@@ -870,3 +870,32 @@ drifts:
       (les autres nœuds recyclés par le reboot de l'os-upgrade). Preuve
       from-scratch prod différée (la prod n'est pas détruite, ADR 0034).
     statut: corrige
+
+  - id: L58
+    campagne: 'installation DataOps sur la prod dirqual1-4 (2026-06-22)'
+    portee: code
+    symptome: >-
+      Un client DANS un pod n'atteint pas un service par son FQDN complet
+      `<svc>.<ns>.svc.cluster.local` alors que le service est sain et joignable par
+      nom court ou par IP. Deux cas vécus : (1) gitea-init `curl` vers
+      `gitea-http.gitea.svc.cluster.local` → « Could not resolve host (timeout DNS) » ;
+      (2) Dagster workspace pointant `toy-codeloc.dagster.svc.cluster.local` →
+      « DagsterUserCodeUnreachableError: gRPC UNAVAILABLE » (pod gRPC pourtant
+      ready/0 restart, TCP 4000 ouvert). `DagsterGrpcClient.ping` OK par nom court/IP.
+    cause: >-
+      Le `resolv.conf` des pods prod porte un search domain EXTERNE de l'organisation
+      (ex. `dix.univ-lehavre.fr`) en plus des `*.svc.cluster.local`, avec `ndots:5`.
+      Un FQDN à 4 points (< 5) est traité comme RELATIF → glibc/c-ares essaie les
+      search domains, dont l'externe qui TIMEOUTE, avant la bonne résolution. c-ares
+      (gRPC) et glibc (curl) échouent là où nslookup/`socket.gethostbyname` peuvent
+      réussir (diagnostic trompeur). Le banc Lima n'a pas ce search domain externe →
+      le FQDN y marche, le bug ne s'y voit pas (drift de PROD pur).
+    correctif: >-
+      Viser le NOM COURT intra-pod : `<svc>` (même ns) ou `<svc>.<ns>` (cross-ns),
+      qui résout via le 1er search domain. Fixes : gitea-init `GITEA_API=localhost:3000`
+      (le curl tourne dans le pod gitea) ; workspace Dagster `host: toy-codeloc`
+      (univ-lehavre/cluster#458) ; atlas/citation-dagster idem (workspace-patch +
+      code-location + definitions._RUN_ENV, univ-lehavre/atlas#428). Documenté dans
+      `contract/endpoints.example.yaml` (en-tête) et `docs/guide-dev-data.md`. Pas de
+      nouvel ADR (résolution intra-pod, non couverte par 0019/0020/0021 exposition bordure).
+    statut: corrige
