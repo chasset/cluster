@@ -47,6 +47,19 @@ Exposition **hors cluster** (UI) via le Gateway Cilium + TLS interne
 : p. ex. `https://dagster.cluster.lan`, `https://marquez.cluster.lan` (hostnames
 `*.cluster.lan` = **placeholders génériques** ; l'admin réseau pose les vrais).
 
+> ⚠️ **Résolution DNS : préférez le nom COURT, pas le FQDN.** Depuis un pod,
+> visez un service par `<svc>` (même namespace) ou `<svc>.<ns>` (autre
+> namespace) — **pas** le FQDN complet `<svc>.<ns>.svc.cluster.local`. En prod,
+> le `resolv.conf` des pods peut porter un **search domain externe** (DNS de
+> l'organisation) avec `ndots:5` : un FQDN complet (moins de 5 points) est
+> traité comme relatif → le résolveur tente le suffixe externe **avant** le bon
+> et **timeoute**, surtout côté **gRPC/c-ares** (code-location Dagster) et
+> **curl/glibc**. Vécu sur dirqual (2026-06-22) : Dagster « gRPC UNAVAILABLE »
+> sur FQDN, OK sur nom court ([drift L58](architecture/registre-drifts.md)). Le
+> banc Lima n'a pas ce search domain → le piège ne s'y voit pas. Le FQDN reste
+> la référence canonique du [contrat](../contract/endpoints.example.yaml) ; pour
+> s'y connecter, raccourcir.
+
 ## Bases logiques PostgreSQL
 
 Un cluster HA unique `pg` (namespace `postgres`) porte **quatre bases
