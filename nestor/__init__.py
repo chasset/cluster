@@ -53,6 +53,13 @@ from nestor.plan import (
     phase_playbook,
     suggest_next,
 )
+from nestor.portal import (
+    Entry,
+    Observed,
+    View,
+    build_view,
+    secret_command,
+)
 from nestor.prod_target import (
     TargetConfirmation,
     add_kubeconfig_field,
@@ -148,4 +155,10 @@ __all__ = [
     "is_affirmative",
     "needs_repatriation",
     "resolve_kubeconfig",
+    # portal (ADR 0091) : croisement contrat ↔ état observé pour le portail d'accès UI
+    "build_view",
+    "secret_command",
+    "Entry",
+    "Observed",
+    "View",
 ]
