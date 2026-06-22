@@ -110,3 +110,4 @@ Format léger inspiré de Michael Nygard :
 | 0088 | [Signer les releases : tarball source + cosign keyless + provenance SLSA](0088-signature-releases-cosign-slsa.md)                    | Accepted           |
 | 0089 | [Migration de la documentation : VitePress → Astro Starlight](0089-migration-doc-vitepress-astro-starlight.md)                       | Proposed           |
 | 0090 | [`nestor` lit l'état réel d'un cluster prod (état = K8s, pas VMs)](0090-nestor-pilote-la-prod.md)                                    | Proposed           |
+| 0091 | [Portail d'accès aux UI de la plateforme](0091-portail-acces-ui.md)                                                                  | Proposed           |
