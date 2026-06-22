@@ -53,6 +53,13 @@ from nestor.plan import (
     phase_playbook,
     suggest_next,
 )
+from nestor.prod_target import (
+    TargetConfirmation,
+    default_kubeconfig_path,
+    is_affirmative,
+    needs_repatriation,
+    resolve_kubeconfig,
+)
 from nestor.profile import consumes_storage, derive_run_params
 from nestor.refresh import RefreshState, classify_refresh
 from nestor.roundtrip import (
@@ -133,4 +140,10 @@ __all__ = [
     "catalog_entry",
     "plan_init",
     "validate_name",
+    # prod_target (ADR 0090) : ciblage/confirmation/rapatriement kubeconfig prod
+    "TargetConfirmation",
+    "default_kubeconfig_path",
+    "is_affirmative",
+    "needs_repatriation",
+    "resolve_kubeconfig",
 ]
