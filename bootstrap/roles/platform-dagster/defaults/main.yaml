@@ -14,6 +14,14 @@ dagster_cnpg_role_secret: pg-role-dagster
 # Secret dérivé attendu par le chart (clé postgresql-password).
 dagster_pg_auth_secret: dagster-pg-auth
 
+# Secret CNPG du rôle `pgvector` (base de l'index sémantique, posé par platform-cnpg).
+# On en DÉRIVE `pgvector-pg-auth` dans le ns `dagster` (clés username/password) pour
+# que les CODE-LOCATIONS atlas (transform_job/index_load) injectent POSTGRES_USER/
+# PASSWORD dans leurs pods de run via secretKeyRef (le Secret CNPG vit en ns postgres,
+# inatteignable depuis un pod du ns dagster ; contrat namespaces-secrets, atlas#429).
+pgvector_cnpg_role_secret: pg-role-pgvector
+pgvector_pg_auth_secret: pgvector-pg-auth
+
 # Gate : webserver ET daemon Ready (prédicat dagster_ready du shell, 300s/10s).
 dagster_ready_retries: 30
 dagster_ready_delay: 10
