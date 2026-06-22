@@ -1,13 +1,13 @@
 # kube-prometheus-stack
 
 Observabilité **palier 2**
-([ADR 0016](../../docs/decisions/0016-observabilite.md)) : Prometheus +
+([ADR 0016](/cluster/docs/decisions/0016-observabilite/)) : Prometheus +
 Alertmanager + Grafana + kube-state-metrics + node-exporter, et activation du
 monitoring Ceph. Complète le palier 1 (metrics-server, autonome).
 
 Géré par **Ansible/kubectl, pas par Argo CD** (anti-bootstrap-circulaire, comme
 cilium/cert-manager/argocd —
-[ADR 0022](../../docs/decisions/0022-argocd-gitops-applicatif.md)).
+[ADR 0022](/cluster/docs/decisions/0022-argocd-gitops-applicatif/)).
 
 ## Fichiers
 
@@ -49,20 +49,20 @@ kubectl apply -f platform/kube-prometheus-stack/gateway.yaml
 ## Adaptations à ce cluster (cf. `values.bench.yaml`)
 
 - **Images épinglées par digest d'index multi-arch**
-  ([ADR 0006](../../docs/decisions/0006-matrice-de-versions-et-politique-de-bump.md))
+  ([ADR 0006](/cluster/docs/decisions/0006-matrice-de-versions-et-politique-de-bump/))
   — banc arm64.
 - **Empreinte bornée** (`requests`/`limits`) — cluster hyperconvergé
-  ([ADR 0009](../../docs/decisions/0009-pourquoi-4-noeuds.md)).
+  ([ADR 0009](/cluster/docs/decisions/0009-pourquoi-4-noeuds/)).
 - **PVC** sur `rook-ceph-block-replicated` (×3) ; rétention Prometheus 15 j.
 - **Webhook operator via cert-manager**
-  ([ADR 0021](../../docs/decisions/0021-cert-manager-ca-interne.md)) — pas de
+  ([ADR 0021](/cluster/docs/decisions/0021-cert-manager-ca-interne/)) — pas de
   job certgen.
 - **`serviceMonitorSelector` vide** : scrape **tous** les ServiceMonitor, dont
   celui du mgr Ceph.
 - **Alertmanager → mail paramétrable** : défaut `mailpit.mail.svc:1025` (puits
-  de test, cf. [platform/mailpit/](../mailpit/)) ; en prod, surcharger vers un
-  service type Mailgun (config locale non versionnée,
-  [ADR 0023](../../docs/decisions/0023-plateforme-exemple-generique.md)).
+  de test, cf. [platform/mailpit/](/cluster/platform/mailpit/)) ; en prod,
+  surcharger vers un service type Mailgun (config locale non versionnée,
+  [ADR 0023](/cluster/docs/decisions/0023-plateforme-exemple-generique/)).
 
 ## Exposition
 

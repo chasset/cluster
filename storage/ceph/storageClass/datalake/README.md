@@ -4,17 +4,17 @@ Object store Ceph compatible S3, exposé via RGW (Rados Gateway). Sert de
 datalake pour les sources de données ingérées par le cluster.
 
 > ⚠️ **Comportement destructif** : `preservePoolsOnDelete: false` (cf.
-> [`datalake-ec.yaml:21`](datalake-ec.yaml#L21)) signifie que **supprimer le
-> `CephObjectStore` détruit aussi les pools `datalake.rgw.buckets.data` et
-> `datalake.rgw.buckets.index`** — donc **toutes les données et buckets** S3.
-> Décision assumée pour ce datalake de recherche (ré-ingestible depuis les
-> sources upstream). Pour conserver les pools, passer à
-> `preservePoolsOnDelete: true` **avant** toute suppression.
+> [`datalake-ec.yaml:21`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/storageClass/datalake/datalake-ec.yaml#L21))
+> signifie que **supprimer le `CephObjectStore` détruit aussi les pools
+> `datalake.rgw.buckets.data` et `datalake.rgw.buckets.index`** — donc **toutes
+> les données et buckets** S3. Décision assumée pour ce datalake de recherche
+> (ré-ingestible depuis les sources upstream). Pour conserver les pools, passer
+> à `preservePoolsOnDelete: true` **avant** toute suppression.
 >
 > 🔑 **Ordre de suppression** : supprimer les **OBC/buckets AVANT** le
 > `CephObjectStore`, sinon deadlock de finalizers (le store attend les buckets,
 > l'OBC ne peut plus se deprovisionner). Procédure complète et déblocage :
-> [`../../RUNBOOK.md` § Désinstallation › Object store](../../RUNBOOK.md#object-store-datalake--ordre-obligatoire).
+> [`../../RUNBOOK.md` § Désinstallation › Object store](/cluster/storage/ceph/RUNBOOK/#object-store-datalake--ordre-obligatoire).
 
 ## Installation
 
@@ -31,8 +31,8 @@ depuis un poste autorisé à parler à l'API K8s :
 ## Créer une bucket
 
 Créer un fichier de claim (voir
-[`object-bucket-claim-example.yaml`](object-bucket-claim-example.yaml) pour un
-exemple générique), puis l'appliquer.
+[`object-bucket-claim-example.yaml`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/storageClass/datalake/object-bucket-claim-example.yaml)
+pour un exemple générique), puis l'appliquer.
 
 Récupérer les credentials (le Secret porte le nom de la bucket) :
 
@@ -46,10 +46,12 @@ echo
 
 ## Smoke-test end-to-end
 
-[`smoke-test.sh`](smoke-test.sh) déroule un test fonctionnel complet :
+[`smoke-test.sh`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/storageClass/datalake/smoke-test.sh)
+déroule un test fonctionnel complet :
 
-1. Applique [`user-smoke.yaml`](user-smoke.yaml) (un
-   `CephObjectStoreUser smoke` + un `ObjectBucketClaim smoke` dédié au test,
+1. Applique
+   [`user-smoke.yaml`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/storageClass/datalake/user-smoke.yaml)
+   (un `CephObjectStoreUser smoke` + un `ObjectBucketClaim smoke` dédié au test,
    séparés des utilisateurs métier).
 2. Attend que le `Secret` de credentials soit posé par le provisioner Rook.
 3. Récupère `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
@@ -117,9 +119,11 @@ kubectl -n rook-ceph logs -l app=rook-ceph-rgw,rook_object_store=datalake
 
 ## Utilisateur global
 
-Après création d'un utilisateur (voir [`user.yaml`](user.yaml) ou
-[`user-datalake.yaml`](user-datalake.yaml)), celui-ci accède à tout l'object
-store :
+Après création d'un utilisateur (voir
+[`user.yaml`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/storageClass/datalake/user.yaml)
+ou
+[`user-datalake.yaml`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/storageClass/datalake/user-datalake.yaml)),
+celui-ci accède à tout l'object store :
 
 ```bash
 USER=rook-ceph-object-user-datalake-admin

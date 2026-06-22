@@ -65,9 +65,9 @@ bench/*.log
 # Lima test bench (per-run state : configs VM rendues, inventaire, kubeconfig)
 bench/**/.work/
 
-# VitePress (generated output + cache)
-docs/.vitepress/cache/
-docs/.vitepress/dist/
+# Astro Starlight (generated output + cache, ADR 0089)
+docs/dist/
+docs/.astro/
 
 # Ansible runtime cache
 .ansible/
@@ -98,3 +98,6 @@ apps/redcap/source/
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+
+# Copie générée de docs/ par migrate_docs_to_astro.py (--content-only, ADR 0089)
+docs/src/content/docs/docs/

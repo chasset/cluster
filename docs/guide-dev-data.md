@@ -63,7 +63,7 @@ logiques**, chacune avec son rôle propriétaire
 Le mot de passe d'un rôle est dans le Secret `pg-role-<rôle>` (clé `password`,
 namespace `postgres`). Connexion : écrire (`pg-rw`) ou lire (`pg-ro`). La
 **procédure** (lire le Secret, exemple psycopg) est dans
-[Se brancher → PostgreSQL](se-brancher.md#base-de-données-postgresql-cloudnativepg).
+[Se brancher → PostgreSQL](se-brancher.md#base-de-données--postgresql-cloudnativepg).
 
 ## StorageClasses disponibles
 
@@ -80,7 +80,7 @@ Le « catalogue » de types de stockage
 | `rook-ceph-datalake`         | objet S3 (via `ObjectBucketClaim`)     |
 
 La **procédure** (PVC type, ObjectBucketClaim) est dans
-[Se brancher → Stockage](se-brancher.md#stockage-réclamer-du-bloc-ou-de-lobjet).
+[Se brancher → Stockage](se-brancher.md#stockage--réclamer-du-bloc-ou-de-lobjet).
 
 ## Variables OpenLineage
 
@@ -113,7 +113,7 @@ atlas) :
 > [contrat](../contract/endpoints.example.yaml).
 
 La **procédure** (logger un run, exemple Python) est dans
-[Se brancher → Suivi de modèles](se-brancher.md#suivi-de-modèles-logger-avec-mlflow).
+[Se brancher → Suivi de modèles](se-brancher.md#suivi-de-modèles--logger-avec-mlflow).
 
 ## Pour aller plus loin
 

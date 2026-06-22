@@ -6,7 +6,7 @@ surprises — du commit au déploiement.
 ## Hooks git (poste de développement)
 
 Posés par [Lefthook](https://lefthook.dev/) au premier `pnpm install` (config :
-[`lefthook.yml`](lefthook.yml)).
+[`lefthook.yml`](https://github.com/univ-lehavre/cluster/blob/main/lefthook.yml)).
 
 ### `pre-commit` — vérifie ce qui est sur le point d'être commité
 
@@ -40,7 +40,8 @@ Posés par [Lefthook](https://lefthook.dev/) au premier `pnpm install` (config :
 
 ## CI GitHub Actions (chaque PR + chaque push `main`)
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) — **jobs en parallèle** :
+[`.github/workflows/ci.yml`](https://github.com/univ-lehavre/cluster/blob/main/.github/workflows/ci.yml)
+— **jobs en parallèle** :
 
 | Job            | Vérifie                                           |
 | -------------- | ------------------------------------------------- |
@@ -60,12 +61,14 @@ Configurée côté GitHub (non versionnable, documentée ici pour mémoire) :
 
 - **Pull request obligatoire** (pas de push direct — doublé par le hook
   `no-direct-push-to-main`).
-- **13 checks requis** avant merge : `prettier`, `yamllint`, `shellcheck`,
+- **12 checks requis** avant merge : `prettier`, `yamllint`, `shellcheck`,
   `kubeconform`, `ansible-lint`, `commitlint`, `trivy`, `bats`, `jscpd`,
-  `markdownlint`, `lychee`, `ansible-syntax`, `scripts-extra`. **Tout job CI
-  doit être ajouté à cette liste** : un job non requis se contourne par
-  l'auto-merge et peut casser `main` (vécu deux fois — `trivy`, puis `lychee`).
-  Règle : nouveau job → l'ajouter aux required checks une fois vu vert.
+  `markdownlint`, `ansible-syntax`, `scripts-extra`. **Tout job CI doit être
+  ajouté à cette liste** : un job non requis se contourne par l'auto-merge et
+  peut casser `main` (vécu deux fois — `trivy`, puis `lychee`). _(`lychee`
+  retiré avec la migration Astro, ADR 0089 : la validation des liens de doc est
+  désormais bloquante au build via `starlight-links-validator`.)_ Règle :
+  nouveau job → l'ajouter aux required checks une fois vu vert.
   - ⚠️ **Écart à combler** : les jobs `python` (ruff + tests unittest) et
     `gitleaks` (secret scanning) tournent en CI mais **ne sont pas encore dans
     les required checks** — à ajouter une fois éprouvés (gitleaks est non
@@ -81,14 +84,16 @@ Configurée côté GitHub (non versionnable, documentée ici pour mémoire) :
 > Vérifier / réappliquer :
 > `gh api repos/univ-lehavre/cluster/branches/main/protection`.
 
-[`.github/workflows/docs.yml`](.github/workflows/docs.yml) :
+[`.github/workflows/docs.yml`](https://github.com/univ-lehavre/cluster/blob/main/.github/workflows/docs.yml)
+:
 
 - À chaque PR : `pnpm docs:build` (validation — pas de dead link, base path
   correct).
 - À chaque push sur `main` : build + déploiement sur
   [GitHub Pages](https://univ-lehavre.github.io/cluster/).
 
-[`.github/workflows/release.yml`](.github/workflows/release.yml) :
+[`.github/workflows/release.yml`](https://github.com/univ-lehavre/cluster/blob/main/.github/workflows/release.yml)
+:
 
 - À chaque push sur `main` :
   [release-please](https://github.com/googleapis/release-please) ouvre (ou met à
@@ -136,20 +141,21 @@ Configurée côté GitHub (non versionnable, documentée ici pour mémoire) :
 
 ## Banc d'essai Lima
 
-[`bench/`](bench/) — valider sur **vrai Debian 13** avant de toucher les
-serveurs.
+[`bench/`](/cluster/bench/) — valider sur **vrai Debian 13** avant de toucher
+les serveurs.
 
-### [`bench/lima/`](bench/lima/) — banc multi-nœuds (ADR 0038, seul banc local)
+### [`bench/lima/`](/cluster/bench/lima/) — banc multi-nœuds (ADR 0038, seul banc local)
 
 3 VMs Lima Debian 13 arm64 (réseau user-v2 `192.168.104.0/24`) + disques bruts
-pour Ceph. Orchestré par [`bench/lima/run-phases.sh`](bench/lima/run-phases.sh)
+pour Ceph. Orchestré par
+[`bench/lima/run-phases.sh`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/run-phases.sh)
 à **gates** : `up → bootstrap → ceph → sc → datalake → dataops → monitoring`.
 Deux profils — léger (local-path/SeaweedFS, ~11 min) et Ceph (RGW, ~30 min).
 Couvre la chaîne complète Phase 1-5 + DataOps.
 
 **Toujours valider sur le banc avant la prod** — c'est le seul endroit où le
 multi-VM et les disques Ceph sont exercés (validation = run e2e from-scratch,
-[ADR 0034](docs/decisions/0034-validation-e2e-from-scratch.md)).
+[ADR 0034](/cluster/docs/decisions/0034-validation-e2e-from-scratch/)).
 
 #### Isolation banc ↔ prod
 
@@ -160,7 +166,7 @@ serveurs.
 
 ## Vérifications en place sur les nœuds
 
-### Détection de drift — [`bootstrap/state.sh`](bootstrap/state.sh)
+### Détection de drift — [`bootstrap/state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
 
 7 couches d'observation (SSH + kubectl) :
 
@@ -179,54 +185,56 @@ serveurs.
 Sortie : `N ok / N drift / N non applicable` + remède pour le **1er** drift
 détecté.
 
-### Visibilité du durcissement — [`bootstrap/security/report.sh`](bootstrap/security/report.sh)
+### Visibilité du durcissement — [`bootstrap/security/report.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/security/report.sh)
 
 Tableau de bord lecture-seule par hôte : services actifs, `sshd -T`, dernier
 `unattended-upgrades.log`, alias root, IPs bannies par fail2ban, règles auditd,
 état UFW, expiration mot de passe. Le hardening est **100 % opt-in**
-([`bootstrap/security/IMPLICATIONS.md`](bootstrap/security/IMPLICATIONS.md)) —
-chaque couche s'active explicitement.
+([`bootstrap/security/IMPLICATIONS.md`](/cluster/bootstrap/security/IMPLICATIONS/))
+— chaque couche s'active explicitement.
 
-### Audit-log par nœud — rôle [`audit-log`](bootstrap/roles/audit-log/)
+### Audit-log par nœud — rôle [`audit-log`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/audit-log)
 
 Chaque playbook bootstrap appose une ligne dans `/var/log/cluster-bootstrap.log`
 du nœud cible : timestamp UTC, nom du playbook, opérateur `$USER@hostname` côté
 contrôle. Lu par la couche 0 de `state.sh` pour corréler "ce qui a été appliqué"
 et "ce qui est observé".
 
-### Sauvegarde etcd — rôle [`etcd-backup`](bootstrap/roles/etcd-backup/)
+### Sauvegarde etcd — rôle [`etcd-backup`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles/etcd-backup)
 
 Timer systemd horaire qui exécute `etcdctl snapshot save` ; rétention 24
 snapshots (1 jour glissant). Procédure de restauration documentée dans
-[`bootstrap/RUNBOOK.md`](bootstrap/RUNBOOK.md).
+[`bootstrap/RUNBOOK.md`](/cluster/bootstrap/RUNBOOK/).
 
-### Rollback du bootstrap — [`bootstrap/rollback.yaml`](bootstrap/rollback.yaml)
+### Rollback du bootstrap — [`bootstrap/rollback.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/rollback.yaml)
 
 Playbook qui ramène un nœud à un état "Debian 13 + first-access" via
 `kubeadm reset + apt purge + cleanup configs`. Confirmation obligatoire via
 `-e confirm=yes`. Hors périmètre : disques Ceph (cf.
-[`storage/ceph/cleanup.sh`](storage/ceph/cleanup.sh)), partitionnement.
+[`storage/ceph/cleanup.sh`](https://github.com/univ-lehavre/cluster/blob/main/storage/ceph/cleanup.sh)),
+partitionnement.
 
-### Idempotence stricte — [`bootstrap/first-access.sh`](bootstrap/first-access.sh)
+### Idempotence stricte — [`bootstrap/first-access.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/first-access.sh)
 
 Dépose la clé SSH, configure `sudo NOPASSWD`, pose le drop-in sshd hardening.
 Strictement idempotent : un 2ᵉ run ne change rien si l'état est déjà conforme
 (compare avec `cat` avant `install`).
 
-## Décisions tracées — [`docs/decisions/`](docs/decisions/)
+## Décisions tracées — [`docs/decisions/`](/cluster/docs/decisions/)
 
 Les ADR (Architecture Decision Records) au format _Contexte / Décision / Statut
 / Conséquences_. Couvrent les choix architecturaux (réplication ×3, control
 plane unique, hyperconvergence, EC 2+1 datalake) et les compromis sécurité (HTTP
 sans auth, dashboard cluster-admin, RStudio sans login). Voir
-[index ADR](docs/decisions/README.md).
+[index ADR](/cluster/docs/decisions/).
 
 ## Phasage gated banc → prod
 
 L'ordre de déploiement (canari `cp1` → workers → stockage cluster-wide) et les
 gates par étape sont décrits dans
-[`bootstrap/RUNBOOK.md` § Ordre de déploiement](bootstrap/RUNBOOK.md) ; **tout
-changement de cette nature doit passer par le banc ([`bench/`](bench/)) avant la
-prod**. Le _pourquoi_ de chaque choix structurant est tracé dans les
-[ADR](docs/decisions/). Le reste-à-faire priorisé vit dans
-[`docs/audit/2026-05-29/12-plan-action.md`](docs/audit/2026-05-29/12-plan-action.md).
+[`bootstrap/RUNBOOK.md` § Ordre de déploiement](/cluster/bootstrap/RUNBOOK/) ;
+**tout changement de cette nature doit passer par le banc
+([`bench/`](/cluster/bench/)) avant la prod**. Le _pourquoi_ de chaque choix
+structurant est tracé dans les [ADR](/cluster/docs/decisions/). Le reste-à-faire
+priorisé vit dans
+[`docs/audit/2026-05-29/12-plan-action.md`](/cluster/docs/audit/2026-05-29/12-plan-action/).

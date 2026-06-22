@@ -1,3 +1,6 @@
 allowBuilds:
   esbuild: true
   lefthook: true
+  # sharp : optimisation d'images Astro. Le site doc n'a aucune image locale ;
+  # on n'autorise pas son build natif (inutile, évite un postinstall lourd).
+  sharp: false

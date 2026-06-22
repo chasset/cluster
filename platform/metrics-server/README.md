@@ -1,7 +1,7 @@
 # metrics-server
 
 Observabilité « a minima » (audit P5 #17 /
-[ADR 0016](../../docs/decisions/0016-observabilite.md)).
+[ADR 0016](/cluster/docs/decisions/0016-observabilite/)).
 
 [metrics-server](https://github.com/kubernetes-sigs/metrics-server) collecte
 l'usage CPU/mémoire des nœuds et des pods via les kubelets et l'expose dans
@@ -31,7 +31,7 @@ Le manifeste est le `components.yaml` officiel de **v0.8.0**, avec :
 1. **`--kubelet-insecure-tls`** : les kubelets kubeadm ont des certificats
    auto-signés (pas de `serverTLSBootstrap`) → metrics-server ne peut pas les
    vérifier. Compromis classique kubeadm, acceptable sur réseau privé
-   ([ADR 0003](../../docs/decisions/0003-pas-de-chiffrement-ceph-tailscale.md)).
+   ([ADR 0003](/cluster/docs/decisions/0003-pas-de-chiffrement-ceph-tailscale/)).
    À lever si un jour les kubelets obtiennent des certs signés par la CA du
    cluster.
 2. **Image épinglée par digest** (audit P11 #11).

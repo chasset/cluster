@@ -36,7 +36,7 @@ logiques**, chacune avec son rôle propriétaire
 [suivi de modèles](composants.md#mlflow-suivi-de-modèles), ADR 0082).
 
 **Connexion** : écrire sur le service primary
-([`pg-rw`](glossaire.md#postgresql-cloudnativepg-cnpg)), lire sur le replica
+([`pg-rw`](glossaire.md#postgresql--cloudnativepg-cnpg)), lire sur le replica
 (`pg-ro`). Le mot de passe d'un rôle est dans le Secret `pg-role-<rôle>` (clé
 `password`, namespace `postgres`) — ne l'employez **jamais** en clair, lisez-le
 du Secret :
@@ -221,7 +221,7 @@ Détail :
 ## Exposer une UI hors cluster
 
 Pour exposer une UI, ajoutez un `HTTPRoute` rattaché au
-[Gateway Cilium](composants.md#exposition-tout-cilium-lb-ipam-annonce-l2-gateway-api),
+[Gateway Cilium](composants.md#exposition-tout-cilium-lb-ipam--annonce-l2--gateway-api),
 avec TLS émis par la CA interne (annotation
 `cert-manager.io/cluster-issuer: internal-ca`) — patron :
 [`platform/dagster/gateway.yaml`](../platform/dagster/gateway.yaml). Le hostname
@@ -243,7 +243,7 @@ Vous ne déployez **pas** vos workflows avec `kubectl`, mais par
 registry → commit manifeste dans la forge → webhook → réconciliation Argo CD).
 La mise en pratique pas à pas sur un banc — cloner la forge, pousser, observer
 la réconciliation — est décrite dans le tutoriel
-[Monter le banc local](banc-local.md#pousser-sur-gitea).
+[Monter le banc local](banc-local.md#3-pousser-sur-gitea).
 
 ## Pour aller plus loin
 

@@ -1,0 +1,47 @@
+---
+title: Cluster
+description: Cluster Kubernetes hyperconvergé — Debian 13, Cilium, Rook-Ceph
+template: splash
+hero:
+  tagline: >-
+    Un cluster Kubernetes de recherche hyperconvergé — installation, stockage
+    distribué, chaîne DataOps et services transverses, racontés de bout en bout.
+  actions:
+    - text: Lire le manifeste
+      link: /cluster/docs/manifeste/
+      icon: right-arrow
+      variant: primary
+    - text: Le guide
+      link: /cluster/docs/demarrage/
+      icon: open-book
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components'
+
+<CardGrid>
+  <Card title="📖 Le manifeste">
+    Le récit du projet pour néophyte — contexte, objectif, méthode, voyage,
+    résultats. Les mots-clés renvoient au glossaire et aux décisions.
+    [Lire →](/cluster/docs/manifeste/)
+  </Card>
+  <Card title="🚀 Démarrer">
+    Public visé, prérequis, parcours d'installation pas à pas.
+    [Lire →](/cluster/docs/demarrage/)
+  </Card>
+  <Card title="🧱 Les composants">
+    La pile technologique brique par brique — rôle et raison d'être.
+    [Lire →](/cluster/docs/composants/)
+  </Card>
+  <Card title="🧭 Décisions (ADR)">
+    Pourquoi chaque choix de conception, au format Nygard, daté et immuable.
+    [Lire →](/cluster/docs/decisions/)
+  </Card>
+  <Card title="🔬 Preuves de qualité">
+    La vitrine consolidée — gouvernance tracée, reproductibilité prouvée, drifts
+    indexés, couverture E2E. [Lire →](/cluster/docs/preuves/)
+  </Card>
+  <Card title="🧪 Banc de test">
+    Topologies reproductibles sur Lima, preuves opérationnelles.
+    [Lire →](/cluster/bench/)
+  </Card>
+</CardGrid>

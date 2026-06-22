@@ -4,7 +4,7 @@
 (`default` = WordPress/MySQL, `rstudio`, `registry`). **Durcissement
 defense-in-depth**, pas une correction de faille : l'absence de NetworkPolicy
 était un compromis assumé du mono-tenant
-([ADR 0012](../../docs/decisions/0012-rstudio-disable-auth.md)). Ces policies
+([ADR 0012](/cluster/docs/decisions/0012-rstudio-disable-auth/)). Ces policies
 posent une barrière est-ouest pour qu'un pod compromis ne puisse pas balayer
 librement le cluster.
 
@@ -73,8 +73,8 @@ kubectl apply -f platform/network-policies/registry/
 
 ## Validation (banc multi-nœuds)
 
-À exécuter sur le banc Lima [`bench/lima/`](../../bench/lima/) **avant la prod**
-:
+À exécuter sur le banc Lima [`bench/lima/`](/cluster/bench/lima/) **avant la
+prod** :
 
 - `kubectl get netpol -A` → les policies présentes par namespace.
 - WordPress répond toujours (ingress :80) et lit/écrit MySQL (DNS +
@@ -85,8 +85,8 @@ kubectl apply -f platform/network-policies/registry/
 - Le provisionnement/montage des PVC reste OK (preuve que Ceph n'est pas
   impacté).
 
-Cf. [SAFEGUARDS.md](../../SAFEGUARDS.md) — toute policy réseau passe par le banc
-avant la prod.
+Cf. [SAFEGUARDS.md](/cluster/SAFEGUARDS/) — toute policy réseau passe par le
+banc avant la prod.
 
 ### Résultat de validation (banc multi-node, 2026-06-01)
 

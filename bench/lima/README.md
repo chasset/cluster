@@ -1,11 +1,11 @@
 # Banc Lima (multi-VM + Ceph)
 
 **Seul banc local**
-([ADR 0038](../../docs/decisions/0038-lima-seul-banc-local.md)) — 3 VMs +
+([ADR 0038](/cluster/docs/decisions/0038-lima-seul-banc-local/)) — 3 VMs +
 disques bruts + Rook/Ceph, sur des **VMs Lima**.
 
 Pourquoi Lima
-([ADR 0006](../../docs/decisions/0006-matrice-de-versions-et-politique-de-bump.md))
+([ADR 0006](/cluster/docs/decisions/0006-matrice-de-versions-et-politique-de-bump/))
 :
 
 - **kind est abandonné** : son image de nœud figeait Kubernetes en **1.31**
@@ -114,7 +114,7 @@ Le banc s'instrumente lui-même (`metrology.sh`) — pas de saisie manuelle.
   chemin complété y **append** une entrée datée (id, date ISO UTC, branche,
   commit, profil, topologie, arch, hôte, durées par phase). C'est la **preuve
   datée** qu'exploite le garde-fou de fraîcheur
-  ([ADR 0042](../../docs/decisions/0042-fraicheur-preuves-banc.md)) — la date
+  ([ADR 0042](/cluster/docs/decisions/0042-fraicheur-preuves-banc/)) — la date
   vit dans le **contenu** (le checkout CI ne préserve pas le mtime).
 - **Métriques de coût** (si `monitoring` déployé) : l'entrée porte un bloc
   `metriques` échantillonné depuis **Prometheus** sur la fenêtre du run —
@@ -126,7 +126,7 @@ Le banc s'instrumente lui-même (`metrology.sh`) — pas de saisie manuelle.
   les rôles/manifestes/versions). Tout changement du socle invalide le cache.
   **`NO_CACHE=1` force le rebuild from-scratch** — c'est lui qui produit la
   **preuve**
-  ([ADR 0034](../../docs/decisions/0034-validation-e2e-from-scratch.md)), le
+  ([ADR 0034](/cluster/docs/decisions/0034-validation-e2e-from-scratch/)), le
   cache n'étant qu'un accélérateur d'itération.
 - **Fraîcheur** : `bench/lima/check-freshness.sh` (seuil `SEUIL_JOURS`,
   défaut 7) lit la date du dernier run et sort en échec si elle est périmée. Le
@@ -166,8 +166,8 @@ kubeconfig banc) et installe la lib Python `kubernetes` en pré-tâche.
 | Marquez      | `marquez` ET `marquez-web` Ready (migration Flyway)             |
 | **lineage**  | un run Dagster réel → événement OpenLineage ingéré par Marquez  |
 
-> Consigner le run dans [`RESULTS.md`](RESULTS.md) (honnêteté des Runs,
-> ADR 0023) — succès **et** drifts éventuels.
+> Consigner le run dans [`RESULTS.md`](/cluster/bench/lima/RESULTS/) (honnêteté
+> des Runs, ADR 0023) — succès **et** drifts éventuels.
 
 Chaque phase est **gated** (s'arrête si le critère n'est pas atteint) et
 **idempotente** (rejouable). Le kubeconfig est exporté sous `.work/kubeconfig`
@@ -191,7 +191,7 @@ KUBECONFIG=bench/lima/.work/kubeconfig kubectl -n rook-ceph exec deploy/rook-cep
 - **Couverture** : up → bootstrap → stockage (simple par défaut, Ceph en
   option). Les workloads applicatifs (WordPress/datalake) et l'etcd-backup ne
   sont pas encore portés sur ce banc (cf.
-  [matrice du catalogue](../../docs/architecture/matrice-catalogue.md)).
+  [matrice du catalogue](/cluster/docs/architecture/matrice-catalogue/)).
 - **`local-path`** : stockage `WaitForFirstConsumer` sur disque local du nœud
   (pas de réplication, pas de bascule) — suffisant pour des PVC simples, mais le
   stockage **résilient** (réplication ×3, RWX, objet S3) se valide en mode Ceph.
@@ -206,17 +206,19 @@ bench/lima/run-phases.sh down   # détruit ce banc (VMs + disques nommés)
 
 Déroulé réel du banc (de bout en bout : up → bootstrap → ceph `HEALTH_OK` → sc
 PVC Bound) et drifts rencontrés (honnêteté des Runs, ADR 0023) :
-[`RESULTS.md`](RESULTS.md).
+[`RESULTS.md`](/cluster/bench/lima/RESULTS/).
 
 ## Architecture interne
 
-- [`run-phases.sh`](run-phases.sh) : orchestrateur, table de nœuds + phases
-  gated.
-- [`lib.sh`](lib.sh) : bibliothèque d'orchestration Lima ↔ Ansible
-  (`lima_disk_create`, `lima_render_node`, `lima_start_node`, `write_inventory`,
+- [`run-phases.sh`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/run-phases.sh)
+  : orchestrateur, table de nœuds + phases gated.
+- [`lib.sh`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/lib.sh)
+  : bibliothèque d'orchestration Lima ↔ Ansible (`lima_disk_create`,
+  `lima_render_node`, `lima_start_node`, `write_inventory`,
   `bootstrap_node_sequence`, `run_cni`, `fetch_kubeconfig_node`). **Sourcée
   aussi par les spikes** qui montent des clusters Lima (ex.
-  [`../spikes/clustermesh-latency/`](../spikes/clustermesh-latency/)) — source
-  unique, pas de duplication.
-- [`profiles/node.yaml.tmpl`](profiles/node.yaml.tmpl) : template de VM Lima
-  (Debian 13, user-v2, provision noyau K8s), rendu par `lima_render_node`.
+  [`../spikes/clustermesh-latency/`](/cluster/bench/spikes/clustermesh-latency/))
+  — source unique, pas de duplication.
+- [`profiles/node.yaml.tmpl`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/profiles/node.yaml.tmpl)
+  : template de VM Lima (Debian 13, user-v2, provision noyau K8s), rendu par
+  `lima_render_node`.

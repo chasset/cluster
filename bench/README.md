@@ -2,30 +2,30 @@
 
 Banc local unique : **Lima** (vraie VM, SSH natif, disques bruts virtio, sans
 VirtualBox). Vagrant + VirtualBox sont **abandonnés**
-([ADR 0038](../docs/decisions/0038-lima-seul-banc-local.md)) ; le
+([ADR 0038](/cluster/docs/decisions/0038-lima-seul-banc-local/)) ; le
 provisionnement local n'est plus un axe du catalogue
-([ADR 0039](../docs/decisions/0039-nomenclature-axes-catalogue.md)).
+([ADR 0039](/cluster/docs/decisions/0039-nomenclature-axes-catalogue/)).
 
 **Nommage** : chaque banc valide une **topologie** au nom technique stable,
 indépendant de l'outil
-([ADR 0030](../docs/decisions/0030-nomenclature-bancs-topologies.md)).
+([ADR 0030](/cluster/docs/decisions/0030-nomenclature-bancs-topologies/)).
 
-| Nom technique    | Dossier                                                      | Outil | Topologie               | Disques Ceph     | Phases couvertes                    | Démarrage |
-| ---------------- | ------------------------------------------------------------ | ----- | ----------------------- | ---------------- | ----------------------------------- | --------- |
-| `multi-node-3`   | [`lima/`](lima/)                                             | Lima  | 3 VMs + user-v2         | 3 HDD + block.db | 1, 2 (avec join), 3 (Ceph), 4       | ~15 min   |
-| `mesh-2clusters` | [`spikes/clustermesh-latency/`](spikes/clustermesh-latency/) | Lima  | 2 clusters + `tc netem` | n/a              | spike Cilium Cluster Mesh (jetable) | variable  |
+| Nom technique    | Dossier                                                                     | Outil | Topologie               | Disques Ceph     | Phases couvertes                    | Démarrage |
+| ---------------- | --------------------------------------------------------------------------- | ----- | ----------------------- | ---------------- | ----------------------------------- | --------- |
+| `multi-node-3`   | [`lima/`](/cluster/bench/lima/)                                             | Lima  | 3 VMs + user-v2         | 3 HDD + block.db | 1, 2 (avec join), 3 (Ceph), 4       | ~15 min   |
+| `mesh-2clusters` | [`spikes/clustermesh-latency/`](/cluster/bench/spikes/clustermesh-latency/) | Lima  | 2 clusters + `tc netem` | n/a              | spike Cilium Cluster Mesh (jetable) | variable  |
 
 > Topologies **cibles** nommées mais pas encore montées sur banc : `ha-3cp` (3
 > control planes HA), `multisite` (plusieurs sites, 1 cluster autonome par
 > site). Cf.
-> [ADR 0030](../docs/decisions/0030-nomenclature-bancs-topologies.md).
+> [ADR 0030](/cluster/docs/decisions/0030-nomenclature-bancs-topologies/).
 
 ## Les trois niveaux de tests
 
 Unitaire (bats, sans cluster), intégration (gates de phase), scénarios
 (comportement) : le **plan de tests** les recense ensemble, avec la couverture
 par couche et les lacunes à combler :
-[plan de tests](../docs/architecture/plan-de-tests.md).
+[plan de tests](/cluster/docs/architecture/plan-de-tests/).
 
 ## Quel profil pour quoi — fidélité vs vitesse (ADR 0035)
 
@@ -33,7 +33,7 @@ Choisir selon **ce qu'on itère** et le **temps qu'on peut payer**. Le banc
 tourne le **vrai `kubeadm` 1.34** (pas de distribution alternative type k3d/kind
 — ADR 0006) : la vitesse se gagne en retirant des couches (Ceph, build), jamais
 en changeant d'installeur. Temps mesurés sur M3 Max
-([tableau de bord](../docs/architecture/lecons-des-runs.md)).
+([tableau de bord](/cluster/docs/architecture/lecons-des-runs/)).
 
 | Besoin (ce qu'on itère)                               | Profil                      | Temps   | Fidélité | Commande                                                          |
 | ----------------------------------------------------- | --------------------------- | ------- | -------- | ----------------------------------------------------------------- |
@@ -48,8 +48,8 @@ en changeant d'installeur. Temps mesurés sur M3 Max
 > backing S3 **SeaweedFS** au lieu du RGW Ceph (ADR 0036). Mais un changement
 > qui touche le **stockage** (réplication, EC, RGW) **doit** repasser sur le
 > profil **`(ceph)`** (chemin `storage-real`) avant d'être déclaré validé
-> ([ADR 0034](../docs/decisions/0034-validation-e2e-from-scratch.md) : la preuve
-> est un run e2e from-scratch). Le profil est un axe **orthogonal** à la
+> ([ADR 0034](/cluster/docs/decisions/0034-validation-e2e-from-scratch/) : la
+> preuve est un run e2e from-scratch). Le profil est un axe **orthogonal** à la
 > topologie (ADR 0030) — noté `(ceph)` / `(local-path)`.
 
 ## Réserves transversales
@@ -57,18 +57,18 @@ en changeant d'installeur. Temps mesurés sur M3 Max
 - **Architecture arm64** (Apple Silicon) ≠ **x86_64** des serveurs lames : on
   valide la _logique_ (rôles, manifestes, ordres, comportements), pas les
   artefacts binaires x86_64. La fidélité x86_64 se gagne sur le banc baremetal
-  (cf. [matrice du catalogue](../docs/architecture/matrice-catalogue.md)).
+  (cf. [matrice du catalogue](/cluster/docs/architecture/matrice-catalogue/)).
 - **Fonctionnel, pas perfs** : VMs modestes, disques virtuels petits.
 - **Image pré-construite** : Debian 13 — l'installation Debian elle-même (mode
   expert, partitionnement LVM, firmware bnxt, IP statique) n'est **pas**
   rejouée. Cette étape se valide à la main lors du rebuild serveurs (cf.
-  [`bootstrap/RUNBOOK.md`](../bootstrap/RUNBOOK.md)).
+  [`bootstrap/RUNBOOK.md`](/cluster/bootstrap/RUNBOOK/)).
 - **Restore d'un nœud (halt → relance) non fidèle** : le retour d'une VM exerce
   des artefacts banc (route ClusterIP perdue au reboot, clock skew) **absents de
   la prod**. La _perte_ de nœud reste un test de résilience valable ; le
   _restore_, non — ne pas chercher à le « réparer » sur le banc. Détail :
-  [`scenarios/README.md`](scenarios/README.md) (03/04) et
-  [`RESULTS.md`](RESULTS.md).
+  [`scenarios/README.md`](/cluster/bench/scenarios/) (03/04) et
+  [`RESULTS.md`](/cluster/bench/RESULTS/).
 
 ## Pré-requis communs
 
@@ -77,8 +77,8 @@ en changeant d'installeur. Temps mesurés sur M3 Max
 | Ansible | ≥ 2.20.5 | `brew install ansible` | tous    |
 | Lima    | ≥ 2.0    | `brew install lima`    | `lima/` |
 
-Voir le [README du banc Lima](lima/) pour les détails (réseau `user-v2`, disques
-bruts virtio, etc.).
+Voir le [README du banc Lima](/cluster/bench/lima/) pour les détails (réseau
+`user-v2`, disques bruts virtio, etc.).
 
 ## Nettoyage
 

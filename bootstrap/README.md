@@ -19,68 +19,70 @@ uv sync   # à la racine du dépôt — crée/maj .venv avec kubernetes + certif
 ```
 
 L'interpréteur Python de `localhost` est dirigé vers ce `.venv` par le groupe
-`control_host` ([`group_vars/control_host.yaml`](group_vars/control_host.yaml)).
-L'inventaire d'exemple ([`hosts.example.yaml`](hosts.example.yaml)) montre la
-déclaration de ce groupe ; un `.venv` placé ailleurs se surcharge par hôte. Si
-les libs manquent, ces playbooks **échouent tôt** avec un rappel `uv sync`
-(garde en `pre_tasks`).
+`control_host`
+([`group_vars/control_host.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/group_vars/control_host.yaml)).
+L'inventaire d'exemple
+([`hosts.example.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/hosts.example.yaml))
+montre la déclaration de ce groupe ; un `.venv` placé ailleurs se surcharge par
+hôte. Si les libs manquent, ces playbooks **échouent tôt** avec un rappel
+`uv sync` (garde en `pre_tasks`).
 
 [#277]: https://github.com/univ-lehavre/cluster/issues/277
 
 ## Contenu
 
 Index **par phase** (lisibilité — ADR 0070). L'ordre canonique d'exécution vit
-dans le [`RUNBOOK.md`](RUNBOOK.md) et le DAG des couches
-([ADR 0069](../docs/decisions/0069-topology-layers-dag-grain-phase.md)) ; ce
+dans le [`RUNBOOK.md`](/cluster/bootstrap/RUNBOOK/) et le DAG des couches
+([ADR 0069](/cluster/docs/decisions/0069-topology-layers-dag-grain-phase/)) ; ce
 tableau regroupe les playbooks par rôle, il ne prescrit pas la séquence.
 
 ### Installation (socle k8s)
 
-| Fichier                                      | Rôle                                                                                |
-| -------------------------------------------- | ----------------------------------------------------------------------------------- |
-| [`hosts.example.yaml`](hosts.example.yaml)   | Modèle d'inventaire générique (le `hosts.yaml` réel n'est pas versionné — ADR 0023) |
-| [`checks.yaml`](checks.yaml)                 | Vérifications préalables                                                            |
-| [`cri.yaml`](cri.yaml)                       | Installation de la runtime conteneur                                                |
-| [`kubeadm.yaml`](kubeadm.yaml)               | Installation des paquets kubeadm/kubelet/kubectl                                    |
-| [`control-planes.yaml`](control-planes.yaml) | Configuration des nœuds control plane                                               |
-| [`initialisation.yaml`](initialisation.yaml) | Initialisation du cluster avec `kubeadm init`                                       |
-| [`cni.sh`](cni.sh)                           | Installation du CNI Cilium (à lancer sur le control plane)                          |
+| Fichier                                                                                                  | Rôle                                                                                |
+| -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| [`hosts.example.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/hosts.example.yaml)   | Modèle d'inventaire générique (le `hosts.yaml` réel n'est pas versionné — ADR 0023) |
+| [`checks.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/checks.yaml)                 | Vérifications préalables                                                            |
+| [`cri.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/cri.yaml)                       | Installation de la runtime conteneur                                                |
+| [`kubeadm.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/kubeadm.yaml)               | Installation des paquets kubeadm/kubelet/kubectl                                    |
+| [`control-planes.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/control-planes.yaml) | Configuration des nœuds control plane                                               |
+| [`initialisation.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/initialisation.yaml) | Initialisation du cluster avec `kubeadm init`                                       |
+| [`cni.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/cni.sh)                           | Installation du CNI Cilium (à lancer sur le control plane)                          |
 
 ### Extension HA / join
 
-| Fichier                                              | Rôle                                                            |
-| ---------------------------------------------------- | --------------------------------------------------------------- |
-| [`kube-vip.yaml`](kube-vip.yaml)                     | VIP de l'API control plane (kube-vip) — topologie HA (ADR 0047) |
-| [`join-control-plane.yaml`](join-control-plane.yaml) | Promotion d'un nœud en control plane supplémentaire (etcd 2/3)  |
-| [`join-workers.yaml`](join-workers.yaml)             | Ajout des nœuds workers                                         |
+| Fichier                                                                                                          | Rôle                                                            |
+| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| [`kube-vip.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/kube-vip.yaml)                     | VIP de l'API control plane (kube-vip) — topologie HA (ADR 0047) |
+| [`join-control-plane.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/join-control-plane.yaml) | Promotion d'un nœud en control plane supplémentaire (etcd 2/3)  |
+| [`join-workers.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/join-workers.yaml)             | Ajout des nœuds workers                                         |
 
 ### Storage & platform
 
-| Fichier                                                | Rôle                                                              |
-| ------------------------------------------------------ | ----------------------------------------------------------------- |
-| [`local-path.yaml`](local-path.yaml)                   | StorageClass local-path (profil léger sans Ceph)                  |
-| [`ceph-checks.yaml`](ceph-checks.yaml)                 | Vérifications préalables Rook-Ceph (devices, prérequis)           |
-| [`ceph-cluster.yaml`](ceph-cluster.yaml)               | Déploiement du cluster Rook-Ceph                                  |
-| [`ceph-storageclasses.yaml`](ceph-storageclasses.yaml) | StorageClasses bloc/CephFS (ADR 0001)                             |
-| [`ceph-datalake.yaml`](ceph-datalake.yaml)             | Datalake S3 (RGW, erasure coding 2+1 — ADR 0004)                  |
-| [`metrics-server.yaml`](metrics-server.yaml)           | metrics-server (`kubectl top`, HPA — ADR 0016/0068)               |
-| [`monitoring.yaml`](monitoring.yaml)                   | Pile d'observabilité (Prometheus/Grafana/Loki)                    |
-| [`gitops.yaml`](gitops.yaml)                           | Socle GitOps : Gitea (forge intra-banc) + Argo CD — ADR 0022/0044 |
-| [`dataops.yaml`](dataops.yaml)                         | Chaîne DataOps (Dagster, Marquez — ADR 0026/0028)                 |
-| [`cnpg-secrets.yaml`](cnpg-secrets.yaml)               | Secrets CloudNativePG (PostgreSQL managé — ADR 0024)              |
+| Fichier                                                                                                            | Rôle                                                              |
+| ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| [`local-path.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/local-path.yaml)                   | StorageClass local-path (profil léger sans Ceph)                  |
+| [`ceph-checks.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/ceph-checks.yaml)                 | Vérifications préalables Rook-Ceph (devices, prérequis)           |
+| [`ceph-cluster.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/ceph-cluster.yaml)               | Déploiement du cluster Rook-Ceph                                  |
+| [`ceph-storageclasses.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/ceph-storageclasses.yaml) | StorageClasses bloc/CephFS (ADR 0001)                             |
+| [`ceph-datalake.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/ceph-datalake.yaml)             | Datalake S3 (RGW, erasure coding 2+1 — ADR 0004)                  |
+| [`metrics-server.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/metrics-server.yaml)           | metrics-server (`kubectl top`, HPA — ADR 0016/0068)               |
+| [`monitoring.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/monitoring.yaml)                   | Pile d'observabilité (Prometheus/Grafana/Loki)                    |
+| [`gitops.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/gitops.yaml)                           | Socle GitOps : Gitea (forge intra-banc) + Argo CD — ADR 0022/0044 |
+| [`dataops.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/dataops.yaml)                         | Chaîne DataOps (Dagster, Marquez — ADR 0026/0028)                 |
+| [`cnpg-secrets.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/cnpg-secrets.yaml)               | Secrets CloudNativePG (PostgreSQL managé — ADR 0024)              |
 
 ### Ops & maintenance
 
-| Fichier                                              | Rôle                                                      |
-| ---------------------------------------------------- | --------------------------------------------------------- |
-| [`os-upgrade.yaml`](os-upgrade.yaml)                 | Mise à jour OS de l'ensemble du parc                      |
-| [`k8s-upgrade.yaml`](k8s-upgrade.yaml)               | Upgrade Kubernetes in-place, séquencé (ADR 0015)          |
-| [`etcd-backup.yaml`](etcd-backup.yaml)               | Sauvegarde etcd horaire (timer systemd) — control plane   |
-| [`etcd-fetch.yaml`](etcd-fetch.yaml)                 | Copie hors-nœud du dernier snapshot etcd (audit P1 #3)    |
-| [`audit-log-baseline.yaml`](audit-log-baseline.yaml) | Initialise le journal d'audit-log sur des nœuds existants |
-| [`rollback.yaml`](rollback.yaml)                     | Rollback du bootstrap K8s (DESTRUCTIF — `-e confirm=yes`) |
-| [`state.sh`](state.sh)                               | Classification d'état d'un nœud/hôte (couche bootstrap)   |
-| [`roles/`](roles/)                                   | Rôles Ansible utilisés par les playbooks                  |
+| Fichier                                                                                                          | Rôle                                                      |
+| ---------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| [`os-upgrade.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/os-upgrade.yaml)                 | Mise à jour OS de l'ensemble du parc                      |
+| [`k8s-upgrade.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/k8s-upgrade.yaml)               | Upgrade Kubernetes in-place, séquencé (ADR 0015)          |
+| [`etcd-backup.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/etcd-backup.yaml)               | Sauvegarde etcd horaire (timer systemd) — control plane   |
+| [`etcd-fetch.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/etcd-fetch.yaml)                 | Copie hors-nœud du dernier snapshot etcd (audit P1 #3)    |
+| [`audit-log-baseline.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/audit-log-baseline.yaml) | Initialise le journal d'audit-log sur des nœuds existants |
+| [`rollback.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/rollback.yaml)                     | Rollback du bootstrap K8s (DESTRUCTIF — `-e confirm=yes`) |
+| [`state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)                               | Classification d'état d'un nœud/hôte (couche bootstrap)   |
+| [`roles/`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/roles)                                    | Rôles Ansible utilisés par les playbooks                  |
 
 ## Les quatre « topology » du dépôt
 
@@ -95,4 +97,4 @@ Quatre objets portent le mot _topology_, à ne pas confondre :
 
 ## Procédure complète
 
-Voir [`RUNBOOK.md`](RUNBOOK.md).
+Voir [`RUNBOOK.md`](/cluster/bootstrap/RUNBOOK/).

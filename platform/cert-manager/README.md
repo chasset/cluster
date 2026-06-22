@@ -1,15 +1,15 @@
 # cert-manager — TLS de bordure (CA interne)
 
 Émet et renouvelle les certificats TLS du **Gateway de bordure** Cilium
-([ADR 0020](../../docs/decisions/0020-exposition-reseau-tout-cilium.md)) via une
-**CA interne** — pas ACME, car le cluster n'est pas exposé à Internet. Décision
-et justifications :
-[ADR 0021](../../docs/decisions/0021-cert-manager-ca-interne.md).
+([ADR 0020](/cluster/docs/decisions/0020-exposition-reseau-tout-cilium/)) via
+une **CA interne** — pas ACME, car le cluster n'est pas exposé à Internet.
+Décision et justifications :
+[ADR 0021](/cluster/docs/decisions/0021-cert-manager-ca-interne/).
 
-| Fichier                                  | Rôle                                                                                           |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [`cert-manager.yaml`](cert-manager.yaml) | Bundle officiel v1.20.2 (CRDs+RBAC+Deploys+webhook), images par digest, `--enable-gateway-api` |
-| [`issuers.yaml`](issuers.yaml)           | Chaîne CA interne : `selfsigned-bootstrap` → `root-ca` → `internal-ca`                         |
+| Fichier                                                                                                          | Rôle                                                                                           |
+| ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [`cert-manager.yaml`](https://github.com/univ-lehavre/cluster/blob/main/platform/cert-manager/cert-manager.yaml) | Bundle officiel v1.20.2 (CRDs+RBAC+Deploys+webhook), images par digest, `--enable-gateway-api` |
+| [`issuers.yaml`](https://github.com/univ-lehavre/cluster/blob/main/platform/cert-manager/issuers.yaml)           | Chaîne CA interne : `selfsigned-bootstrap` → `root-ca` → `internal-ca`                         |
 
 ## Déploiement
 
@@ -25,8 +25,8 @@ kubectl -n cert-manager get certificate root-ca              # READY=True
 ```
 
 > **Pré-requis Gateway API** : les CRDs `gateway.networking.k8s.io` v1.4.1 sont
-> posées par l'addon [`cilium-expo`](../cilium-expo/) (ADR 0020). Le contrôleur
-> cert-manager doit démarrer **après** elles ; sinon
+> posées par l'addon [`cilium-expo`](/cluster/platform/cilium-expo/) (ADR 0020).
+> Le contrôleur cert-manager doit démarrer **après** elles ; sinon
 > `kubectl -n cert-manager rollout restart deploy/cert-manager`.
 >
 > **Images sans Internet** : le cluster n'étant pas exposé, les images

@@ -7,7 +7,7 @@ Helm, avec un compte de service `admin-user` lié au rôle `cluster-admin`.
 > **Décision assumée** : le dashboard utilise le rôle `cluster-admin` (tous
 > droits sur tous les namespaces). C'est cohérent avec un cluster mono-admin de
 > recherche, **pas** un modèle multi-tenants. Voir
-> [docs/decisions/0010-dashboard-cluster-admin.md](../../docs/decisions/0010-dashboard-cluster-admin.md).
+> [docs/decisions/0010-dashboard-cluster-admin.md](/cluster/docs/decisions/0010-dashboard-cluster-admin/).
 
 ## Installation
 

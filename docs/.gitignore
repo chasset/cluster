@@ -1,0 +1,4 @@
+# Astro build artifacts
+dist/
+.astro/
+node_modules/

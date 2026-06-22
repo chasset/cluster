@@ -7,7 +7,7 @@
 Honnêteté des Runs (ADR 0023) : ce fichier consigne le déroulé réel et les
 _drifts_ (écarts banc, pas bugs du dépôt) rencontrés en montant le banc Lima de
 bout en bout. Le banc Vagrant a son propre log :
-[`../RESULTS.md`](../RESULTS.md).
+[`../RESULTS.md`](/cluster/bench/RESULTS/).
 
 ## Le chemin — pourquoi ces drifts comptent
 
@@ -23,10 +23,10 @@ n'a fonctionné e2e du premier coup** :
 À chaque campagne, le même schéma : le code passe **tout le lint au vert**, puis
 le **run réel from-scratch** révèle des drifts que seul un vrai cluster expose —
 et on les verrouille un par un. C'est exactement pourquoi
-[ADR 0034](../../docs/decisions/0034-validation-e2e-from-scratch.md) pose que
+[ADR 0034](/cluster/docs/decisions/0034-validation-e2e-from-scratch/) pose que
 **la validation est un run e2e, pas le lint**. La synthèse par catégorie et le
 tableau de bord (matériel + temps) :
-[leçons des Runs](../../docs/architecture/lecons-des-runs.md).
+[leçons des Runs](/cluster/docs/architecture/lecons-des-runs/).
 
 > La répétition n'est pas un échec — c'est la **courbe de fiabilisation**.
 > Chaque drift traversé devient un invariant durable et un savoir réutilisable
@@ -112,7 +112,7 @@ Exemple jetable retiré ensuite.
 ## Réserves
 
 - **`os-upgrade` non rejoué** (contrairement au banc Vagrant) : image Lima
-  fraîche — divergence assumée (cf. [`README.md`](README.md)).
+  fraîche — divergence assumée (cf. [`README.md`](/cluster/bench/lima/)).
 - **arm64** : images Ceph dé-épinglées (digests amd64 → `exec format error`)
   côté banc seulement ; le livrable garde ses digests.
 - **StorageClass `default` unique** : le banc pose `is-default-class` sur UNE
@@ -179,7 +179,7 @@ tâches idempotentes plutôt que les redécouvrir à chaque run.
 
 > **✅ Validé e2e sur banc Lima arm64 (2026-06-07), en MODE CEPH.** Le portage
 > de la couche plateforme en rôles Ansible (`bootstrap/dataops.yaml`,
-> [ADR 0033](../../docs/decisions/0033-orchestration-ansible-platform-dataops.md))
+> [ADR 0033](/cluster/docs/decisions/0033-orchestration-ansible-platform-dataops/))
 > a été monté de bout en bout **par le playbook** (plus de shell impératif) et
 > le **lineage d'un run Dagster réel est ingéré dans Marquez**.
 >
@@ -187,7 +187,7 @@ tâches idempotentes plutôt que les redécouvrir à chaque run.
 > correctifs intermédiaires** (drifts L21–L33) : la chaîne a échoué et été
 > relancée de nombreuses fois avant de passer — fidèle au constat que rien ne
 > marche e2e du premier coup
-> ([ADR 0034](../../docs/decisions/0034-validation-e2e-from-scratch.md)). Un
+> ([ADR 0034](/cluster/docs/decisions/0034-validation-e2e-from-scratch/)). Un
 > **run propre from-scratch d'une traite** (banc détruit puis remonté) a
 > **ensuite confirmé** le résultat : `all` + `datalake` + `dataops` sans
 > intervention, vert (cf. encadré « Run from-scratch confirmé » plus bas). Le
@@ -195,7 +195,7 @@ tâches idempotentes plutôt que les redécouvrir à chaque run.
 > propre — preuve qu'il fallait le faire.
 
 Log brut **générisé** (preuve, ADR 0023) :
-[`runs/2026-06-07-dataops-ansible.log`](runs/2026-06-07-dataops-ansible.log).
+[`runs/2026-06-07-dataops-ansible.log`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/runs/2026-06-07-dataops-ansible.log).
 Séquence : `WITH_CEPH=1 all → datalake → dataops`.
 
 | Étape                          | Résultat                                                                                           |
@@ -242,7 +242,7 @@ Tous corrigés dans le dépôt ; aucun n'est un bug de conception — ce sont de
 > intervention (socle + Ceph), et `dataops` a abouti **vert (0 échec)** —
 > `dataops` mesuré à **13m37s** (M3 Max, 8 GiB/VM), lineage `0 → 1` ingéré dans
 > Marquez. Total banc complet ≈ **30 min**. Métriques émises par `run-phases.sh`
-> (cf. [tableau de bord](../../docs/architecture/lecons-des-runs.md)).
+> (cf. [tableau de bord](/cluster/docs/architecture/lecons-des-runs/)).
 
 ### Enseignement
 
@@ -260,7 +260,7 @@ deviennent des invariants du run. Barman archive désormais vers le **RGW Ceph**
 > Portage en rôles Ansible de `kube-prometheus-stack` (Prometheus + Alertmanager
 >
 > - Grafana), `loki` et `seaweedfs`
->   ([ADR 0036](../../docs/decisions/0036-backing-s3-unique-rgw.md)), avec
+>   ([ADR 0036](/cluster/docs/decisions/0036-backing-s3-unique-rgw/)), avec
 >   **storageClass paramétrable** (#158) et **backing S3 par topologie** (#186).
 >   Deux runs from-scratch du namespace : profil **léger** (local-path +
 >   SeaweedFS) **puis** profil **Ceph** (rook-ceph + RGW via OBC).
@@ -270,7 +270,7 @@ deviennent des invariants du run. Barman archive désormais vers le **RGW Ceph**
 > drifts (**L38/L39**) **n'apparaissent qu'en RGW** — le profil léger (creds
 > admin SeaweedFS) les masquait. C'est la preuve concrète qu'un chemin de code
 > partagé doit être validé **sur chaque backing réellement employé** (cf.
-> [Leçons des Runs](../../docs/architecture/lecons-des-runs.md), cat. 7).
+> [Leçons des Runs](/cluster/docs/architecture/lecons-des-runs/), cat. 7).
 
 | Profil         | storageClass PVC             | Backing S3 Loki                         | Verdict                                      | Temps `monitoring` |
 | -------------- | ---------------------------- | --------------------------------------- | -------------------------------------------- | ------------------ |
@@ -302,14 +302,15 @@ forte est la **portée des drifts** : L34–L37 cassaient les deux profils (ordr
 CRD/webhook/contrôleur — invariants d'admission), mais **L38/L39 ne se révèlent
 qu'en RGW**. Le banc léger, avec ses creds admin SeaweedFS, validait une version
 **plus permissive** que la prod. D'où la règle inscrite en
-[ADR 0036](../../docs/decisions/0036-backing-s3-unique-rgw.md) : un changement
+[ADR 0036](/cluster/docs/decisions/0036-backing-s3-unique-rgw/) : un changement
 S3 validé en léger **doit** être revalidé en Ceph avant prod.
 
 ## Re-validation from-scratch des deux bancs (2026-06-08)
 
 > **But** : confirmer **zéro drift résiduel** après les chantiers #158/#186, par
 > deux runs **from-scratch d'une traite** (banc détruit puis remonté), un par
-> profil ([ADR 0034](../../docs/decisions/0034-validation-e2e-from-scratch.md)).
+> profil
+> ([ADR 0034](/cluster/docs/decisions/0034-validation-e2e-from-scratch/)).
 
 Un **drift de plus** est apparu — précisément ce que cherche un from-scratch :
 
@@ -320,7 +321,7 @@ Un **drift de plus** est apparu — précisément ce que cherche un from-scratch
 > **L40 n'apparaît que sur le profil léger** (monitoring sans dataops, donc sans
 > registry) : les runs précédents montaient toujours le registry via `dataops`,
 > qui masquait le bug. Encore un drift qu'**un seul profil révèle** (cf.
-> [Leçons des Runs](../../docs/architecture/lecons-des-runs.md), cat. 7).
+> [Leçons des Runs](/cluster/docs/architecture/lecons-des-runs/), cat. 7).
 
 Verdicts (M3 Max, 8 GiB/VM, `multi-node-3` arm64, local) :
 
@@ -338,7 +339,7 @@ banc Ceph (profil RGW) — la stack monitoring passe de _montée_ à _éprouvée
 > **But** : rendre la chaîne DataOps (CNPG/Barman) **montable sans Ceph**, en la
 > découplant du RGW via un rôle S3 factorisé `platform-s3-bucket` (backing `rgw`
 > | `seaweedfs`,
-> [ADR 0036](../../docs/decisions/0036-backing-s3-unique-rgw.md)). Loki et CNPG
+> [ADR 0036](/cluster/docs/decisions/0036-backing-s3-unique-rgw/)). Loki et CNPG
 > partagent désormais cette brique (fin de la duplication OBC/creds).
 
 Validé e2e **sur les deux profils** (M3 Max, `multi-node-3` arm64, local) — le
@@ -350,8 +351,8 @@ refactor S3 ne casse pas le chemin prod (RGW) **et** débloque le banc léger :
 | Ceph   | **RGW** (OBC)             | ✅ idem (non-régression rgw), lineage 0→1     | ceph 3m09s · datalake 1m31s · dataops ~14m · monitoring ~3m |
 
 Drifts de cette campagne (détail :
-[`registre-drifts.yaml`](../../docs/architecture/registre-drifts.yaml)) :
-**L41** (storageClass registry/CNPG non aligné au profil → paramétré),
+[`registre-drifts.yaml`](https://github.com/univ-lehavre/cluster/blob/main/docs/architecture/registre-drifts.yaml))
+: **L41** (storageClass registry/CNPG non aligné au profil → paramétré),
 **L42/L43** (single-node : gate Dagster lent, éviction CNPG disque — _caducs_,
 topologie abandonnée ADR 0040), **L44** (dépendance à `WITH_CEPH` en variable
 d'env — _ouvert_ : dataops/monitoring devraient détecter le profil).
@@ -360,9 +361,10 @@ d'env — _ouvert_ : dataops/monitoring devraient détecter le profil).
 
 > **✅ Socle validé from-scratch en mode Ceph (2026-06-08), branche
 > `feat/banc-metrologie-cache`.** Première preuve consignée **automatiquement**
-> dans [`runs-history.yaml`](runs-history.yaml) par `run-phases.sh` (plus de
-> saisie manuelle). Log brut :
-> [`runs/2026-06-08-banc-metrologie-e2e.log`](runs/2026-06-08-banc-metrologie-e2e.log).
+> dans
+> [`runs-history.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/runs-history.yaml)
+> par `run-phases.sh` (plus de saisie manuelle). Log brut :
+> [`runs/2026-06-08-banc-metrologie-e2e.log`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/runs/2026-06-08-banc-metrologie-e2e.log).
 
 `NO_CACHE=1 WITH_CEPH=1 run-phases.sh all` — up → bootstrap → ceph → sc, monté
 de zéro (preuve ADR 0034) :
@@ -445,8 +447,9 @@ Drifts de cette campagne :
 > `NO_CACHE=1 run-phases.sh all` monté de zéro :
 > `up 169s → bootstrap 406s → storage-simple 13s → gitops 75s` (total **663s**,
 > profil local-path). Entrée appendée automatiquement dans
-> [`runs-history.yaml`](runs-history.yaml) — preuve ADR 0034/0042 (et validation
-> du correctif L49 : l'entrée est complète, pas tronquée).
+> [`runs-history.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/runs-history.yaml)
+> — preuve ADR 0034/0042 (et validation du correctif L49 : l'entrée est
+> complète, pas tronquée).
 
 ## Chemins d'installation + scénarios atlas (#237, 2026-06-09)
 
@@ -457,12 +460,12 @@ Drifts de cette campagne :
 > (total **1564s**, local-path, RAM pic 9191 MiB). Première exécution de l'ordre
 > **monitoring AVANT dataops** : SeaweedFS posé par monitoring, consommé par
 > dataops — ordre validé. Consigné dans
-> [`runs-history.yaml`](runs-history.yaml).
+> [`runs-history.yaml`](https://github.com/univ-lehavre/cluster/blob/main/bench/lima/runs-history.yaml).
 
 **Scénarios pertinents joués sur le banc `atlas` (9/9 PASS)** — preuve de
 comportement par-dessus les gates d'intégration (sous-ensemble applicable au
 profil local-path, cf.
-[plan de tests](../../docs/architecture/plan-de-tests.md)) :
+[plan de tests](/cluster/docs/architecture/plan-de-tests/)) :
 
 | #   | Scénario                     | Résultat                                            |
 | --- | ---------------------------- | --------------------------------------------------- |
@@ -730,7 +733,7 @@ remonté) avant correction — preuve qu'il valide bien le schéma du job.
 ## Outil déclaratif `cluster_topology` (depuis renommé `nestor`) — validation partielle sur banc vivant (P6, 2026-06-13)
 
 Première confrontation de l'outil déclaratif
-([ADR 0056](../../docs/decisions/0056-modele-declaratif-topologies.md), paliers
+([ADR 0056](/cluster/docs/decisions/0056-modele-declaratif-topologies/), paliers
 P0-P6) à un **banc Lima vivant** (3 nœuds `lima-cp1/node1/node2` Ready, k8s
 v1.34.8, API `127.0.0.1:6443` — kubeconfig `test/lima/.work/kubeconfig`,
 **jamais le contexte prod**). Décrit une topologie `multi-node-3` / `dataops` /

@@ -1,14 +1,14 @@
 # CloudNativePG
 
 PostgreSQL managé (socle DataOps, étape 1.6,
-[ADR 0024](../../docs/decisions/0024-postgres-manage-cloudnative-pg.md)). Un
+[ADR 0024](/cluster/docs/decisions/0024-postgres-manage-cloudnative-pg/)). Un
 cluster HA servant **deux usages** via deux bases logiques : l'**event log
 Dagster** (1.7) et l'**index pgvector** (recherche sémantique, chargé par
 atlas). Sauvegardes vers S3 via le **plugin Barman Cloud**.
 
 Géré par `kubectl apply` (comme les autres addons `platform/`), pas par Argo CD
 (anti-bootstrap-circulaire,
-[ADR 0022](../../docs/decisions/0022-argocd-gitops-applicatif.md)).
+[ADR 0022](/cluster/docs/decisions/0022-argocd-gitops-applicatif/)).
 
 ## Fichiers
 
@@ -30,7 +30,7 @@ Géré par `kubectl apply` (comme les autres addons `platform/`), pas par Argo C
    par les Image Volume Extensions (la voie pgvector sans image custom). Beta en
    K8s 1.33+ mais **NON activée par défaut**. Le bootstrap l'active (config
    kubeadm, rôle `k8s-initialization` — cf.
-   [ADR 0006](../../docs/decisions/0006-matrice-de-versions-et-politique-de-bump.md)).
+   [ADR 0006](/cluster/docs/decisions/0006-matrice-de-versions-et-politique-de-bump/)).
    Sans ce flag : `extension "vector" is not available`.
 3. Un **provisioner de stockage** (RWO) pour les PVC.
 
@@ -67,11 +67,11 @@ kubectl apply -f platform/cloudnative-pg/backup.yaml
 ## Adaptations
 
 - **Images épinglées par digest d'index multi-arch**
-  ([ADR 0006](../../docs/decisions/0006-matrice-de-versions-et-politique-de-bump.md)).
+  ([ADR 0006](/cluster/docs/decisions/0006-matrice-de-versions-et-politique-de-bump/)).
 - **3 instances HA** (1 primary + 2 replicas, réplication streaming).
 - **RBD réplication ×3, jamais EC 2+1** pour ce stateful
-  ([ADR 0001](../../docs/decisions/0001-replication-x3-pour-workloads-bloc.md) :
-  EC bloque l'I/O à la perte d'un hôte).
+  ([ADR 0001](/cluster/docs/decisions/0001-replication-x3-pour-workloads-bloc/)
+  : EC bloque l'I/O à la perte d'un hôte).
 - pgvector via **Image Volume Extension** (`cluster.yaml`
   `postgresql.extensions`) ; nom SQL de l'extension = **`vector`** (pas
   `pgvector`).
@@ -81,7 +81,8 @@ kubectl apply -f platform/cloudnative-pg/backup.yaml
 Sur le banc léger : Cluster `Healthy`, `CREATE EXTENSION vector` OK, colonne
 `vector(384)` + requête kNN (`<->`), base `dagster` créée, et **sauvegarde
 testée** (base + WAL archivés dans le bucket S3). Cf.
-[`bootstrap/state.sh`](../../bootstrap/state.sh) (section CloudNativePG).
+[`bootstrap/state.sh`](https://github.com/univ-lehavre/cluster/blob/main/bootstrap/state.sh)
+(section CloudNativePG).
 
 ## Régénérer les manifestes vendored
 
