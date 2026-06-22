@@ -1,11 +1,11 @@
 # 2026-06-22 — OpenSSF Best Practices Badge : answer-sheet « passing »
 
-| Champ       | Contenu                                                                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Date**    | 2026-06-22                                                                                                                                                               |
-| **Type**    | feuille de réponses opérationnelle — pour remplir le questionnaire **passing** du badge sur [best.openssf.org](https://www.bestpractices.dev/) (BadgeApp)                |
-| **Fonde**   | les quick-wins maturité de juin 2026 (Scorecard 4.9 → 6.4) + la migration doc Astro Starlight ([ADR 0089](../decisions/0089-migration-doc-vitepress-astro-starlight.md)) |
-| **Verdict** | **passing à 1 critère près** : ~49 Met, ~12 N/A légitimes, **1 Unmet** (`english`, un SHOULD non bloquant). `discussion` désormais Met (Discussions activées).           |
+| Champ       | Contenu                                                                                                                                                                    |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Date**    | 2026-06-22                                                                                                                                                                 |
+| **Type**    | feuille de réponses opérationnelle — pour remplir le questionnaire **passing** du badge sur [best.openssf.org](https://www.bestpractices.dev/) (BadgeApp)                  |
+| **Fonde**   | les quick-wins maturité de juin 2026 (Scorecard 4.9 → 6.4) + la migration doc Astro Starlight ([ADR 0089](../decisions/0089-migration-doc-vitepress-astro-starlight.md))   |
+| **Verdict** | **passing atteignable** : ~50 Met, ~12 N/A légitimes, **0 Unmet**. `discussion` Met (Discussions activées) ; `english` Met (encarts anglais README/CONTRIBUTING/SECURITY). |
 
 ## Comment s'en servir
 
@@ -43,21 +43,21 @@
 
 ## Basics
 
-| Critère                     | Réponse   | Justification / preuve                                                                                                                                                    |
-| --------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `description_good`          | Met       | README (`# Cluster`) + description repo « Installateur et réconciliateur sur kubernetes » + site doc.                                                                     |
-| `interact`                  | Met       | README « Par où commencer », `CONTRIBUTING.md`, issue templates, **GitHub Discussions activées**.                                                                         |
-| `contribution`              | Met       | `CONTRIBUTING.md` : process (branches, Conventional Commits, hooks, merge commit ADR 0037).                                                                               |
-| `contribution_requirements` | Met       | Exigences d'acceptation dans `CONTRIBUTING.md` § « Workflow de PR » (sujet minuscule, ≤100 col, hooks pre-push, merge commit). **URL** : `CONTRIBUTING.md#workflow-de-pr` |
-| `floss_license`             | Met       | `LICENSE` = MIT (FLOSS).                                                                                                                                                  |
-| `floss_license_osi`         | Met       | MIT = OSI-approved.                                                                                                                                                       |
-| `license_location`          | Met       | `LICENSE` + `NOTICE` à la racine.                                                                                                                                         |
-| `documentation_basics`      | Met       | Install (`bootstrap/RUNBOOK.md`), usage (`docs/se-brancher.md`), sécurité (`SECURITY.md`, `SAFEGUARDS.md`).                                                               |
-| `documentation_interface`   | Met       | Contrat versionné `contract/` (endpoints, StorageClasses) + `docs/guide-dev-data.md`.                                                                                     |
-| `sites_https`               | Met       | Site doc HTTPS (GitHub Pages, **Astro Starlight** depuis ADR 0089) ; repo GitHub HTTPS.                                                                                   |
-| `discussion`                | **Met**   | **GitHub Discussions activées** (`hasDiscussionsEnabled: true`) + issue tracker public searchable.                                                                        |
-| `english`                   | **Unmet** | Doc 100 % française. SHOULD non bloquant → cochable Met avec un encart anglais (README) + « reports in English welcome ». **Action restante.**                            |
-| `maintained`                | Met       | Activité quotidienne (releases régulières, issues traitées sous quelques jours).                                                                                          |
+| Critère                     | Réponse | Justification / preuve                                                                                                                                                                                                             |
+| --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `description_good`          | Met     | README (`# Cluster`) + description repo « Installateur et réconciliateur sur kubernetes » + site doc.                                                                                                                              |
+| `interact`                  | Met     | README « Par où commencer », `CONTRIBUTING.md`, issue templates, **GitHub Discussions activées**.                                                                                                                                  |
+| `contribution`              | Met     | `CONTRIBUTING.md` : process (branches, Conventional Commits, hooks, merge commit ADR 0037).                                                                                                                                        |
+| `contribution_requirements` | Met     | Exigences d'acceptation dans `CONTRIBUTING.md` § « Workflow de PR » (sujet minuscule, ≤100 col, hooks pre-push, merge commit). **URL** : `CONTRIBUTING.md#workflow-de-pr`                                                          |
+| `floss_license`             | Met     | `LICENSE` = MIT (FLOSS).                                                                                                                                                                                                           |
+| `floss_license_osi`         | Met     | MIT = OSI-approved.                                                                                                                                                                                                                |
+| `license_location`          | Met     | `LICENSE` + `NOTICE` à la racine.                                                                                                                                                                                                  |
+| `documentation_basics`      | Met     | Install (`bootstrap/RUNBOOK.md`), usage (`docs/se-brancher.md`), sécurité (`SECURITY.md`, `SAFEGUARDS.md`).                                                                                                                        |
+| `documentation_interface`   | Met     | Contrat versionné `contract/` (endpoints, StorageClasses) + `docs/guide-dev-data.md`.                                                                                                                                              |
+| `sites_https`               | Met     | Site doc HTTPS (GitHub Pages, **Astro Starlight** depuis ADR 0089) ; repo GitHub HTTPS.                                                                                                                                            |
+| `discussion`                | **Met** | **GitHub Discussions activées** (`hasDiscussionsEnabled: true`) + issue tracker public searchable.                                                                                                                                 |
+| `english`                   | Met     | Encart anglais (« English summary ») dans `README.md` + notes anglaises dans `CONTRIBUTING.md` et `SECURITY.md` : issues, PR et rapports de sécurité **en anglais acceptés**. La doc de fond reste française (langue de l'équipe). |
+| `maintained`                | Met     | Activité quotidienne (releases régulières, issues traitées sous quelques jours).                                                                                                                                                   |
 
 ## Change Control
 

@@ -5,6 +5,13 @@
 > Un cluster Kubernetes de recherche hyperconvergé — installation, stockage
 > distribué, chaîne DataOps et services transverses, racontés de bout en bout.
 
+> 🇬🇧 **English summary.** A self-hosted, hyperconverged research Kubernetes
+> cluster: provisioning, distributed storage (Rook-Ceph), a DataOps chain and
+> shared services, documented end to end. The documentation is written in French
+> (the maintaining team's language), but **issues, pull requests and security
+> reports written in English are welcome** — see
+> [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+
 <!-- Badges — doctrine ADR 0080 (docs/decisions/0080-notations-et-badges-readme.md) :
 n'afficher QUE ce qui mesure un état VRAI (dynamique câblé, ou statique factuel
 stable) ; GROUPER par thématique pour rendre visibles les familles revendiquées.
