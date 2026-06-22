@@ -2,11 +2,11 @@
 
 ## État
 
-> **État : Brouillon** (2026-06-22) · **Fonde :**
-> [ADR 0091](../decisions/0091-portail-acces-ui.md) (Proposed).
+> **État : Actif** (2026-06-22) · **Fonde :**
+> [ADR 0091](../decisions/0091-portail-acces-ui.md) (Accepted).
 
-Promotion `Brouillon → Actif` et `ADR 0091 Proposed → Accepted` au démarrage de
-l'étape 1 (ADR 0057 : pas d'implémentation tant que l'ADR est Proposed).
+Promu `Brouillon → Actif` (et ADR 0091 `Proposed → Accepted`) au démarrage de
+l'étape 1 — logique pure de croisement contrat ↔ état (ADR 0057).
 
 ## ADR fondateurs
 
@@ -103,7 +103,8 @@ l'étape 1 (ADR 0057 : pas d'implémentation tant que l'ADR est Proposed).
 
 ## Suivi
 
-- [ ] Étape 1 — logique pure + tests
+- [x] Étape 1 — logique pure + tests (`nestor/portal.py`,
+      `tests/test_portal.py`)
 - [ ] Étape 2 — serveur + image
 - [ ] Étape 3 — Deployment + RBAC + NetworkPolicy (RBAC sans secrets prouvé)
 - [ ] Étape 4 — Gateway hostNetwork (portail joignable au banc)

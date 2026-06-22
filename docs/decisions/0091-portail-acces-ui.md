@@ -2,9 +2,10 @@
 
 ## Statut
 
-Proposed (2026-06-22) — mise en œuvre **incrémentale** suivie par
-[`plan-portail.md`](../plans/plan-portail.md) (promotion Proposed→Accepted au
-démarrage de l'implémentation).
+Accepted (2026-06-22) — mise en œuvre **incrémentale** suivie par
+[`plan-portail.md`](../plans/plan-portail.md) (promu `Proposed → Accepted` au
+démarrage de l'implémentation, étape 1 : logique pure de croisement contrat ↔
+état).
 
 Suite directe de l'[ADR 0048](0048-acces-local-developpeur.md) (accès local
 développeur, aujourd'hui CLI banc-only) et de
