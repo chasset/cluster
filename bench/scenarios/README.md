@@ -63,7 +63,9 @@ bench/scenarios/
 ├── 27-gitops-workflow-deploy.sh      ← INTÉGRATION : push Gitea → Argo CD → workflows atlas → lineage (#231)
 ├── 28-ui-reachable.sh                 ← PORTAIL : UIs joignables via le Gateway Cilium + TLS (#232)
 ├── 29-codelocation-externe.sh        ← INTÉGRATION : code-location externe (image+job) → run → lineage+S3 (#264)
-└── 30-ha-3cp-cp-survival.sh           ← HA : survie à 1 panne CP (VIP bascule + quorum etcd, ADR 0047/0055, #250)
+├── 30-ha-3cp-cp-survival.sh           ← HA : survie à 1 panne CP (VIP bascule + quorum etcd, ADR 0047/0055, #250)
+├── 31-contract-endpoints.sh          ← CONTRAT : endpoints du contrat réellement servis (ADR 0043)
+└── 32-portal.sh                      ← PORTAIL : répond, liste les UI, NE PEUT PAS lire un Secret (ADR 0091)
 ```
 
 Chaque script :

@@ -116,7 +116,7 @@ consolidée, pour juger en 5 min : [docs/preuves.md](docs/preuves.md).
 - **91 ADR** (82 Accepted, 7 Proposed, 2 Superseded)
 - **11 plans** vivants (4 Achevé, 5 Actif, 2 Brouillon)
 - **59 drifts** indexés (3 caduc, 53 corrige, 1 en-cours, 2 ouvert)
-- **31 scénarios** E2E reproductibles
+- **32 scénarios** E2E reproductibles
 
 <!-- STATS:FIN -->
 

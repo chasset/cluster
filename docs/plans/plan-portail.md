@@ -113,6 +113,7 @@ l'étape 1 — logique pure de croisement contrat ↔ état (ADR 0057).
 - [x] Étape 4 — Gateway hostNetwork (`platform/portal/gateway.yaml`,
       `portail.cluster.lan`)
 - [x] Étape 5 — intégration contrat (`portal-ui`) + README brique
-- [ ] Étape 6 — preuve e2e au banc + bascule prod (banc à monter : build image,
-      `kubectl apply`, sonder `portail.cluster.lan`, `auth can-i get secrets` →
-      no)
+- [~] Étape 6 — scénario e2e ÉCRIT (`bench/scenarios/32-portal.sh` : pod Ready +
+  /healthz, page liste les UI, `auth can-i get secrets` → no) ; PREUVE
+  d'exécution au banc en attente (banc à monter : build image, `kubectl apply`,
+  `ONLY='28 32' run-all.sh`), puis bascule prod.
